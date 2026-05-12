@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { Trophy, Sparkles } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/premios")({ component: Page });
