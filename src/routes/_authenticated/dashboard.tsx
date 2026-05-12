@@ -25,12 +25,12 @@ function Dashboard() {
         title={`${saud}, ${nome}.`}
         description="O que se passa no bairro, agora."
       />
-      {error && <p className="text-destructive text-sm">Erro: {(error as Error).message}</p>}
+      {error && <p className="text-destructive text-sm">Caiu qualquer coisa: {(error as Error).message}</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Membros" value={data?.totalMembers} loading={isLoading} accent />
+        <Kpi label="Gente da casa" value={data?.totalMembers} loading={isLoading} accent />
         <Kpi label="Saídas em aberto" value={data?.openSaidas} loading={isLoading} />
-        <Kpi label="Tags pendentes" value={data?.pendingTagRequests} loading={isLoading} />
-        <Kpi label="Stock total" value={data?.totalStock} loading={isLoading} />
+        <Kpi label="Tags por tratar" value={data?.pendingTagRequests} loading={isLoading} />
+        <Kpi label="Stock no armazém" value={data?.totalStock} loading={isLoading} />
       </div>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
