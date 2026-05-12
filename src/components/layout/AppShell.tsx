@@ -1,9 +1,11 @@
 import { TopNav } from "./TopNav";
 import type { ReactNode } from "react";
+import { CinematicBackdrop } from "./CinematicBackdrop";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="ambient-bg min-h-screen">
+      <CinematicBackdrop />
       <div className="hairline-top sticky top-0 z-50" />
       <TopNav />
       <main className="mx-auto max-w-7xl px-4 py-10 animate-rise">{children}</main>

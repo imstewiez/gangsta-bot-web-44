@@ -124,49 +124,11 @@
   background-size: 4px 4px;
 }
 
-/* Ambient cinematic backdrop — applied directly to <html> for true full-bleed */
-html {
-  background-color: var(--background);
-  background-image:
-    radial-gradient(ellipse 80% 60% at 8% -10%, color-mix(in oklab, var(--primary) 38%, transparent) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 55% at 105% 15%, color-mix(in oklab, var(--blood) 28%, transparent) 0%, transparent 60%),
-    radial-gradient(ellipse 65% 50% at 95% 105%, color-mix(in oklab, var(--primary) 32%, transparent) 0%, transparent 60%),
-    radial-gradient(ellipse 55% 45% at -5% 90%, color-mix(in oklab, var(--blood) 22%, transparent) 0%, transparent 60%),
-    linear-gradient(180deg, oklch(0.10 0.012 25) 0%, oklch(0.13 0.014 25) 50%, oklch(0.09 0.010 25) 100%);
-  background-attachment: fixed;
-  background-repeat: no-repeat;
-}
-
+/* The cinematic backdrop is rendered by <CinematicBackdrop /> as a fixed layer.
+   .ambient-bg is now just a positioning context. */
 .ambient-bg {
   position: relative;
   isolation: isolate;
-}
-/* Floating animated red orbs */
-.ambient-bg::before {
-  content: "";
-  position: fixed;
-  inset: -10%;
-  pointer-events: none;
-  z-index: -1;
-  background:
-    radial-gradient(circle 380px at 20% 30%, color-mix(in oklab, var(--primary) 35%, transparent) 0%, transparent 70%),
-    radial-gradient(circle 460px at 85% 75%, color-mix(in oklab, var(--blood) 30%, transparent) 0%, transparent 70%),
-    radial-gradient(circle 300px at 60% 10%, color-mix(in oklab, var(--primary) 22%, transparent) 0%, transparent 70%);
-  filter: blur(30px);
-  animation: drift 22s ease-in-out infinite alternate;
-}
-/* Grid + grain + vignette overlay */
-.ambient-bg::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  background:
-    linear-gradient(color-mix(in oklab, var(--primary) 6%, transparent) 1px, transparent 1px) 0 0 / 100% 56px,
-    linear-gradient(90deg, color-mix(in oklab, var(--primary) 6%, transparent) 1px, transparent 1px) 0 0 / 56px 100%,
-    radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.035) 1px, transparent 0) 0 0 / 3px 3px,
-    radial-gradient(ellipse 100% 80% at 50% 50%, transparent 40%, oklch(0 0 0 / 0.75) 100%);
 }
 
 @keyframes drift {
