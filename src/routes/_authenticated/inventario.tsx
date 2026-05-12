@@ -205,9 +205,12 @@ function StockTable() {
       </Card>
     );
 
-  const ordered = Object.entries(groups).sort(
-    (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50),
-  );
+  // Ordena categorias por valor total decrescente
+  const ordered = Object.entries(groups).sort((a, b) => {
+    const valA = a[1].reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
+    const valB = b[1].reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
+    return valB - valA;
+  });
 
   return (
     <div className="space-y-6">
@@ -252,7 +255,7 @@ function StockTable() {
                 <tbody>
                   {items
                     .slice()
-                    .sort((a, b) => (b.qty ?? 0) - (a.qty ?? 0))
+                    .sort((a, b) => (b.unit_price ?? 0) - (a.unit_price ?? 0))
                     .map((r) => {
                       const low = r.qty <= 0;
                       const warn = r.qty > 0 && r.qty < 5;
