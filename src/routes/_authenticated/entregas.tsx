@@ -102,8 +102,8 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
           <div className="flex items-start gap-4">
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
-                  {tipoMeta.emoji} {tipoMeta.label}
+                <span className={"inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
+                  <tipoMeta.Icon className="h-3 w-3" /> {tipoMeta.label}
                 </span>
                 <span className="font-semibold">{d.requester_name ?? "—"}</span>
                 <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
