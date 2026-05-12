@@ -9,38 +9,173 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/tops'
+import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
+import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
+import { Route as AuthenticatedInventarioRouteImport } from './routes/_authenticated/inventario'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCemiterioRouteImport } from './routes/_authenticated/cemiterio'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros.$id'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTopsRoute = AuthenticatedTopsRouteImport.update({
+  id: '/tops',
+  path: '/tops',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOperacoesRoute = AuthenticatedOperacoesRouteImport.update({
+  id: '/operacoes',
+  path: '/operacoes',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMembrosRoute = AuthenticatedMembrosRouteImport.update({
+  id: '/membros',
+  path: '/membros',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedInventarioRoute = AuthenticatedInventarioRouteImport.update({
+  id: '/inventario',
+  path: '/inventario',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCemiterioRoute = AuthenticatedCemiterioRouteImport.update({
+  id: '/cemiterio',
+  path: '/cemiterio',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMembrosIdRoute = AuthenticatedMembrosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedMembrosRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/admin': typeof AuthenticatedAdminRoute
+  '/cemiterio': typeof AuthenticatedCemiterioRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inventario': typeof AuthenticatedInventarioRoute
+  '/membros': typeof AuthenticatedMembrosRouteWithChildren
+  '/operacoes': typeof AuthenticatedOperacoesRoute
+  '/tops': typeof AuthenticatedTopsRoute
+  '/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/admin': typeof AuthenticatedAdminRoute
+  '/cemiterio': typeof AuthenticatedCemiterioRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inventario': typeof AuthenticatedInventarioRoute
+  '/membros': typeof AuthenticatedMembrosRouteWithChildren
+  '/operacoes': typeof AuthenticatedOperacoesRoute
+  '/tops': typeof AuthenticatedTopsRoute
+  '/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/cemiterio': typeof AuthenticatedCemiterioRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/inventario': typeof AuthenticatedInventarioRoute
+  '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
+  '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
+  '/_authenticated/tops': typeof AuthenticatedTopsRoute
+  '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/admin'
+    | '/cemiterio'
+    | '/dashboard'
+    | '/inventario'
+    | '/membros'
+    | '/operacoes'
+    | '/tops'
+    | '/membros/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/admin'
+    | '/cemiterio'
+    | '/dashboard'
+    | '/inventario'
+    | '/membros'
+    | '/operacoes'
+    | '/tops'
+    | '/membros/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/login'
+    | '/_authenticated/admin'
+    | '/_authenticated/cemiterio'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/inventario'
+    | '/_authenticated/membros'
+    | '/_authenticated/operacoes'
+    | '/_authenticated/tops'
+    | '/_authenticated/membros/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +183,104 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/tops': {
+      id: '/_authenticated/tops'
+      path: '/tops'
+      fullPath: '/tops'
+      preLoaderRoute: typeof AuthenticatedTopsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/operacoes': {
+      id: '/_authenticated/operacoes'
+      path: '/operacoes'
+      fullPath: '/operacoes'
+      preLoaderRoute: typeof AuthenticatedOperacoesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/membros': {
+      id: '/_authenticated/membros'
+      path: '/membros'
+      fullPath: '/membros'
+      preLoaderRoute: typeof AuthenticatedMembrosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/inventario': {
+      id: '/_authenticated/inventario'
+      path: '/inventario'
+      fullPath: '/inventario'
+      preLoaderRoute: typeof AuthenticatedInventarioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/cemiterio': {
+      id: '/_authenticated/cemiterio'
+      path: '/cemiterio'
+      fullPath: '/cemiterio'
+      preLoaderRoute: typeof AuthenticatedCemiterioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/membros/$id': {
+      id: '/_authenticated/membros/$id'
+      path: '/$id'
+      fullPath: '/membros/$id'
+      preLoaderRoute: typeof AuthenticatedMembrosIdRouteImport
+      parentRoute: typeof AuthenticatedMembrosRoute
+    }
   }
 }
 
+interface AuthenticatedMembrosRouteChildren {
+  AuthenticatedMembrosIdRoute: typeof AuthenticatedMembrosIdRoute
+}
+
+const AuthenticatedMembrosRouteChildren: AuthenticatedMembrosRouteChildren = {
+  AuthenticatedMembrosIdRoute: AuthenticatedMembrosIdRoute,
+}
+
+const AuthenticatedMembrosRouteWithChildren =
+  AuthenticatedMembrosRoute._addFileChildren(AuthenticatedMembrosRouteChildren)
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedCemiterioRoute: typeof AuthenticatedCemiterioRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInventarioRoute: typeof AuthenticatedInventarioRoute
+  AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
+  AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
+  AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedCemiterioRoute: AuthenticatedCemiterioRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInventarioRoute: AuthenticatedInventarioRoute,
+  AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
+  AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
+  AuthenticatedTopsRoute: AuthenticatedTopsRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
