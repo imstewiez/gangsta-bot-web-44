@@ -24,15 +24,10 @@ const GROUPS: Record<string, CatMeta> = {
   carregadores: { label: "Carregadores", tone: "primary", order: 3 },
   acessorios_armas: { label: "Acessórios de armas", tone: "info", order: 4 },
   drogas: { label: "Drogas", tone: "success", order: 5 },
-  craft_armas: {
-    label: "Craft de armas (peças, corpos, ferro, prints)",
-    tone: "primary",
-    order: 7,
-  },
-  craft_carregadores: {
-    label: "Craft de carregadores (cobre, pólvora)",
+  materiais_craft: {
+    label: "Materiais de Craft",
     tone: "muted",
-    order: 8,
+    order: 6,
   },
 };
 
@@ -44,17 +39,29 @@ function classifyRow(r: {
   const c = (r.category ?? "").toLowerCase();
   const n = (r.item_name ?? "").toLowerCase();
 
-  // Drogas
+  // === EXPLICITAMENTE NÃO GUARDAMOS ===
+  // Lixo, madeiras, borracha, tecido, papel, couro, kevlar, ferro, carvão, armas brancas
+  const lixo = /r[áa]dio|telem[oó]vel|sucata|lixo|pl[áa]stico|pe[çc]as estragadas/;
+  const madeiras = /serradura|t[áa]bua|taninos/;
+  const outras_primas = /borracha|tecido|papel|couro|kevlar/;
+  const min_nao_craft = /\bferro\b|\bcarv[aã]o\b/;
+  const armas_brancas =
+    /adaga|taco|garrafa|crowbar|clube|machado|chave de tubo|bast[aã]o|canivete|machete|faca|soqueira/;
+
+  if (lixo.test(n) || madeiras.test(n) || outras_primas.test(n) || min_nao_craft.test(n))
+    return null;
+  if (c === "armas_brancas" || armas_brancas.test(n)) return null;
+  if (c === "lixo" || c === "madeiras" || c === "coletes") return null;
+
+  // === DROGAS ===
   if (
     c === "drogas" ||
-    /coca|metanfetamina|meta\b|erva|maconha|haxixe|ecstasy|lsd|heroina|opio/.test(
-      n,
-    )
+    /cabe[çc]os|haxixe|erva|meth|meta\b|metanfetamina|maconha|coca[ií]na|op[ií]o/.test(n)
   ) {
     return "drogas";
   }
 
-  // Carregadores
+  // === CARREGADORES ===
   if (
     c === "municoes" ||
     c === "municao" ||
@@ -63,53 +70,40 @@ function classifyRow(r: {
     return "carregadores";
   }
 
-  // Acessórios de armas: silenciador, mira, lanterna, punho, etc.
+  // === ACESSÓRIOS ===
   if (
     c === "acessorios" ||
-    /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano/.test(
-      n,
-    )
+    /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano|grip|muzzle|barrel|extensivo|mag expandido/.test(n)
   ) {
     return "acessorios_armas";
   }
 
-  // Material craft armas
+  // === MATERIAIS DE CRAFT ===
   if (
-    /\b(pe[çc]a|pe[çc]as|corpo|corpos)\b|\bferro\b|\bprint\b|\bprints\b|esquema/.test(
-      n,
-    )
+    /\b(pe[çc]a|pe[çc]as)\b|\ba[çc]o\b|\bcorpo\b|\bcorpos\b|\bprint\b|\bprints\b/.test(n)
   ) {
-    return "craft_armas";
+    return "materiais_craft";
   }
-
-  // Material craft carregadores
   if (/\bcobre\b|\bp[oó]lvora\b/.test(n)) {
-    return "craft_carregadores";
+    return "materiais_craft";
   }
 
-  // Armas
-  if (c === "armas" || c === "armas_fogo" || c === "armas_brancas") {
+  // === ARMAS ===
+  if (c === "armas" || c === "armas_fogo") {
+    // Orange tier
     if (
-      c === "armas_brancas" ||
-      /faca|machete|katana|taco|cassetete|martelo|punh[aã]l|navalha/.test(n)
+      /sns|xm3|mini smg|micro smg|machine pistol|tec pistol|ap pistol|assault shotgun|heavy shotgun|compact rifle|gusenberg/.test(n)
     ) {
-      // Bairro não trabalha com armas brancas — esconder do armazém.
-      return null;
-    }
-    if (/compact|drako|sns|xm3/.test(n)) return "armas_orange";
-    if (
-      /red|ak\b|m4|sniper|fuzil|shotgun|caçadeira|cacadeira|g36|scar|fal/.test(
-        n,
-      )
-    )
-      return "armas_red";
-    if (
-      /pistola|glock|deagle|desert|colt|revolver|revólver|beretta|usp|uzi|mp5|mp7|smg|p90|vector/.test(
-        n,
-      )
-    )
       return "armas_orange";
-    return "armas_red";
+    }
+    // Red tier
+    if (
+      /heavy pistol|\.50\b|p90|pdw|bullpup|carabina|revolver|gadget|assault rifle|sniper|fuzil/.test(n)
+    ) {
+      return "armas_red";
+    }
+    // Default para armas não reconhecidas
+    return "armas_orange";
   }
 
   // Tudo o resto não interessa ao armazém
