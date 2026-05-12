@@ -76,6 +76,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           content:
             "Painel de gestão da Firma RedWood — onboarding, hierarquia, inventário, saídas, tops.",
         },
+        { property: "og:title", content: "Firma RedWood — Bairro" },
+        { name: "twitter:title", content: "Firma RedWood — Bairro" },
+        { name: "description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
+        { property: "og:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
+        { name: "twitter:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
+        { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
+        { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { property: "og:type", content: "website" },
       ],
       links: [
         { rel: "stylesheet", href: appCss },
