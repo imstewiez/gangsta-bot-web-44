@@ -9,6 +9,7 @@ import { ROLE_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
 import { Users } from "lucide-react";
+import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/membros/")({ component: Page });
 
@@ -53,7 +54,9 @@ function Page() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">A carregar…</td></tr>}
+            {isLoading && (
+              <TableRowsSkeleton rows={8} cols={6} widths={["w-40", "w-24", "w-28", "w-16", "w-24", "w-20"]} />
+            )}
             {sorted.map((m) => (
               <tr key={m.id} className="border-t border-border hover:bg-accent/30">
                 <td className="px-3 py-2">

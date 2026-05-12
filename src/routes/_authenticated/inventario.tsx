@@ -10,6 +10,10 @@ import { fmtNum, fmtMoney, fmtDate, formatMovementType, prettyItemName } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
+import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
   beforeLoad: async () => {
