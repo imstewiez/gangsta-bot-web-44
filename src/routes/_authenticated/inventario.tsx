@@ -129,9 +129,9 @@ function StockTable() {
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
 
-  // group by category
+  // group by visual category
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
-    const k = r.category ?? "outros";
+    const k = classifyRow(r);
     (acc[k] ||= []).push(r);
     return acc;
   }, {});
@@ -144,38 +144,51 @@ function StockTable() {
       </Card>
     );
 
+  const ordered = Object.entries(groups).sort(
+    (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50)
+  );
+
   return (
     <div className="space-y-6">
-      {Object.entries(groups).map(([cat, items]) => {
+      {ordered.map(([cat, items]) => {
+        const meta = GROUPS[cat] ?? GROUPS.outros;
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
+        const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
         return (
-          <section key={cat}>
-            <div className="mb-2 flex items-baseline justify-between">
-              <h2 className="text-display text-sm uppercase tracking-widest text-muted-foreground">
-                {CAT_LABEL[cat] ?? cat}
-              </h2>
-              <span className="text-display text-xs text-muted-foreground">
-                {items.length} refs · <span className="text-foreground">{fmtNum(total)}</span> em casa
+          <section key={cat} className="overflow-hidden rounded-sm border border-border bg-card">
+            <header
+              className={
+                "flex items-center justify-between gap-3 border-b px-4 py-2.5 " +
+                TONE_BG[meta.tone]
+              }
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg leading-none">{meta.emoji}</span>
+                <h2 className="text-display text-sm uppercase tracking-widest">
+                  {meta.label}
+                </h2>
+              </div>
+              <span className="text-display text-[11px] tracking-wider opacity-90">
+                {items.length} refs · {fmtNum(total)} em casa · {fmtNum(Math.round(value))} €
               </span>
-            </div>
-            <div className="overflow-hidden rounded-sm border border-border">
-              <table className="w-full text-sm">
-                <thead className="bg-secondary text-display text-xs">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Item</th>
-                    <th className="px-3 py-2 text-right">Em casa</th>
-                    <th className="px-3 py-2 text-right">Preço</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((r) => {
+            </header>
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50 text-display text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Item</th>
+                  <th className="px-3 py-2 text-right">Em casa</th>
+                  <th className="px-3 py-2 text-right">Preço unid.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items
+                  .slice()
+                  .sort((a, b) => (b.qty ?? 0) - (a.qty ?? 0))
+                  .map((r) => {
                     const low = r.qty <= 0;
                     const warn = r.qty > 0 && r.qty < 5;
                     return (
-                      <tr
-                        key={r.item_id}
-                        className="border-t border-border hover:bg-accent/30"
-                      >
+                      <tr key={r.item_id} className="border-t border-border hover:bg-accent/30">
                         <td className="px-3 py-2 font-medium">{r.item_name}</td>
                         <td
                           className={
@@ -191,9 +204,8 @@ function StockTable() {
                       </tr>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+              </tbody>
+            </table>
           </section>
         );
       })}
