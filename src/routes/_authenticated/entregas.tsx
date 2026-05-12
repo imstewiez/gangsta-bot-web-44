@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Check, X, PackageOpen, Package, Coins } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
 
@@ -82,7 +83,7 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (list.isLoading) return <p className="text-muted-foreground">A puxar entregas…</p>;
+  if (list.isLoading) return <div className="grid gap-3"><CardGridSkeleton count={4} /></div>;
   if (!list.data?.length)
     return (
       <Card className="p-10 text-center">

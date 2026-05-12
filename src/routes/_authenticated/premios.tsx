@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { Trophy, Sparkles } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/premios")({ component: Page });
@@ -45,7 +46,7 @@ function Page() {
         action={isAdmin ? <Button size="sm" onClick={() => gen.mutate()} disabled={gen.isPending}><Sparkles className="mr-1 h-4 w-4" />Gerar para a semana</Button> : null}
       />
       <div className="space-y-2">
-        {prizes.isLoading && <p className="text-muted-foreground">A carregar…</p>}
+        {prizes.isLoading && <CardGridSkeleton count={3} />}
         {(prizes.data ?? []).map((p) => (
           <div key={p.id} className="flex items-center gap-4 rounded-sm border border-border bg-card p-4">
             <Trophy className="h-5 w-5 text-primary" />

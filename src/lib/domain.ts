@@ -244,7 +244,10 @@ export function formatSaidaStatus(s: string | null | undefined): string {
   return SAIDA_STATUS_LABELS[s] ?? s;
 }
 
+// Fonte única de verdade para nomes de eventos da Auditoria.
+// Cobre verbos genéricos + eventos específicos do bairro.
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  // verbos genéricos
   create: "Criou",
   update: "Atualizou",
   delete: "Apagou",
@@ -256,11 +259,78 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   demote: "Despromoveu",
   role_change: "Mudou cargo",
   notify: "Notificou",
+
+  // membros
+  member_promoted: "Promoção",
+  member_demoted: "Despromoção",
+  member_kicked: "Expulsão",
+  member_joined: "Entrada no bairro",
+  member_renamed: "Renomeação",
+  member_tier_set: "Tier alterado",
+  member_stats_adjusted: "Stats ajustadas",
+
+  // encomendas
+  order_new: "Encomenda criada",
+  order_created: "Encomenda criada",
+  order_approved: "Encomenda aceite",
+  order_denied: "Encomenda recusada",
+  order_fulfilled: "Encomenda entregue",
+  order_cancelled: "Encomenda cancelada",
+
+  // entregas / inventário
+  delivery_created: "Entrega registada",
+  inventory_in: "Entrada de stock",
+  inventory_out: "Saída de stock",
+
+  // saídas
+  operation_created: "Saída planeada",
+  operation_started: "Saída iniciada",
+  operation_finalized: "Saída finalizada",
+  operation_closed: "Saída fechada",
+
+  // prémios
+  prize_set: "Prémio definido",
+  prize_delivered: "Prémio entregue",
+
+  // ranking / sistema
+  rankings_recompute: "Ranking recalculado",
+
+  // tags
+  tag_request: "Pedido de tag",
+  tag_approved: "Tag aprovada",
+  tag_denied: "Tag recusada",
 };
 
 export function formatAuditAction(a: string | null | undefined): string {
   if (!a) return "—";
   return AUDIT_ACTION_LABELS[a] ?? a.replace(/_/g, " ");
+}
+
+// ───────── Categorias de itens (PT-PT bonito) ─────────
+// Transforma slugs internos (ex: "armas_red", "drogas") em labels apresentáveis.
+export const CATEGORY_LABELS: Record<string, string> = {
+  armas: "Armas",
+  armas_red: "Armas",
+  municoes: "Munições",
+  municao: "Munições",
+  carregadores: "Carregadores",
+  coletes: "Coletes",
+  acessorios: "Acessórios",
+  drogas: "Drogas",
+  consumiveis: "Consumíveis",
+  materiais: "Materiais",
+  veiculos: "Veículos",
+  outros: "Outros",
+};
+
+export function formatCategoryLabel(c: string | null | undefined): string {
+  if (!c) return "Outros";
+  const key = c.toLowerCase().trim();
+  if (CATEGORY_LABELS[key]) return CATEGORY_LABELS[key];
+  // fallback: capitalizar e tirar underscores
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b([a-záéíóúâêîôûãõç])/gi, (m) => m.toUpperCase());
 }
 
 // "Embeleza" nomes de itens vindos da DB — capitaliza palavras e arruma espaços.

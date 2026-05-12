@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { fmtDate, fmtMoney, formatOrderStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, ShoppingBag } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
 
@@ -101,7 +102,7 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (orders.isLoading) return <p className="text-muted-foreground">A puxar pedidos…</p>;
+  if (orders.isLoading) return <div className="grid gap-3"><CardGridSkeleton count={4} /></div>;
   if (!orders.data?.length)
     return (
       <Card className="p-10 text-center">

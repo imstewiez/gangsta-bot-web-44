@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { useState } from "react";
 import { CalendarClock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/disponibilidade")({ component: Page });
 
@@ -27,7 +28,13 @@ function Page() {
         <Card>
           <CardHeader><CardTitle className="text-display text-sm">Sessões</CardTitle></CardHeader>
           <CardContent className="space-y-1">
-            {sessions.isLoading && <p className="text-muted-foreground text-sm">A carregar…</p>}
+            {sessions.isLoading && (
+              <div className="space-y-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            )}
             {(sessions.data ?? []).map((s) => (
               <button key={s.id} onClick={() => setOpenId(s.id)}
                 className={"flex w-full items-center gap-3 rounded-sm border px-3 py-2 text-left text-sm " +
@@ -47,7 +54,13 @@ function Page() {
           <CardHeader><CardTitle className="text-display text-sm">Votos {openId ? `(sessão #${openId})` : ""}</CardTitle></CardHeader>
           <CardContent>
             {!openId && <p className="text-sm text-muted-foreground">Escolhe uma sessão.</p>}
-            {openId && votes.isLoading && <p className="text-sm text-muted-foreground">A carregar…</p>}
+            {openId && votes.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-3/4" />
+              </div>
+            )}
             {openId && votes.data && (
               <div className="space-y-3">
                 {votes.data.slots.map((s) => {
