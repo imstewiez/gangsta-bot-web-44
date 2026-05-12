@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
+import { resolveCurrentMember } from "./pricing.server";
 
 export type RecipeRow = {
   recipe_id: number;
