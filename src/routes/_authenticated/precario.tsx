@@ -22,7 +22,6 @@ const COMPRA_GROUPS: { key: string; label: string }[] = [
 ];
 
 const VENDA_GROUPS: { key: string; label: string }[] = [
-  { key: "armas_brancas", label: "Armas brancas" },
   { key: "armas_orange", label: "Armas Orange" },
   { key: "armas_red", label: "Armas Red" },
   { key: "carregadores", label: "Carregadores" },
