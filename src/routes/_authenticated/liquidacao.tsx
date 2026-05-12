@@ -6,7 +6,7 @@ import { listUnfinalizedSaidas, getSaidaDetail, liquidateSaida } from "@/lib/liq
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtNum } from "@/lib/domain";
+import { fmtDate, fmtNum, fmtMoney, formatSaidaStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { CheckCircle2, FileSearch } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +39,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["liq:list"] });
       qc.invalidateQueries({ queryKey: ["liq:detail"] });
       qc.invalidateQueries({ queryKey: ["saidas"] });
-      toast.success(`Liquidada · Net ${fmtNum(Math.round(r.net))} €`);
+      toast.success(`Liquidada · Net ${fmtMoney(Math.round(r.net))}`);
       setOpenId(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -58,7 +58,7 @@ function Page() {
             <div className="flex-1">
               <div className="font-medium">{s.operation_type ?? "Saída"} · {s.spot ?? "—"}</div>
               <div className="text-xs text-muted-foreground">
-                {fmtDate(s.scheduled_at)} · {s.participants} participantes · {s.status}
+                {fmtDate(s.scheduled_at)} · {s.participants} participantes · {formatSaidaStatus(s.status)}
               </div>
             </div>
             <Button size="sm" variant="outline" onClick={() => setOpenId(s.id)}>
@@ -78,10 +78,10 @@ function Page() {
               <div className="grid grid-cols-2 gap-2 rounded-sm border border-border bg-muted/30 p-3 text-xs md:grid-cols-3">
                 <div>Tipo: <strong>{detail.data.operation.operation_type ?? "—"}</strong></div>
                 <div>Spot: <strong>{detail.data.operation.spot ?? "—"}</strong></div>
-                <div>Status: <strong>{detail.data.operation.status}</strong></div>
-                <div>Fornecido: {fmtNum(Math.round(detail.data.operation.supplied_value))} €</div>
-                <div>Retornado: {fmtNum(Math.round(detail.data.operation.returned_value))} €</div>
-                <div>Net atual: {fmtNum(Math.round(detail.data.operation.net_value))} €</div>
+                <div>Status: <strong>{formatSaidaStatus(detail.data.operation.status)}</strong></div>
+                <div>Fornecido: {fmtMoney(Math.round(detail.data.operation.supplied_value))}</div>
+                <div>Retornado: {fmtMoney(Math.round(detail.data.operation.returned_value))}</div>
+                <div>Net atual: {fmtMoney(Math.round(detail.data.operation.net_value))}</div>
               </div>
               <div>
                 <div className="text-display text-xs text-muted-foreground mb-1">Participantes ({detail.data.participants.length})</div>
@@ -95,8 +95,8 @@ function Page() {
                         <tr key={p.id} className="border-t border-border/40">
                           <td className="px-2 py-1">{p.member_name ?? `#${p.member_id}`}</td>
                           <td className="px-2 py-1 text-center">{p.kills}/{p.deaths_count}</td>
-                          <td className={"px-2 py-1 text-center " + (p.net_material_delta >= 0 ? "text-emerald-500" : "text-red-500")}>
-                            {fmtNum(Math.round(p.net_material_delta))} €
+                          <td className={"px-2 py-1 text-center " + (p.net_material_delta >= 0 ? "text-success" : "text-destructive")}>
+                            {fmtMoney(Math.round(p.net_material_delta))}
                           </td>
                           <td className="px-2 py-1 text-center">{p.settled ? "✓" : "—"}</td>
                         </tr>
@@ -110,7 +110,7 @@ function Page() {
                 <div className="max-h-32 overflow-auto rounded-sm border border-border text-xs">
                   {detail.data.materials.map((m) => (
                     <div key={m.id} className="flex justify-between border-b border-border/40 px-2 py-1 last:border-0">
-                      <span>{m.item_name ?? `#${m.item_id}`}</span>
+                      <span>{prettyItemName(m.item_name) ?? `#${m.item_id}`}</span>
                       <span className="text-muted-foreground">{m.direction} · {m.quantity}</span>
                     </div>
                   ))}
