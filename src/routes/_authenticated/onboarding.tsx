@@ -44,7 +44,7 @@ function Page() {
   });
   return (
     <>
-      <PageHeader eyebrow="Chefia" title="Onboarding" description="Pedidos de tag." />
+      <PageHeader eyebrow="Chefia" title="Onboarding" description="Pedidos de tag." icon={UserPlus} />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>{["pending", "approved", "denied", "all"].map((s) => <TabsTrigger key={s} value={s}>{s}</TabsTrigger>)}</TabsList>
       </Tabs>
