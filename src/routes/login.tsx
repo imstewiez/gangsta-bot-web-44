@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import redwoodLogo from "@/assets/redwood-logo.png";
+import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -38,18 +39,19 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background bg-grain">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
-        <Link to="/" className="mb-10 flex items-center gap-3 self-start">
-          <img src={redwoodLogo} alt="RedWood" className="h-11 w-11 rounded-sm object-contain drop-shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_60%,transparent)]" />
-          <span className="text-display text-sm tracking-[0.25em]">Firma RedWood</span>
+    <div className="ambient-bg relative min-h-screen overflow-hidden">
+      <CinematicBackdrop />
+      <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
+        <Link to="/" className="mb-10 flex items-center gap-3 self-start animate-rise">
+          <img src={redwoodLogo} alt="RedWood" className="h-11 w-11 rounded-sm object-contain drop-shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_70%,transparent)]" />
+          <span className="text-display text-sm tracking-[0.25em]">RedWood</span>
         </Link>
 
-        <div className="rounded-sm border border-border bg-card p-7 shadow-2xl">
+        <div className="card-frame rounded-xl p-7 animate-rise delay-100">
           <div className="text-display text-[11px] tracking-[0.3em] text-primary mb-2">
             Porta da firma
           </div>
-          <h1 className="mb-1 text-2xl font-bold">Diz quem és.</h1>
+          <h1 className="mb-1 text-display text-3xl font-bold text-glow">Diz quem és.</h1>
           <p className="mb-6 text-sm text-muted-foreground">
             Acesso só para quem já tem nome no bairro.
           </p>
@@ -78,14 +80,14 @@ function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <Button type="submit" disabled={loading} className="w-full text-display tracking-wider">
+            <Button type="submit" disabled={loading} className="btn-shine w-full text-display tracking-wider">
               {loading ? "A abrir…" : "Entrar"}
             </Button>
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground/70">
-          Sem conta? Fala com a chefia. Não se cria sozinho.
+        <p className="mt-6 text-center text-xs uppercase tracking-[0.24em] text-muted-foreground/60">
+          Sem conta? Fala com a chefia.
         </p>
       </div>
     </div>
