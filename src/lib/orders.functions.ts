@@ -127,9 +127,10 @@ export const transitionOrder = createServerFn({ method: "POST" })
       );
       const have = bal?.balance ?? 0;
       if (have < before.quantity) {
-        throw new Error(
-          `Sem stock que chegue: ${before.item_name ?? "item"} (${have} em casa, ${before.quantity} pedidos)`
-        );
+        return {
+          ok: false as const,
+          error: `Sem stock que chegue: ${before.item_name ?? "item"} (${have} em casa, ${before.quantity} pedidos)`,
+        };
       }
       await pgQuery(
         `insert into inventory_movements
@@ -175,5 +176,5 @@ export const transitionOrder = createServerFn({ method: "POST" })
         link: "/encomendas",
       });
     }
-    return { ok: true };
+    return { ok: true as const };
   });
