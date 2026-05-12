@@ -35,19 +35,41 @@ function Dashboard() {
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-display text-sm">Por tier</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-display text-sm">Hierarquia do bairro</CardTitle></CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              {(data?.byTier ?? []).map((t) => (
-                <li key={t.tier} className="flex items-center justify-between border-b border-border/50 py-2 last:border-0">
-                  <span className="text-sm">{TIER_LABELS[t.tier as Tier] ?? t.tier}</span>
-                  <span className="text-display text-lg">{fmtNum(t.count)}</span>
-                </li>
-              ))}
-              {!data?.byTier?.length && !isLoading && <li className="text-sm text-muted-foreground">Sem dados.</li>}
-            </ul>
+            {(() => {
+              const rows = data?.byTier ?? [];
+              const max = Math.max(1, ...rows.map((r) => Number(r.count) || 0));
+              const sorted = [...rows].sort(
+                (a, b) => TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier),
+              );
+              return (
+                <ul className="space-y-3">
+                  {sorted.map((t) => {
+                    const n = Number(t.count) || 0;
+                    const pct = Math.max(4, Math.round((n / max) * 100));
+                    return (
+                      <li key={t.tier} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2">
+                            <span aria-hidden className="text-base leading-none">{TIER_EMOJI[t.tier] ?? "•"}</span>
+                            <span className="font-medium">{TIER_LABELS[t.tier] ?? t.tier}</span>
+                          </span>
+                          <span className="text-display tabular-nums">{fmtNum(n)}</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="h-full bg-primary/70" style={{ width: `${pct}%` }} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                  {!sorted.length && !isLoading && <li className="text-sm text-muted-foreground">Sem dados.</li>}
+                </ul>
+              );
+            })()}
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader><CardTitle className="text-display text-sm">Top da semana</CardTitle></CardHeader>
           <CardContent>
