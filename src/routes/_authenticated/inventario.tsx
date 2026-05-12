@@ -219,7 +219,12 @@ function StockTable() {
                     const warn = r.qty > 0 && r.qty < 5;
                     return (
                       <tr key={r.item_id} className="border-t border-border hover:bg-accent/30">
-                        <td className="px-3 py-2 font-medium">{r.item_name}</td>
+                        <td className="px-3 py-2 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            <ItemIcon name={r.item_name} category={r.category} size={14} />
+                            {r.item_name}
+                          </span>
+                        </td>
                         <td
                           className={
                             "px-3 py-2 text-right font-mono " +
