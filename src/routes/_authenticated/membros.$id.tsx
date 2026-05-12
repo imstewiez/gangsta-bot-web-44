@@ -5,7 +5,7 @@ import { getMember } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fmtNum, fmtDate, ROLE_LABELS, formatMovementType } from "@/lib/domain";
+import { fmtNum, fmtDate, ROLE_LABELS, formatMovementType, prettyItemName } from "@/lib/domain";
 import { MemberIdentity } from "@/components/domain/RoleBadge";
 import { MemberAdminPanel } from "@/components/domain/MemberAdminPanel";
 
@@ -46,7 +46,7 @@ function Page() {
               <ul className="space-y-1">{data.recentMovements.map((mv) => (
                 <li key={mv.id} className="flex items-baseline gap-2 border-b border-border/50 py-1.5 text-xs last:border-0">
                   <span className="text-muted-foreground">{fmtDate(mv.created_at).split(",")[0]}</span>
-                  <span>{formatMovementType(mv.type)}</span><span className="text-muted-foreground">{mv.item_name ?? "—"}</span>
+                  <span>{formatMovementType(mv.type)}</span><span className="text-muted-foreground truncate">{prettyItemName(mv.item_name)}</span>
                   <span className="ml-auto font-mono">{fmtNum(mv.qty)}</span>
                 </li>))}
               </ul>}
