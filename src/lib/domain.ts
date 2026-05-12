@@ -165,3 +165,111 @@ export function fmtDate(d: string | Date | null | undefined): string {
     hour: "2-digit", minute: "2-digit",
   }).format(date);
 }
+
+export function fmtMoney(n: number | string | null | undefined): string {
+  if (n == null) return "—";
+  const v = typeof n === "string" ? Number(n) : n;
+  if (!Number.isFinite(v)) return "—";
+  return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 0 }).format(v) + " €";
+}
+
+// ───────── Label mappers (PT-PT) ─────────
+// Fonte de verdade para nomes "humanos" — usa em vez de mostrar códigos crus da DB.
+
+export const MOVEMENT_LABELS: Record<string, string> = {
+  saldo_inicial: "Saldo inicial",
+  entrega_bairrista: "Entrega",
+  venda_bairrista: "Venda",
+  entrega_oficial: "Entrega oficial",
+  fornecimento_org: "Fornecimento",
+  consumo_saida: "Saída — consumo",
+  devolucao_saida: "Saída — devolução",
+  ajuste_manual: "Ajuste manual",
+  perda_saida: "Perdido",
+  apreendido: "Apreendido",
+  craftado: "Craftado",
+  produzido: "Produzido",
+};
+
+export function formatMovementType(t: string | null | undefined): string {
+  if (!t) return "—";
+  return MOVEMENT_LABELS[t] ?? t.replace(/_/g, " ");
+}
+
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: "À espera",
+  approved: "Aceite",
+  in_progress: "A tratar",
+  ready: "Pronta",
+  fulfilled: "Entregue",
+  denied: "Recusada",
+  cancelled: "Cancelada",
+};
+
+export const ORDER_STATUS_TONE: Record<string, string> = {
+  pending: "warning",
+  approved: "info",
+  in_progress: "info",
+  ready: "primary",
+  fulfilled: "success",
+  denied: "destructive",
+  cancelled: "muted",
+};
+
+export function formatOrderStatus(s: string | null | undefined): string {
+  if (!s) return "—";
+  return ORDER_STATUS_LABELS[s] ?? s;
+}
+
+export const SAIDA_STATUS_LABELS: Record<string, string> = {
+  planeada: "Planeada",
+  em_curso: "Em curso",
+  pausada: "Pausada",
+  finalizada: "Finalizada",
+  cancelada: "Cancelada",
+  expirada: "Expirada",
+};
+
+export const SAIDA_STATUS_TONE: Record<string, string> = {
+  planeada: "info",
+  em_curso: "warning",
+  pausada: "muted",
+  finalizada: "success",
+  cancelada: "destructive",
+  expirada: "destructive",
+};
+
+export function formatSaidaStatus(s: string | null | undefined): string {
+  if (!s) return "—";
+  return SAIDA_STATUS_LABELS[s] ?? s;
+}
+
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  create: "Criou",
+  update: "Atualizou",
+  delete: "Apagou",
+  liquidate: "Liquidou",
+  approve: "Aceitou",
+  deny: "Recusou",
+  fulfill: "Entregou",
+  promote: "Promoveu",
+  demote: "Despromoveu",
+  role_change: "Mudou cargo",
+  notify: "Notificou",
+};
+
+export function formatAuditAction(a: string | null | undefined): string {
+  if (!a) return "—";
+  return AUDIT_ACTION_LABELS[a] ?? a.replace(/_/g, " ");
+}
+
+// "Embeleza" nomes de itens vindos da DB — capitaliza palavras e arruma espaços.
+export function prettyItemName(name: string | null | undefined): string {
+  if (!name) return "—";
+  return name
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b([a-záéíóúâêîôûãõç])([a-záéíóúâêîôûãõç]*)/gi,
+      (_, a: string, b: string) => a.toUpperCase() + b.toLowerCase());
+}
+
