@@ -13,15 +13,21 @@ export type MemberRow = {
   status_lifecycle: string | null;
 };
 
+const SELECT_MEMBER = `
+  id, discord_id, display_name,
+  nickname as nick, tier,
+  coalesce(role,'bairrista') as role_label,
+  joined_at,
+  coalesce(lifecycle_state::text, status, 'active') as status_lifecycle
+`;
+
 export const listMembers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<MemberRow[]> => {
     return pgQuery<MemberRow>(
-      `select id, discord_id, display_name, nick, tier,
-              coalesce(role, 'bairrista') as role_label,
-              joined_at,
-              status_lifecycle
+      `select ${SELECT_MEMBER}
        from members
+       where deleted_at is null
        order by
          case coalesce(role,'bairrista')
            when 'manda_chuva' then 1
@@ -51,29 +57,28 @@ export type MemberDetail = {
 };
 
 export const getMember = createServerFn({ method: "GET" })
-  .inputValidator((d: { id: number }) => d)
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: number }) => d)
   .handler(async ({ data }): Promise<MemberDetail> => {
     const member = await pgOne<MemberRow>(
-      `select id, discord_id, display_name, nick, tier,
-              coalesce(role,'bairrista') as role_label, joined_at, status_lifecycle
-       from members where id = $1`,
+      `select ${SELECT_MEMBER} from members where id = $1`,
       [data.id]
     );
     if (!member) return { member: null, contributions: [], recentMovements: [], kills: 0 };
     const [contrib, movs, kills] = await Promise.all([
       pgQuery<{ type: string; total: string }>(
-        `select type, sum(qty)::text as total
+        `select movement_type as type, sum(quantity)::text as total
          from inventory_movements
          where member_id = $1
-         group by type order by sum(qty) desc`,
+         group by movement_type order by sum(quantity) desc`,
         [data.id]
       ),
       pgQuery<{
         id: number; type: string; item_id: number | null; item_name: string | null;
         qty: number; created_at: string;
       }>(
-        `select im.id, im.type, im.item_id, i.name as item_name, im.qty, im.created_at
+        `select im.id, im.movement_type as type, im.item_id, i.name as item_name,
+                im.quantity as qty, im.created_at
          from inventory_movements im
          left join items i on i.id = im.item_id
          where im.member_id = $1
@@ -82,7 +87,7 @@ export const getMember = createServerFn({ method: "GET" })
         [data.id]
       ),
       pgOne<{ count: string }>(
-        "select count(*)::text as count from kill_logs where member_id = $1",
+        "select count(*)::text as count from kill_logs where killer_id = $1",
         [data.id]
       ).catch(() => ({ count: "0" })),
     ]);
