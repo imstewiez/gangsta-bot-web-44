@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { fmtDate, fmtMoney, formatSaidaStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { CheckCircle2, FileSearch } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/liquidacao")({
