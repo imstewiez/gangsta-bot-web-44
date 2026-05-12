@@ -157,15 +157,17 @@ function StockTable() {
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
 
-  // group by visual category
+  // group by visual category, dropping items that don't belong in the warehouse
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
     const k = classifyRow(r);
+    if (!k) return acc;
     (acc[k] ||= []).push(r);
     return acc;
   }, {});
+  const total = Object.values(groups).reduce((s, arr) => s + arr.length, 0);
 
   if (q.isLoading) return <p className="text-muted-foreground">A contar…</p>;
-  if (!rows.length)
+  if (!total)
     return (
       <Card className="p-8 text-center text-muted-foreground">
         Armazém vazio. Mete-te a trabalhar.
