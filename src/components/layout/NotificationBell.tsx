@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { Bell } from "lucide-react";
+import { Bell, ShoppingCart, PackageCheck, Coins, AlertTriangle, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -60,12 +60,12 @@ export function NotificationBell() {
     load();
   };
 
-  const typeMeta = (t: string): { icon: string; tone: string } => {
-    if (t.startsWith("order")) return { icon: "🛒", tone: "border-l-info" };
-    if (t.startsWith("delivery")) return { icon: "📦", tone: "border-l-warning" };
-    if (t.startsWith("liquidation") || t.startsWith("payout")) return { icon: "💰", tone: "border-l-success" };
-    if (t.includes("warn") || t.includes("alert")) return { icon: "⚠️", tone: "border-l-destructive" };
-    return { icon: "🔔", tone: "border-l-primary" };
+  const typeMeta = (t: string): { Icon: LucideIcon; tone: string; color: string } => {
+    if (t.startsWith("order")) return { Icon: ShoppingCart, tone: "border-l-info", color: "text-info" };
+    if (t.startsWith("delivery")) return { Icon: PackageCheck, tone: "border-l-warning", color: "text-warning" };
+    if (t.startsWith("liquidation") || t.startsWith("payout")) return { Icon: Coins, tone: "border-l-success", color: "text-success" };
+    if (t.includes("warn") || t.includes("alert")) return { Icon: AlertTriangle, tone: "border-l-destructive", color: "text-destructive" };
+    return { Icon: Bell, tone: "border-l-primary", color: "text-primary" };
   };
 
   return (
@@ -88,7 +88,10 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0 border-border">
         <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
-          <div className="text-display text-xs font-bold uppercase tracking-wider">🔔 Recados do bairro</div>
+          <div className="inline-flex items-center gap-1.5 text-display text-xs font-bold uppercase tracking-wider">
+            <Bell className="h-3.5 w-3.5 text-primary" />
+            Recados do bairro
+          </div>
           {unread > 0 && <span className="text-[10px] text-muted-foreground">{unread} por ler</span>}
         </div>
         <div className="max-h-96 overflow-y-auto">
@@ -112,7 +115,7 @@ export function NotificationBell() {
                 }
               >
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 text-base leading-none">{meta.icon}</span>
+                  <meta.Icon className={"mt-0.5 h-4 w-4 shrink-0 " + meta.color} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold">{n.title}</div>
                     {n.body && <div className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{n.body}</div>}

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
+import { Flame, CalendarDays, Trophy, Medal, Award } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
@@ -77,20 +78,23 @@ function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-5">
             <TopList
-              title="🔥 Esta semana"
+              icon={<Flame className="h-3.5 w-3.5 text-destructive" />}
+              title="Esta semana"
               subtitle={data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null}
               rows={data?.topWeek}
               loading={isLoading}
             />
             <TopList
-              title="📅 Semana passada"
+              icon={<CalendarDays className="h-3.5 w-3.5 text-info" />}
+              title="Semana passada"
               subtitle={data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null}
               rows={data?.topPrevWeek}
               loading={isLoading}
               compact
             />
             <TopList
-              title="🏆 Mês"
+              icon={<Trophy className="h-3.5 w-3.5 text-warning" />}
+              title="Mês"
               subtitle={data?.topMonthLabel ?? null}
               rows={data?.topMonth}
               loading={isLoading}
@@ -113,16 +117,22 @@ type RankRow = {
   ops: number;
 };
 
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDAL_ICONS = [
+  { Cmp: Trophy, cls: "text-warning" },
+  { Cmp: Medal,  cls: "text-muted-foreground" },
+  { Cmp: Award,  cls: "text-orange-400" },
+] as const;
 
 function TopList({
   title,
+  icon,
   subtitle,
   rows,
   loading,
   compact,
 }: {
   title: string;
+  icon?: React.ReactNode;
   subtitle?: string | null;
   rows?: RankRow[];
   loading?: boolean;
@@ -131,7 +141,10 @@ function TopList({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-display text-xs tracking-[0.2em] text-muted-foreground">{title}</span>
+        <span className="inline-flex items-center gap-1.5 text-display text-xs tracking-[0.2em] text-muted-foreground">
+          {icon}
+          {title}
+        </span>
         {subtitle && <span className="text-[10px] text-muted-foreground/70">{subtitle}</span>}
       </div>
       <ol className="space-y-1">
@@ -141,6 +154,7 @@ function TopList({
           if (m.deliveries) bits.push(`${m.deliveries} entregas`);
           if (m.sales) bits.push(`${m.sales} vendas`);
           if (m.ops) bits.push(`${m.ops} saídas`);
+          const medal = MEDAL_ICONS[i];
           return (
             <li
               key={i}
@@ -150,8 +164,12 @@ function TopList({
                 (i === 0 ? " bg-primary/5" : "")
               }
             >
-              <span className="w-7 text-display text-base">
-                {MEDALS[i] ?? <span className="text-muted-foreground text-xs">#{i + 1}</span>}
+              <span className="grid w-7 place-items-center">
+                {medal ? (
+                  <medal.Cmp className={"h-4 w-4 " + medal.cls} />
+                ) : (
+                  <span className="text-muted-foreground text-xs">#{i + 1}</span>
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{name}</div>

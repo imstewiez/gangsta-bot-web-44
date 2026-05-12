@@ -20,13 +20,13 @@ import { Plus, ShoppingBag } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: "⌛ à espera",
-  approved: "✅ aceite",
-  in_progress: "🔧 a tratar",
-  ready: "📦 pronta",
-  fulfilled: "🤝 entregue",
-  denied: "🚫 recusada",
-  cancelled: "❌ cancelada",
+  pending: "à espera",
+  approved: "aceite",
+  in_progress: "a tratar",
+  ready: "pronta",
+  fulfilled: "entregue",
+  denied: "recusada",
+  cancelled: "cancelada",
 };
 
 const STATUS_COLOR: Record<string, string> = {
