@@ -7,6 +7,8 @@ import { LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./NotificationBell";
 import { getCurrentMember } from "@/lib/pricing.functions";
+import { TIER_LABELS, TIER_EMOJI, tierColor } from "@/lib/domain";
+import redwoodLogo from "@/assets/redwood-logo.png";
 
 type NavItem = { to: string; label: string; need?: "inventory" };
 
