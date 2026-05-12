@@ -5,8 +5,9 @@ import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { ROLE_LABELS, fmtDate, TIER_ORDER, TIER_EMOJI } from "@/lib/domain";
+import { ROLE_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
+import { TierIcon } from "@/components/domain/TierIcon";
 
 export const Route = createFileRoute("/_authenticated/membros")({ component: Page });
 

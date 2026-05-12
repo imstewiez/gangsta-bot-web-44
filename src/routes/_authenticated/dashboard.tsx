@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { getDashboardKpis } from "@/lib/dashboard.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fmtNum, TIER_LABELS, TIER_EMOJI, TIER_ORDER } from "@/lib/domain";
+import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
+import { TierIcon } from "@/components/domain/TierIcon";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
@@ -52,7 +53,7 @@ function Dashboard() {
                       <li key={t.tier} className="space-y-1">
                         <div className="flex items-center justify-between text-sm">
                           <span className="flex items-center gap-2">
-                            <span aria-hidden className="text-base leading-none">{TIER_EMOJI[t.tier] ?? "•"}</span>
+                            <TierIcon tier={t.tier} size="sm" />
                             <span className="font-medium">{TIER_LABELS[t.tier] ?? t.tier}</span>
                           </span>
                           <span className="text-display tabular-nums">{fmtNum(n)}</span>
