@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { fmtNum, fmtDate } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
+import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
   beforeLoad: async () => {
@@ -18,20 +19,19 @@ export const Route = createFileRoute("/_authenticated/inventario")({
   component: Page,
 });
 
-type CatMeta = { label: string; emoji: string; tone: string; order: number };
+type CatMeta = { label: string; tone: string; order: number };
 
 // O bairro só guarda o que vende ou material p/ craftar o que vende.
-// Tudo o resto é descartado da vista (sucata, consumíveis aleatórios, etc).
 const GROUPS: Record<string, CatMeta> = {
-  armas_red:        { label: "Armas Red",          emoji: "🟥", tone: "destructive", order: 1 },
-  armas_orange:     { label: "Armas Orange",       emoji: "🟧", tone: "warning",     order: 2 },
-  armas_brancas:    { label: "Armas Brancas",      emoji: "🔪", tone: "info",        order: 3 },
-  carregadores:     { label: "Carregadores",       emoji: "🧰", tone: "primary",     order: 4 },
-  acessorios_armas: { label: "Acessórios de armas",emoji: "🔧", tone: "info",        order: 5 },
-  coletes:          { label: "Coletes padrão",     emoji: "🦺", tone: "warning",     order: 6 },
-  drogas:           { label: "Drogas",             emoji: "💊", tone: "success",     order: 7 },
-  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", emoji: "⚒️", tone: "primary", order: 8 },
-  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", emoji: "🧪", tone: "muted", order: 9 },
+  armas_red:        { label: "Armas Red",          tone: "destructive", order: 1 },
+  armas_orange:     { label: "Armas Orange",       tone: "warning",     order: 2 },
+  armas_brancas:    { label: "Armas Brancas",      tone: "info",        order: 3 },
+  carregadores:     { label: "Carregadores",       tone: "primary",     order: 4 },
+  acessorios_armas: { label: "Acessórios de armas",tone: "info",        order: 5 },
+  coletes:          { label: "Coletes padrão",     tone: "warning",     order: 6 },
+  drogas:           { label: "Drogas",             tone: "success",     order: 7 },
+  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", tone: "primary", order: 8 },
+  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", tone: "muted", order: 9 },
 };
 
 // Devolve a chave do grupo, ou null se o item não interessa ao armazém.
@@ -181,7 +181,7 @@ function StockTable() {
   return (
     <div className="space-y-6">
       {ordered.map(([cat, items]) => {
-        const meta = GROUPS[cat] ?? { label: cat, emoji: "📦", tone: "muted", order: 99 };
+        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99 };
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
         const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
         return (
@@ -193,7 +193,7 @@ function StockTable() {
               }
             >
               <div className="flex items-center gap-2">
-                <span className="text-lg leading-none">{meta.emoji}</span>
+                <CategoryIcon category={cat} tone={meta.tone} size={18} />
                 <h2 className="text-display text-sm uppercase tracking-widest">
                   {meta.label}
                 </h2>
@@ -219,7 +219,12 @@ function StockTable() {
                     const warn = r.qty > 0 && r.qty < 5;
                     return (
                       <tr key={r.item_id} className="border-t border-border hover:bg-accent/30">
-                        <td className="px-3 py-2 font-medium">{r.item_name}</td>
+                        <td className="px-3 py-2 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            <ItemIcon name={r.item_name} category={r.category} size={14} />
+                            {r.item_name}
+                          </span>
+                        </td>
                         <td
                           className={
                             "px-3 py-2 text-right font-mono " +
@@ -272,7 +277,14 @@ function LedgerTable() {
                 {fmtDate(r.created_at)}
               </td>
               <td className="px-3 py-2">{MOV_LABEL[r.type] ?? r.type}</td>
-              <td className="px-3 py-2 font-medium">{r.item_name ?? "—"}</td>
+              <td className="px-3 py-2 font-medium">
+                {r.item_name ? (
+                  <span className="inline-flex items-center gap-2">
+                    <ItemIcon name={r.item_name} size={14} />
+                    {r.item_name}
+                  </span>
+                ) : "—"}
+              </td>
               <td className="px-3 py-2 text-muted-foreground">{r.member_name ?? "—"}</td>
               <td
                 className={

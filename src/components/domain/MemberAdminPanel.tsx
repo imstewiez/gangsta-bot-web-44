@@ -14,7 +14,7 @@ import {
   adminAdjustStats,
   TIER_LIST,
 } from "@/lib/member-admin.functions";
-import { TIER_LABELS, TIER_EMOJI } from "@/lib/domain";
+import { TIER_LABELS } from "@/lib/domain";
 import { Pencil, Crown, UserMinus, Activity } from "lucide-react";
 
 type Member = {
@@ -102,7 +102,7 @@ export function MemberAdminPanel({ member }: { member: Member }) {
             >
               {TIER_LIST.map((t) => (
                 <option key={t} value={t}>
-                  {TIER_EMOJI[t]} {TIER_LABELS[t]}
+                  {TIER_LABELS[t]}
                 </option>
               ))}
             </select>

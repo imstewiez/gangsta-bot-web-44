@@ -15,7 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Plus, Trash2, Check, X, PackageOpen } from "lucide-react";
+import { Plus, Trash2, Check, X, PackageOpen, Package, Coins } from "lucide-react";
+import { ItemIcon } from "@/components/domain/ItemIcon";
+import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
 
@@ -28,9 +30,9 @@ function statusMeta(tipo: string, status: string): { label: string; color: strin
   return { label: status, color: "bg-muted text-muted-foreground border-border" };
 }
 
-const TIPO_META: Record<string, { label: string; emoji: string; tone: string }> = {
-  entrega: { label: "Entrega ao bairro", emoji: "📦", tone: "bg-info/15 text-info border-info/30" },
-  venda:   { label: "Venda ao bairro",   emoji: "💰", tone: "bg-warning/15 text-warning border-warning/30" },
+const TIPO_META: Record<string, { label: string; Icon: LucideIcon; tone: string }> = {
+  entrega: { label: "Entrega ao bairro", Icon: Package, tone: "bg-info/15 text-info border-info/30" },
+  venda:   { label: "Venda ao bairro",   Icon: Coins,   tone: "bg-warning/15 text-warning border-warning/30" },
 };
 
 function Page() {
@@ -100,8 +102,8 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
           <div className="flex items-start gap-4">
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
-                  {tipoMeta.emoji} {tipoMeta.label}
+                <span className={"inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
+                  <tipoMeta.Icon className="h-3 w-3" /> {tipoMeta.label}
                 </span>
                 <span className="font-semibold">{d.requester_name ?? "—"}</span>
                 <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
@@ -112,8 +114,9 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
               <ul className="mt-3 divide-y divide-border/50 text-sm">
                 {d.lines.map((l, i) => (
                   <li key={i} className="flex justify-between py-1">
-                    <span>
-                      <span className="font-mono text-muted-foreground">{l.qty}×</span>{" "}
+                    <span className="inline-flex items-center gap-2">
+                      <span className="font-mono text-muted-foreground">{l.qty}×</span>
+                      <ItemIcon name={l.item_name ?? ""} size={14} />
                       {l.item_name ?? `#${l.item_id}`}
                     </span>
                     <span className="font-mono text-muted-foreground">
