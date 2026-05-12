@@ -88,7 +88,10 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0 border-border">
         <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
-          <div className="text-display text-xs font-bold uppercase tracking-wider">🔔 Recados do bairro</div>
+          <div className="inline-flex items-center gap-1.5 text-display text-xs font-bold uppercase tracking-wider">
+            <Bell className="h-3.5 w-3.5 text-primary" />
+            Recados do bairro
+          </div>
           {unread > 0 && <span className="text-[10px] text-muted-foreground">{unread} por ler</span>}
         </div>
         <div className="max-h-96 overflow-y-auto">
