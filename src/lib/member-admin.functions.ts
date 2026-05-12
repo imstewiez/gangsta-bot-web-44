@@ -5,15 +5,16 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyBot } from "./discord.server";
 
+// Hierarquia descendente — chefia primeiro, base por baixo.
 const TIERS = [
-  "young_blood",
-  "o_gunao",
-  "gangster_fodido",
-  "patrao_di_zona",
-  "real_gangster",
-  "og",
-  "kingpin",
   "manda_chuva",
+  "kingpin",
+  "og",
+  "real_gangster",
+  "patrao_di_zona",
+  "gangster_fodido",
+  "o_gunao",
+  "young_blood",
 ] as const;
 
 async function assertManager(supabase: any, userId: string) {
