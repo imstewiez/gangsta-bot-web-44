@@ -10,6 +10,7 @@ export type DeliveryRow = {
   requester_member_id: number;
   requester_name: string | null;
   status: string;
+  tipo: string;
   lines: DeliveryLine[];
   notes: string;
   total_qty: number;
