@@ -135,9 +135,10 @@ export function TopNav() {
                 key={n.to}
                 to={n.to}
                 onClick={() => setMobileOpen(false)}
-                className={linkClass(n.to) + " text-center"}
+                className={linkClass(n.to) + " justify-center"}
               >
-                {n.label}
+                <n.icon className="h-3.5 w-3.5" />
+                <span>{n.label}</span>
               </Link>
             ))}
             {isAdmin &&
@@ -146,9 +147,10 @@ export function TopNav() {
                   key={n.to}
                   to={n.to}
                   onClick={() => setMobileOpen(false)}
-                  className={linkClass(n.to) + " text-center"}
+                  className={linkClass(n.to) + " justify-center"}
                 >
-                  {n.label}
+                  <n.icon className="h-3.5 w-3.5" />
+                  <span>{n.label}</span>
                 </Link>
               ))}
           </nav>
