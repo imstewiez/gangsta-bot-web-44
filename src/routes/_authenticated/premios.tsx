@@ -41,6 +41,7 @@ function Page() {
     <>
       <PageHeader eyebrow="Ranking" title="Prémios semanais"
         description="Top semanal — o vencedor leva o prémio."
+        icon={Trophy}
         action={isAdmin ? <Button size="sm" onClick={() => gen.mutate()} disabled={gen.isPending}><Sparkles className="mr-1 h-4 w-4" />Gerar para a semana</Button> : null}
       />
       <div className="space-y-2">
