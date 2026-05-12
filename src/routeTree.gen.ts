@@ -13,10 +13,13 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/tops'
+import { Route as AuthenticatedSyncRouteImport } from './routes/_authenticated/sync'
+import { Route as AuthenticatedReceitasRouteImport } from './routes/_authenticated/receitas'
 import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticated/premios'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
+import { Route as AuthenticatedLiquidacaoRouteImport } from './routes/_authenticated/liquidacao'
 import { Route as AuthenticatedInventarioRouteImport } from './routes/_authenticated/inventario'
 import { Route as AuthenticatedEncomendasRouteImport } from './routes/_authenticated/encomendas'
 import { Route as AuthenticatedDisponibilidadeRouteImport } from './routes/_authenticated/disponibilidade'
@@ -45,6 +48,16 @@ const AuthenticatedTopsRoute = AuthenticatedTopsRouteImport.update({
   path: '/tops',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSyncRoute = AuthenticatedSyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedReceitasRoute = AuthenticatedReceitasRouteImport.update({
+  id: '/receitas',
+  path: '/receitas',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPremiosRoute = AuthenticatedPremiosRouteImport.update({
   id: '/premios',
   path: '/premios',
@@ -63,6 +76,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
 const AuthenticatedMembrosRoute = AuthenticatedMembrosRouteImport.update({
   id: '/membros',
   path: '/membros',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLiquidacaoRoute = AuthenticatedLiquidacaoRouteImport.update({
+  id: '/liquidacao',
+  path: '/liquidacao',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedInventarioRoute = AuthenticatedInventarioRouteImport.update({
@@ -117,10 +135,13 @@ export interface FileRoutesByFullPath {
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
+  '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/premios': typeof AuthenticatedPremiosRoute
+  '/receitas': typeof AuthenticatedReceitasRoute
+  '/sync': typeof AuthenticatedSyncRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
@@ -134,10 +155,13 @@ export interface FileRoutesByTo {
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
+  '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/premios': typeof AuthenticatedPremiosRoute
+  '/receitas': typeof AuthenticatedReceitasRoute
+  '/sync': typeof AuthenticatedSyncRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
@@ -153,10 +177,13 @@ export interface FileRoutesById {
   '/_authenticated/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/_authenticated/encomendas': typeof AuthenticatedEncomendasRoute
   '/_authenticated/inventario': typeof AuthenticatedInventarioRoute
+  '/_authenticated/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
+  '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
+  '/_authenticated/sync': typeof AuthenticatedSyncRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
   '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
@@ -172,10 +199,13 @@ export interface FileRouteTypes {
     | '/disponibilidade'
     | '/encomendas'
     | '/inventario'
+    | '/liquidacao'
     | '/membros'
     | '/onboarding'
     | '/operacoes'
     | '/premios'
+    | '/receitas'
+    | '/sync'
     | '/tops'
     | '/membros/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -189,10 +219,13 @@ export interface FileRouteTypes {
     | '/disponibilidade'
     | '/encomendas'
     | '/inventario'
+    | '/liquidacao'
     | '/membros'
     | '/onboarding'
     | '/operacoes'
     | '/premios'
+    | '/receitas'
+    | '/sync'
     | '/tops'
     | '/membros/$id'
   id:
@@ -207,10 +240,13 @@ export interface FileRouteTypes {
     | '/_authenticated/disponibilidade'
     | '/_authenticated/encomendas'
     | '/_authenticated/inventario'
+    | '/_authenticated/liquidacao'
     | '/_authenticated/membros'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
     | '/_authenticated/premios'
+    | '/_authenticated/receitas'
+    | '/_authenticated/sync'
     | '/_authenticated/tops'
     | '/_authenticated/membros/$id'
   fileRoutesById: FileRoutesById
@@ -251,6 +287,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTopsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/sync': {
+      id: '/_authenticated/sync'
+      path: '/sync'
+      fullPath: '/sync'
+      preLoaderRoute: typeof AuthenticatedSyncRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/receitas': {
+      id: '/_authenticated/receitas'
+      path: '/receitas'
+      fullPath: '/receitas'
+      preLoaderRoute: typeof AuthenticatedReceitasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/premios': {
       id: '/_authenticated/premios'
       path: '/premios'
@@ -277,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/membros'
       fullPath: '/membros'
       preLoaderRoute: typeof AuthenticatedMembrosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/liquidacao': {
+      id: '/_authenticated/liquidacao'
+      path: '/liquidacao'
+      fullPath: '/liquidacao'
+      preLoaderRoute: typeof AuthenticatedLiquidacaoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/inventario': {
@@ -357,10 +414,13 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDisponibilidadeRoute: typeof AuthenticatedDisponibilidadeRoute
   AuthenticatedEncomendasRoute: typeof AuthenticatedEncomendasRoute
   AuthenticatedInventarioRoute: typeof AuthenticatedInventarioRoute
+  AuthenticatedLiquidacaoRoute: typeof AuthenticatedLiquidacaoRoute
   AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
+  AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
+  AuthenticatedSyncRoute: typeof AuthenticatedSyncRoute
   AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
 }
 
@@ -372,10 +432,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDisponibilidadeRoute: AuthenticatedDisponibilidadeRoute,
   AuthenticatedEncomendasRoute: AuthenticatedEncomendasRoute,
   AuthenticatedInventarioRoute: AuthenticatedInventarioRoute,
+  AuthenticatedLiquidacaoRoute: AuthenticatedLiquidacaoRoute,
   AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
+  AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,
+  AuthenticatedSyncRoute: AuthenticatedSyncRoute,
   AuthenticatedTopsRoute: AuthenticatedTopsRoute,
 }
 
