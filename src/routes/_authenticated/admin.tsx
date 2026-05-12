@@ -34,7 +34,7 @@ function AdminPage() {
   });
   return (
     <>
-      <PageHeader eyebrow="Chefia" title="Admin" description="Gerir acessos da app." />
+      <PageHeader eyebrow="Chefia" title="Admin" description="Gerir acessos da app." icon={Shield} />
       <Card>
         <CardHeader><CardTitle className="text-display text-sm">Utilizadores da app</CardTitle></CardHeader>
         <CardContent>
