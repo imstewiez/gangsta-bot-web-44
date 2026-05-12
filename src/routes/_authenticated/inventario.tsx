@@ -146,7 +146,7 @@ function StockTable() {
                 </h2>
               </div>
               <span className="text-display text-[11px] tracking-wider opacity-90">
-                {items.length} refs · {fmtNum(total)} em casa · {fmtNum(Math.round(value))} €
+                {items.length} refs · {fmtNum(total)} em casa · {fmtMoney(Math.round(value))}
               </span>
             </header>
             <table className="w-full text-sm">
