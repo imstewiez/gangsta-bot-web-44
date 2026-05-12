@@ -3,13 +3,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { listRecipes, computeCraftFeasibility, type CraftFeasibility } from "@/lib/recipes.functions";
+import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Hammer, Calculator } from "lucide-react";
+import { Hammer, Calculator, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/receitas")({ component: Page });
 
