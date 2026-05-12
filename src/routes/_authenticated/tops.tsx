@@ -42,6 +42,44 @@ function Page() {
           </Tabs>
         }
       />
+      {!isLoading && (data ?? []).length >= 3 && (
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          {[1, 0, 2].map((idx) => {
+            const r = data![idx];
+            if (!r) return null;
+            const medal = MEDAL_ICONS[idx];
+            const isFirst = idx === 0;
+            return (
+              <div
+                key={r.member_id}
+                className={
+                  "relative overflow-hidden rounded-sm border p-4 text-center " +
+                  (isFirst
+                    ? "border-warning/50 bg-gradient-to-b from-warning/15 via-card to-card sm:order-2 sm:scale-[1.04] sm:py-5"
+                    : idx === 1
+                    ? "border-border bg-card sm:order-1"
+                    : "border-border bg-card sm:order-3")
+                }
+              >
+                <div className="absolute right-3 top-3 text-display text-[10px] tracking-[0.3em] text-muted-foreground">
+                  #{idx + 1}
+                </div>
+                <medal.Cmp className={"mx-auto h-6 w-6 " + medal.cls} />
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <TierIcon tier={r.tier} size="sm" />
+                  <span className="truncate text-sm font-semibold">{r.display_name ?? r.nick ?? "—"}</span>
+                </div>
+                <div className={"mt-1 text-display tabular-nums " + (isFirst ? "text-2xl text-warning" : "text-xl text-foreground")}>
+                  {fmtNum(Math.round(r.score))}
+                </div>
+                <div className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {r.kills} K · {r.deliveries} entregas · {r.ops} saídas
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-[11px] uppercase tracking-widest text-muted-foreground">
