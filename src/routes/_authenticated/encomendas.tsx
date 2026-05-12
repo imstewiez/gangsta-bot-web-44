@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtMoney, formatOrderStatus, ORDER_STATUS_TONE, prettyItemName } from "@/lib/domain";
+import { fmtDate, fmtMoney, formatOrderStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, ShoppingBag } from "lucide-react";
 
@@ -28,7 +28,7 @@ const STATUS_COLOR: Record<string, string> = {
   denied: "bg-destructive/20 text-destructive border-destructive/40",
   cancelled: "bg-muted/60 text-muted-foreground border-border line-through",
 };
-void ORDER_STATUS_TONE;
+
 
 const NEXT_STATES: Record<string, { to: string; label: string; variant?: "destructive" | "default" }[]> = {
   pending: [
