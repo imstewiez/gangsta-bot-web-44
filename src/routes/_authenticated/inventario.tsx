@@ -134,6 +134,7 @@ function Page() {
         eyebrow="Armazém"
         title="Inventário"
         description="Armas e carregadores que a firma tem em casa. Movimentos automáticos via entregas e encomendas."
+        icon={Package}
       />
       <Tabs defaultValue="stock">
         <TabsList>

@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { fmtNum } from "@/lib/domain";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
+import { Tags } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/precario")({ component: Page });
 
@@ -52,6 +53,7 @@ function Page() {
       <PageHeader
         eyebrow="Tabela da firma"
         title="Preçário"
+        icon={Tags}
         description={
           me.data
             ? `Vês os preços ajustados ao teu escalão — ${TIER_LABELS[me.data.tier ?? ""] ?? "—"}${myMargin > 0 ? ` (margem +${(myMargin * 100).toFixed(1)}%)` : ""}.`
