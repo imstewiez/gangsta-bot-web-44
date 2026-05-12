@@ -114,8 +114,9 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
               <ul className="mt-3 divide-y divide-border/50 text-sm">
                 {d.lines.map((l, i) => (
                   <li key={i} className="flex justify-between py-1">
-                    <span>
-                      <span className="font-mono text-muted-foreground">{l.qty}×</span>{" "}
+                    <span className="inline-flex items-center gap-2">
+                      <span className="font-mono text-muted-foreground">{l.qty}×</span>
+                      <ItemIcon name={l.item_name ?? ""} size={14} />
                       {l.item_name ?? `#${l.item_id}`}
                     </span>
                     <span className="font-mono text-muted-foreground">
