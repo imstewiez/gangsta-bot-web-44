@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { fmtMoney, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Hammer, Calculator, Lock } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/receitas")({ component: Page });
 
@@ -45,7 +46,7 @@ function Page() {
         <Input placeholder="Procurar item…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="grid gap-3 md:grid-cols-2">
-        {recipes.isLoading && <p className="text-muted-foreground">A carregar…</p>}
+        {recipes.isLoading && <CardGridSkeleton count={6} />}
         {filtered.map((r) => (
           <div key={r.recipe_id} className="rounded-sm border border-border bg-card p-4">
             <div className="flex items-center justify-between">

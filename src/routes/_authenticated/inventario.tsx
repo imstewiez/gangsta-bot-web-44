@@ -10,6 +10,10 @@ import { fmtNum, fmtMoney, fmtDate, formatMovementType, prettyItemName } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
+import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
   beforeLoad: async () => {
@@ -103,6 +107,7 @@ function StockTable() {
   const fn = useServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
+  const [filter, setFilter] = useState<string>("todas");
 
   // Agrupa pela subcategory vinda da BD (mesma fonte do preçário).
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
@@ -113,7 +118,17 @@ function StockTable() {
   }, {});
   const total = Object.values(groups).reduce((s, arr) => s + arr.length, 0);
 
-  if (q.isLoading) return <p className="text-muted-foreground">A contar…</p>;
+  if (q.isLoading) {
+    return (
+      <div className="overflow-hidden rounded-sm border border-border">
+        <table className="w-full text-sm">
+          <tbody>
+            <TableRowsSkeleton rows={8} cols={3} widths={["w-40", "w-16", "w-20"]} />
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   if (!total)
     return (
       <Card className="p-8 text-center text-muted-foreground">
@@ -121,12 +136,42 @@ function StockTable() {
       </Card>
     );
 
-  const ordered = Object.entries(groups).sort(
+  const ordered = Object.entries(groups)
+    .sort((a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50))
+    .filter(([cat]) => filter === "todas" || cat === filter);
+
+  const allCats = Object.entries(groups).sort(
     (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50)
   );
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-1.5">
+        <Button
+          size="sm"
+          variant={filter === "todas" ? "default" : "outline"}
+          className="h-7 px-3 text-[11px] uppercase tracking-wider"
+          onClick={() => setFilter("todas")}
+        >
+          Todas
+        </Button>
+        {allCats.map(([cat]) => {
+          const meta = GROUPS[cat];
+          const active = filter === cat;
+          return (
+            <Button
+              key={cat}
+              size="sm"
+              variant={active ? "default" : "outline"}
+              className="h-7 px-3 text-[11px] uppercase tracking-wider"
+              onClick={() => setFilter(cat)}
+            >
+              <CategoryIcon category={cat} size={12} />
+              <span className="ml-1.5">{meta?.label ?? cat}</span>
+            </Button>
+          );
+        })}
+      </div>
       {ordered.map(([cat, items]) => {
         const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99, group: "compra" as const };
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
@@ -212,11 +257,7 @@ function LedgerTable() {
         </thead>
         <tbody>
           {q.isLoading && (
-            <tr>
-              <td colSpan={5} className="p-6 text-center text-muted-foreground">
-                A puxar histórico…
-              </td>
-            </tr>
+            <TableRowsSkeleton rows={8} cols={5} widths={["w-28", "w-24", "w-32", "w-24", "w-12"]} />
           )}
           {(q.data ?? []).map((r) => (
             <tr key={r.id} className="border-t border-border hover:bg-accent/30">
