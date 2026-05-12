@@ -24,23 +24,29 @@ const SELECT_MEMBER = `
 export const listMembers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<MemberRow[]> => {
-    return pgQuery<MemberRow>(
-      `select ${SELECT_MEMBER}
-       from members
-       where deleted_at is null
-       order by
-         case coalesce(role,'bairrista')
-           when 'manda_chuva' then 1
-           when 'kingpin' then 2
-           when 'og' then 3
-           when 'real_gangster' then 4
-           when 'patrao_di_zona' then 5
-           else 6 end,
-         case tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
-         display_name nulls last
-       limit 500`
-    );
+    try {
+      return await pgQuery<MemberRow>(
+        `select ${SELECT_MEMBER}
+         from members
+         where deleted_at is null
+         order by
+           case coalesce(role,'bairrista')
+             when 'manda_chuva' then 1
+             when 'kingpin' then 2
+             when 'og' then 3
+             when 'real_gangster' then 4
+             when 'patrao_di_zona' then 5
+             else 6 end,
+           case tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
+           display_name nulls last
+         limit 500`
+      );
+    } catch (err) {
+      console.error("[listMembers] failed:", err);
+      throw new Error(err instanceof Error ? err.message : "DB error");
+    }
   });
+
 
 export type MemberDetail = {
   member: MemberRow | null;
