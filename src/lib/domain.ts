@@ -1,27 +1,69 @@
-// Domain enums mirroring the bot's hierarchy
-export type Tier = "young_blood" | "o_gunao" | "gangster_fodido";
-export type MemberRole =
-  | "manda_chuva"
-  | "kingpin"
-  | "og"
-  | "real_gangster"
+// Hierarquia do bairro — labels bonitos com emoji para UI.
+// Nunca mostrar os IDs internos (young_blood, patrao_di_zona, etc) na UI.
+export type Tier =
+  | "young_blood"
+  | "o_gunao"
+  | "gangster_fodido"
   | "patrao_di_zona"
-  | "bairrista";
+  | "real_gangster"
+  | "og"
+  | "kingpin"
+  | "manda_chuva";
 
-export const TIER_LABELS: Record<Tier, string> = {
+export type MemberRole = Tier | "bairrista";
+
+// Etiquetas curtas (sem emoji) — para sítios densos/tabelas.
+export const TIER_LABELS: Record<string, string> = {
   young_blood: "Young Blood",
   o_gunao: "O Gunão",
   gangster_fodido: "Gangster Fodido",
-};
-
-export const ROLE_LABELS: Record<string, string> = {
-  manda_chuva: "Manda-Chuva",
-  kingpin: "Kingpin",
-  og: "OG",
-  real_gangster: "Real Gangster",
   patrao_di_zona: "Patrão di Zona",
+  real_gangster: "Real Gangster",
+  og: "OG",
+  kingpin: "Kingpin",
+  manda_chuva: "Manda-Chuva",
   bairrista: "Bairrista",
 };
+
+// Emoji por rank — usado para destacar a hierarquia.
+export const TIER_EMOJI: Record<string, string> = {
+  young_blood: "🩸",
+  o_gunao: "🔥",
+  gangster_fodido: "💀",
+  patrao_di_zona: "👑",
+  real_gangster: "🎯",
+  og: "🏴",
+  kingpin: "♛",
+  manda_chuva: "⚡",
+  bairrista: "•",
+};
+
+// Ordem hierárquica (mais baixo → mais alto).
+export const TIER_ORDER: string[] = [
+  "young_blood",
+  "o_gunao",
+  "gangster_fodido",
+  "patrao_di_zona",
+  "real_gangster",
+  "og",
+  "kingpin",
+  "manda_chuva",
+];
+
+export function tierLabel(tier: string | null | undefined): string {
+  if (!tier) return "—";
+  return TIER_LABELS[tier] ?? tier;
+}
+
+export function tierLabelWithEmoji(tier: string | null | undefined): string {
+  if (!tier) return "—";
+  const emoji = TIER_EMOJI[tier] ?? "•";
+  const label = TIER_LABELS[tier] ?? tier;
+  return `${emoji} ${label}`;
+}
+
+export const ROLE_LABELS = TIER_LABELS;
+
 
 export function tierColor(tier: Tier | string | null | undefined): string {
   switch (tier) {
