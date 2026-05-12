@@ -4,8 +4,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { getWeeklyTop } from "@/lib/operations.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { fmtNum } from "@/lib/domain";
+import { Trophy, Medal, Award } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/tops")({ component: Page });
+
+const MEDAL_ICONS = [
+  { Cmp: Trophy, cls: "text-warning" },
+  { Cmp: Medal,  cls: "text-muted-foreground" },
+  { Cmp: Award,  cls: "text-orange-400" },
+] as const;
 
 function Page() {
   const fn = useServerFn(getWeeklyTop);
