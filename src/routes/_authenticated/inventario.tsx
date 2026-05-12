@@ -277,7 +277,14 @@ function LedgerTable() {
                 {fmtDate(r.created_at)}
               </td>
               <td className="px-3 py-2">{MOV_LABEL[r.type] ?? r.type}</td>
-              <td className="px-3 py-2 font-medium">{r.item_name ?? "—"}</td>
+              <td className="px-3 py-2 font-medium">
+                {r.item_name ? (
+                  <span className="inline-flex items-center gap-2">
+                    <ItemIcon name={r.item_name} size={14} />
+                    {r.item_name}
+                  </span>
+                ) : "—"}
+              </td>
               <td className="px-3 py-2 text-muted-foreground">{r.member_name ?? "—"}</td>
               <td
                 className={
