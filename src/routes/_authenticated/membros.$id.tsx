@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMember } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fmtNum, fmtDate, TIER_LABELS, ROLE_LABELS, tierColor, type Tier } from "@/lib/domain";
+import { fmtNum, fmtDate, ROLE_LABELS } from "@/lib/domain";
+import { MemberIdentity } from "@/components/domain/RoleBadge";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({ component: Page });
 
@@ -18,7 +19,7 @@ function Page() {
   return (
     <>
       <PageHeader eyebrow={ROLE_LABELS[m.role_label ?? "bairrista"]} title={m.display_name ?? "—"} description={m.nick ? `"${m.nick}"` : undefined}
-        action={m.tier ? <span className={"rounded-sm border px-3 py-1 text-display text-xs " + tierColor(m.tier as Tier)}>{TIER_LABELS[m.tier as Tier] ?? m.tier}</span> : null} />
+        action={<MemberIdentity tier={m.tier} size="md" />} />
       <div className="grid gap-4 md:grid-cols-3">
         <Card><CardHeader><CardTitle className="text-display text-sm">Entrou</CardTitle></CardHeader><CardContent>{fmtDate(m.joined_at)}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-display text-sm">Discord ID</CardTitle></CardHeader><CardContent className="font-mono text-xs">{m.discord_id ?? "—"}</CardContent></Card>

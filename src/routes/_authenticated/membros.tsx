@@ -5,7 +5,8 @@ import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { TIER_LABELS, ROLE_LABELS, tierColor, fmtDate, type Tier } from "@/lib/domain";
+import { ROLE_LABELS, fmtDate, TIER_ORDER, TIER_EMOJI } from "@/lib/domain";
+import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 
 export const Route = createFileRoute("/_authenticated/membros")({ component: Page });
 
@@ -18,6 +19,15 @@ function Page() {
     !q || (m.display_name ?? "").toLowerCase().includes(q.toLowerCase()) ||
     (m.nick ?? "").toLowerCase().includes(q.toLowerCase())
   );
+  // ordena por hierarquia (mais alto primeiro), depois alfabético
+  const sorted = [...filtered].sort((a, b) => {
+    const ai = TIER_ORDER.indexOf(a.tier ?? "");
+    const bi = TIER_ORDER.indexOf(b.tier ?? "");
+    const aRank = ai === -1 ? -1 : ai;
+    const bRank = bi === -1 ? -1 : bi;
+    if (aRank !== bRank) return bRank - aRank;
+    return (a.display_name ?? "").localeCompare(b.display_name ?? "", "pt");
+  });
   return (
     <>
       <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} no total.`}
@@ -30,18 +40,29 @@ function Page() {
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs">
-            <tr><th className="px-3 py-2 text-left">Nome</th><th className="px-3 py-2 text-left">Alcunha</th>
-            <th className="px-3 py-2 text-left">Role</th><th className="px-3 py-2 text-left">Tier</th>
-            <th className="px-3 py-2 text-left">Entrou</th></tr>
+            <tr>
+              <th className="px-3 py-2 text-left">Nome</th>
+              <th className="px-3 py-2 text-left">Alcunha</th>
+              <th className="px-3 py-2 text-left">Posição</th>
+              <th className="px-3 py-2 text-left">Tier</th>
+              <th className="px-3 py-2 text-left">Afiliação</th>
+              <th className="px-3 py-2 text-left">Entrou</th>
+            </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">A carregar…</td></tr>}
-            {filtered.map((m) => (
+            {isLoading && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">A carregar…</td></tr>}
+            {sorted.map((m) => (
               <tr key={m.id} className="border-t border-border hover:bg-accent/30">
-                <td className="px-3 py-2"><Link to="/membros/$id" params={{ id: String(m.id) }} className="font-medium hover:text-primary">{m.display_name ?? "—"}</Link></td>
+                <td className="px-3 py-2">
+                  <Link to="/membros/$id" params={{ id: String(m.id) }} className="font-medium hover:text-primary inline-flex items-center gap-2">
+                    <span aria-hidden className="text-base leading-none">{TIER_EMOJI[m.tier ?? "bairrista"] ?? "🏠"}</span>
+                    {m.display_name ?? "—"}
+                  </Link>
+                </td>
                 <td className="px-3 py-2 text-muted-foreground">{m.nick ?? "—"}</td>
-                <td className="px-3 py-2">{ROLE_LABELS[m.role_label ?? "bairrista"] ?? m.role_label}</td>
-                <td className="px-3 py-2">{m.tier ? <span className={"rounded-sm border px-2 py-0.5 text-xs " + tierColor(m.tier as Tier)}>{TIER_LABELS[m.tier as Tier] ?? m.tier}</span> : "—"}</td>
+                <td className="px-3 py-2 text-muted-foreground">{ROLE_LABELS[m.role_label ?? "bairrista"] ?? m.role_label}</td>
+                <td className="px-3 py-2"><TierBadge tier={m.tier} /></td>
+                <td className="px-3 py-2"><AffiliationBadge tier={m.tier} /></td>
                 <td className="px-3 py-2 text-xs text-muted-foreground">{fmtDate(m.joined_at)}</td>
               </tr>
             ))}
@@ -51,3 +72,4 @@ function Page() {
     </>
   );
 }
+
