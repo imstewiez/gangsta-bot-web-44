@@ -30,7 +30,7 @@ function Page() {
   const { data, isLoading } = useQuery({ queryKey: ["saidas"], queryFn: () => fn() });
   return (
     <>
-      <PageHeader eyebrow="PvP" title="Operações / Saídas" description={`${data?.length ?? 0} registos.`} action={<NewSaida />} />
+      <PageHeader eyebrow="PvP" title="Operações / Saídas" description={`${data?.length ?? 0} registos.`} icon={Crosshair} action={<NewSaida />} />
       <div className="grid gap-3">
         {isLoading && <p className="text-muted-foreground">A carregar…</p>}
         {(data ?? []).map((s) => (
