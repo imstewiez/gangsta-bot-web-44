@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -8,21 +8,37 @@ export const Route = createFileRoute("/auth/callback")({
 
 function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
+  const search = useSearch({ from: "/auth/callback" });
 
   useEffect(() => {
     const handleCallback = async () => {
-      // Supabase automatically processes the #access_token hash
-      // when getSession() is called. We just need to wait a tick.
-      await new Promise((r) => setTimeout(r, 100));
+      // Supabase v2 uses PKCE: the callback has ?code=... in the query string
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      const errorDescription = url.searchParams.get("error_description");
 
-      const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session) {
+      if (errorDescription) {
+        setError(errorDescription);
+        return;
+      }
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setError(error.message);
+          return;
+        }
+      }
+
+      // Verify session was created
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !data.session) {
         setError("Falha na autenticação. Tenta novamente.");
         return;
       }
 
-      // Session is valid — redirect to dashboard
-      throw redirect({ to: "/dashboard" });
+      // Success — redirect to dashboard
+      window.location.href = "/dashboard";
     };
 
     handleCallback();
