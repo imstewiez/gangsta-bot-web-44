@@ -12,7 +12,7 @@
   },
   "vars": {
     "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
-    "SUPABASE_ANON_KEY": "PREENCHER-ANON-KEY-AQUI",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdWN2Ymtvenh0YWN3enZnZ2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDAwMjcsImV4cCI6MjA5NDE3NjAyN30.Rf7AHVSigbdQxkvMSwHY2pDYgjoLyG2oqSAw4E-v2Lc",
   },
   "secrets": [
     "SUPABASE_SERVICE_ROLE_KEY",
