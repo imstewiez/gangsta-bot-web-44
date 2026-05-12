@@ -1,5 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import redwoodLogo from "@/assets/redwood-logo.png";
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
@@ -29,9 +30,7 @@ function Landing() {
       <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-10">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-sm bg-primary font-display text-primary-foreground shadow-[0_0_20px_-5px_color-mix(in_oklab,var(--primary)_60%,transparent)]">
-              R
-            </div>
+            <img src={redwoodLogo} alt="RedWood" className="h-12 w-12 rounded-sm object-contain drop-shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_65%,transparent)]" />
             <div className="leading-tight">
               <div className="text-display text-sm tracking-[0.25em]">Firma RedWood</div>
               <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">

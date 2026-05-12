@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import redwoodLogo from "@/assets/redwood-logo.png";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -40,9 +41,7 @@ function LoginPage() {
     <div className="min-h-screen bg-background bg-grain">
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
         <Link to="/" className="mb-10 flex items-center gap-3 self-start">
-          <div className="grid h-9 w-9 place-items-center rounded-sm bg-primary font-display text-primary-foreground">
-            R
-          </div>
+          <img src={redwoodLogo} alt="RedWood" className="h-11 w-11 rounded-sm object-contain drop-shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_60%,transparent)]" />
           <span className="text-display text-sm tracking-[0.25em]">Firma RedWood</span>
         </Link>
 

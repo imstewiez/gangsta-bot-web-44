@@ -7,6 +7,8 @@ import { LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./NotificationBell";
 import { getCurrentMember } from "@/lib/pricing.functions";
+import { TIER_LABELS, TIER_EMOJI, tierColor } from "@/lib/domain";
+import redwoodLogo from "@/assets/redwood-logo.png";
 
 type NavItem = { to: string; label: string; need?: "inventory" };
 
@@ -37,6 +39,10 @@ export function TopNav() {
   const meFn = useServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn(), staleTime: 60_000 });
   const canSeeInv = me.data?.can_see_inventory ?? false;
+  const myTier = me.data?.tier ?? null;
+  const myTierLabel = myTier ? TIER_LABELS[myTier] ?? myTier : null;
+  const myEmoji = myTier ? TIER_EMOJI[myTier] : null;
+  const myDisplay = me.data?.display_name ?? profile?.display_name ?? "—";
 
   const visible = NAV.filter((n) => !n.need || (n.need === "inventory" && canSeeInv));
 
@@ -54,9 +60,11 @@ export function TopNav() {
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
         <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
-          <div className="grid h-8 w-8 place-items-center rounded-sm bg-primary font-display text-primary-foreground shadow-[0_0_15px_-5px_color-mix(in_oklab,var(--primary)_60%,transparent)]">
-            R
-          </div>
+          <img
+            src={redwoodLogo}
+            alt="RedWood"
+            className="h-9 w-9 rounded-sm object-contain drop-shadow-[0_0_10px_color-mix(in_oklab,var(--primary)_55%,transparent)]"
+          />
           <span className="hidden text-display text-sm tracking-[0.2em] sm:block">
             RedWood
           </span>
@@ -80,8 +88,17 @@ export function TopNav() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell />
-          <span className="hidden text-xs text-muted-foreground sm:block">
-            {profile?.display_name ?? "—"}
+          <span
+            className={
+              "hidden items-center gap-1.5 rounded-sm border px-2 py-1 text-display text-[11px] tracking-[0.08em] sm:inline-flex " +
+              (myTier ? tierColor(myTier) : "border-border text-muted-foreground")
+            }
+            title={myTierLabel ? `${myTierLabel} — ${myDisplay}` : myDisplay}
+          >
+            {myEmoji && <span aria-hidden>{myEmoji}</span>}
+            {myTierLabel && <span className="opacity-90">{myTierLabel}</span>}
+            {myTierLabel && <span className="opacity-50">·</span>}
+            <span className="font-semibold tracking-normal normal-case">{myDisplay}</span>
           </span>
           <Button size="sm" variant="ghost" onClick={signOut} title="Sair">
             <LogOut className="h-4 w-4" />
