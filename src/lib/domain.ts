@@ -80,17 +80,18 @@ export const TIER_ORDER: string[] = [
   "manda_chuva",
 ];
 
-// Ordem hierárquica (mais baixo → mais alto).
-export const TIER_ORDER: string[] = [
-  "young_blood",
-  "o_gunao",
-  "gangster_fodido",
+// Tag "Chefia de RedWood" — patrões di zona e acima representam a firma.
+export const CHEFIA_TIERS = new Set<string>([
   "patrao_di_zona",
   "real_gangster",
   "og",
   "kingpin",
   "manda_chuva",
-];
+]);
+
+export function isChefia(tier: string | null | undefined): boolean {
+  return !!tier && CHEFIA_TIERS.has(tier);
+}
 
 export function tierLabel(tier: string | null | undefined): string {
   if (!tier) return "—";
