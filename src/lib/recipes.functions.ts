@@ -25,7 +25,9 @@ export type RecipeRow = {
 
 export const listRecipes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<RecipeRow[]> => {
+  .handler(async ({ context }): Promise<RecipeRow[]> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    const isManager = me?.is_manager ?? false;
     const rows = await pgQuery<{
       recipe_id: number;
       item_id: number;
