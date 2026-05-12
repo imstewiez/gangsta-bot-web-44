@@ -14,12 +14,16 @@ function Dashboard() {
   const { profile } = useAuth();
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
 
+  const h = new Date().getHours();
+  const saud = h < 5 ? "Ainda na rua" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
+  const nome = profile?.display_name?.split(" ")[0] ?? "mano";
+
   return (
     <>
       <PageHeader
-        eyebrow="Dashboard"
-        title={`Bom dia, ${profile?.display_name ?? "bairrista"}.`}
-        description="Estado actual do bairro, em tempo real."
+        eyebrow="Casa"
+        title={`${saud}, ${nome}.`}
+        description="O que se passa no bairro, agora."
       />
       {error && <p className="text-destructive text-sm">Erro: {(error as Error).message}</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
