@@ -65,18 +65,26 @@ export function tierLabelWithEmoji(tier: string | null | undefined): string {
 export const ROLE_LABELS = TIER_LABELS;
 
 
-export function tierColor(tier: Tier | string | null | undefined): string {
+export function tierColor(tier: string | null | undefined): string {
   switch (tier) {
+    case "manda_chuva":
+    case "kingpin":
+      return "bg-primary/25 text-primary border-primary/50";
+    case "og":
+    case "real_gangster":
+      return "bg-accent/20 text-accent-foreground border-accent/40";
+    case "patrao_di_zona":
+      return "bg-warning/25 text-warning border-warning/50";
     case "gangster_fodido":
-      return "bg-primary/20 text-primary border-primary/40";
+      return "bg-primary/15 text-primary border-primary/30";
     case "o_gunao":
-      return "bg-warning/20 text-warning border-warning/40";
+      return "bg-warning/15 text-warning border-warning/30";
     case "young_blood":
-      return "bg-muted text-muted-foreground border-border";
     default:
       return "bg-muted text-muted-foreground border-border";
   }
 }
+
 
 export function fmtNum(n: number | string | null | undefined): string {
   if (n == null) return "—";
