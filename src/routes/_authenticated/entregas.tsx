@@ -15,7 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Plus, Trash2, Check, X, PackageOpen } from "lucide-react";
+import { Plus, Trash2, Check, X, PackageOpen, Package, Coins } from "lucide-react";
+import { ItemIcon } from "@/components/domain/ItemIcon";
+import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
 
