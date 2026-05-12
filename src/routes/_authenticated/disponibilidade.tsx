@@ -28,7 +28,13 @@ function Page() {
         <Card>
           <CardHeader><CardTitle className="text-display text-sm">Sessões</CardTitle></CardHeader>
           <CardContent className="space-y-1">
-            {sessions.isLoading && <p className="text-muted-foreground text-sm">A carregar…</p>}
+            {sessions.isLoading && (
+              <div className="space-y-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            )}
             {(sessions.data ?? []).map((s) => (
               <button key={s.id} onClick={() => setOpenId(s.id)}
                 className={"flex w-full items-center gap-3 rounded-sm border px-3 py-2 text-left text-sm " +
