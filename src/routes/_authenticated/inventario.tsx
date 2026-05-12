@@ -257,11 +257,7 @@ function LedgerTable() {
         </thead>
         <tbody>
           {q.isLoading && (
-            <tr>
-              <td colSpan={5} className="p-6 text-center text-muted-foreground">
-                A puxar histórico…
-              </td>
-            </tr>
+            <TableRowsSkeleton rows={8} cols={5} widths={["w-28", "w-24", "w-32", "w-24", "w-12"]} />
           )}
           {(q.data ?? []).map((r) => (
             <tr key={r.id} className="border-t border-border hover:bg-accent/30">
