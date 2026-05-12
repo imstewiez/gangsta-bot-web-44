@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { fmtNum, fmtDate } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
+import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
   beforeLoad: async () => {
