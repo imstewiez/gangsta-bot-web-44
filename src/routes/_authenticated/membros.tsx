@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ROLE_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
+import { Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/membros")({ component: Page });
 
@@ -31,7 +32,8 @@ function Page() {
   });
   return (
     <>
-      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} no total.`}
+      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} no total. Carrega num membro para ver o perfil completo.`}
+        icon={Users}
         action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
       {error && (
         <div className="mb-3 rounded-sm border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">

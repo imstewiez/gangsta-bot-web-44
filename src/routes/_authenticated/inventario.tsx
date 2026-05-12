@@ -25,13 +25,12 @@ type CatMeta = { label: string; tone: string; order: number };
 const GROUPS: Record<string, CatMeta> = {
   armas_red:        { label: "Armas Red",          tone: "destructive", order: 1 },
   armas_orange:     { label: "Armas Orange",       tone: "warning",     order: 2 },
-  armas_brancas:    { label: "Armas Brancas",      tone: "info",        order: 3 },
-  carregadores:     { label: "Carregadores",       tone: "primary",     order: 4 },
-  acessorios_armas: { label: "Acessórios de armas",tone: "info",        order: 5 },
-  coletes:          { label: "Coletes padrão",     tone: "warning",     order: 6 },
-  drogas:           { label: "Drogas",             tone: "success",     order: 7 },
-  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", tone: "primary", order: 8 },
-  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", tone: "muted", order: 9 },
+  carregadores:     { label: "Carregadores",       tone: "primary",     order: 3 },
+  acessorios_armas: { label: "Acessórios de armas",tone: "info",        order: 4 },
+  coletes:          { label: "Coletes padrão",     tone: "warning",     order: 5 },
+  drogas:           { label: "Drogas",             tone: "success",     order: 6 },
+  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", tone: "primary", order: 7 },
+  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", tone: "muted", order: 8 },
 };
 
 // Devolve a chave do grupo, ou null se o item não interessa ao armazém.
@@ -71,9 +70,14 @@ function classifyRow(r: { category: string | null; item_name: string }): string 
 
   // Armas
   if (c === "armas" || c === "armas_fogo" || c === "armas_brancas") {
-    if (c === "armas_brancas" || /faca|machete|katana|taco|cassetete|martelo/.test(n)) return "armas_brancas";
-    if (/red|ak|m4|sniper|fuzil|shotgun|caçadeira|cacadeira|g36|scar|fal/.test(n)) return "armas_red";
-    return "armas_orange";
+    if (c === "armas_brancas" || /faca|machete|katana|taco|cassetete|martelo|punh[aã]l|navalha/.test(n)) {
+      // Bairro não trabalha com armas brancas — esconder do armazém.
+      return null;
+    }
+    if (/compact|drako|sns|xm3/.test(n)) return "armas_orange";
+    if (/red|ak\b|m4|sniper|fuzil|shotgun|caçadeira|cacadeira|g36|scar|fal/.test(n)) return "armas_red";
+    if (/pistola|glock|deagle|desert|colt|revolver|revólver|beretta|usp|uzi|mp5|mp7|smg|p90|vector/.test(n)) return "armas_orange";
+    return "armas_red";
   }
 
   // Tudo o resto não interessa ao armazém
@@ -130,6 +134,7 @@ function Page() {
         eyebrow="Armazém"
         title="Inventário"
         description="Armas e carregadores que a firma tem em casa. Movimentos automáticos via entregas e encomendas."
+        icon={Package}
       />
       <Tabs defaultValue="stock">
         <TabsList>

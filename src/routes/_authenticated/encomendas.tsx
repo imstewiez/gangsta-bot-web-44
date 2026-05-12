@@ -64,6 +64,7 @@ function Page() {
         eyebrow="Loja da firma"
         title="Encomendas"
         description="Armas, carregadores, coletes e acessórios. Pede e a chefia trata."
+        icon={ShoppingBag}
         action={<NewOrder />}
       />
       <Tabs value={tab} onValueChange={setTab}>
@@ -180,7 +181,9 @@ function NewOrder() {
   const createFn = useServerFn(createOrder);
   const qc = useQueryClient();
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn(), enabled: open });
-  const items = (cat.data ?? []).filter((i: CatalogItem) => i.side === "venda");
+  const items = (cat.data ?? []).filter(
+    (i: CatalogItem) => i.side === "venda" && i.subcategory !== "armas_brancas",
+  );
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("1");
   const [notes, setNotes] = useState("");

@@ -15,7 +15,7 @@ type NavItem = { to: string; label: string; need?: "inventory" };
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Casa" },
-  { to: "/membros", label: "Bairro" },
+  { to: "/membros", label: "Membros" },
   { to: "/precario", label: "Preçário" },
   { to: "/encomendas", label: "Encomendas" },
   { to: "/entregas", label: "Entregas" },
@@ -23,7 +23,7 @@ const NAV: NavItem[] = [
   { to: "/receitas", label: "Receitas" },
   { to: "/operacoes", label: "Saídas" },
   { to: "/disponibilidade", label: "Disp." },
-  { to: "/tops", label: "Tops" },
+  { to: "/tops", label: "Leaderboard" },
   { to: "/premios", label: "Prémios" },
 ];
 
