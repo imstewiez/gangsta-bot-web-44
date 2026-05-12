@@ -1,19 +1,36 @@
-import { TopNav } from "./TopNav";
 import type { ReactNode } from "react";
 import { CinematicBackdrop } from "./CinematicBackdrop";
+import { AppSidebar } from "./AppSidebar";
+import { NotificationBell } from "./NotificationBell";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="ambient-bg min-h-screen">
-      <CinematicBackdrop />
-      <div className="hairline-top sticky top-0 z-50" />
-      <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-10 animate-rise">{children}</main>
-      <footer className="mx-auto max-w-7xl px-4 py-8 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50 flex items-center justify-between border-t border-border/40 mt-12">
-        <span>© Firma RedWood</span>
-        <span>Lealdade primeiro · resto depois</span>
-      </footer>
-    </div>
+    <SidebarProvider>
+      <div className="ambient-bg flex min-h-screen w-full">
+        <CinematicBackdrop />
+        <AppSidebar />
+
+        <div className="flex flex-1 flex-col">
+          <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border/60 bg-background/70 px-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <div className="ml-auto flex items-center gap-2">
+              <NotificationBell />
+            </div>
+            <div aria-hidden className="absolute inset-x-0 -bottom-px hairline-top" />
+          </header>
+
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 animate-rise">
+            {children}
+          </main>
+
+          <footer className="mx-auto flex w-full max-w-7xl items-center justify-between border-t border-border/40 px-4 py-8 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50">
+            <span>© RedWood</span>
+            <span>Casa fechada · só para os de dentro</span>
+          </footer>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }
 
