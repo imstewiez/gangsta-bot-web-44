@@ -140,9 +140,38 @@ function StockTable() {
     .sort((a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50))
     .filter(([cat]) => filter === "todas" || cat === filter);
 
+  const allCats = Object.entries(groups).sort(
+    (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50)
+  );
+
   return (
     <div className="space-y-6">
-      {ordered.map(([cat, items]) => {
+      <div className="flex flex-wrap gap-1.5">
+        <Button
+          size="sm"
+          variant={filter === "todas" ? "default" : "outline"}
+          className="h-7 px-3 text-[11px] uppercase tracking-wider"
+          onClick={() => setFilter("todas")}
+        >
+          Todas
+        </Button>
+        {allCats.map(([cat]) => {
+          const meta = GROUPS[cat];
+          const active = filter === cat;
+          return (
+            <Button
+              key={cat}
+              size="sm"
+              variant={active ? "default" : "outline"}
+              className="h-7 px-3 text-[11px] uppercase tracking-wider"
+              onClick={() => setFilter(cat)}
+            >
+              <CategoryIcon category={cat} size={12} />
+              <span className="ml-1.5">{meta?.label ?? cat}</span>
+            </Button>
+          );
+        })}
+      </div>
         const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99, group: "compra" as const };
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
         const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
