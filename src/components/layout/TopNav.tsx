@@ -7,9 +7,18 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/membros", label: "Membros" },
   { to: "/inventario", label: "Inventário" },
+  { to: "/encomendas", label: "Encomendas" },
   { to: "/operacoes", label: "Operações" },
   { to: "/cemiterio", label: "Cemitério" },
+  { to: "/disponibilidade", label: "Disp." },
   { to: "/tops", label: "Tops" },
+  { to: "/premios", label: "Prémios" },
+] as const;
+
+const ADMIN_NAV = [
+  { to: "/admin", label: "Chefia" },
+  { to: "/onboarding", label: "Onboarding" },
+  { to: "/auditoria", label: "Auditoria" },
 ] as const;
 
 export function TopNav() {
@@ -45,19 +54,23 @@ export function TopNav() {
               </Link>
             );
           })}
-          {isAdmin && (
-            <Link
-              to="/admin"
-              className={
-                "text-display text-xs px-3 py-1.5 rounded-sm transition-colors " +
-                (loc.pathname.startsWith("/admin")
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50")
-              }
-            >
-              Chefia
-            </Link>
-          )}
+          {isAdmin && ADMIN_NAV.map((n) => {
+            const active = loc.pathname.startsWith(n.to);
+            return (
+              <Link
+                key={n.to}
+                to={n.to}
+                className={
+                  "text-display text-xs px-3 py-1.5 rounded-sm transition-colors " +
+                  (active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50")
+                }
+              >
+                {n.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground sm:block">
