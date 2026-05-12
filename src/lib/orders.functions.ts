@@ -159,10 +159,19 @@ export const transitionOrder = createServerFn({ method: "POST" })
       [before.member_id]
     );
     if (reqProfile?.discord_id) {
+      const STATUS_PT: Record<string, string> = {
+        pending: "à espera",
+        approved: "aceite pela chefia",
+        in_progress: "a ser tratada",
+        ready: "pronta a levantar",
+        fulfilled: "entregue",
+        denied: "recusada",
+        cancelled: "cancelada",
+      };
       await notifyUsers(context.supabase, [reqProfile.discord_id], {
         type: "order_update",
-        title: `Encomenda #${data.id}`,
-        body: `${before.item_name ?? "Item"} → ${data.to}`,
+        title: `Encomenda #${data.id} · ${STATUS_PT[data.to] ?? data.to}`,
+        body: `${before.item_name ?? "Item"} — ${STATUS_PT[data.to] ?? data.to}`,
         link: "/encomendas",
       });
     }
