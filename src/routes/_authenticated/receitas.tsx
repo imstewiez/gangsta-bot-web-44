@@ -17,6 +17,9 @@ export const Route = createFileRoute("/_authenticated/receitas")({ component: Pa
 function Page() {
   const fn = useServerFn(listRecipes);
   const calcFn = useServerFn(computeCraftFeasibility);
+  const meFn = useServerFn(getCurrentMember);
+  const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
+  const isManager = me.data?.is_manager ?? false;
   const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => fn() });
   const [calcRecipe, setCalcRecipe] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
