@@ -122,8 +122,8 @@ export const createOperation = createServerFn({ method: "POST" })
       `insert into operations
          (operation_type, spot, leader_id, status, date, scheduled_time, start_time, notes, created_by, created_at)
        values ($1, $2, $3, 'planeada',
-         coalesce($4::date, current_date),
-         coalesce($4::time, null),
+         coalesce(($4::timestamptz)::date, current_date),
+         ($4::timestamptz)::time,
          $4::timestamptz, $5, $6, now())
        returning id`,
       [
