@@ -5,8 +5,8 @@ import { resolveCurrentMember } from "./pricing.server";
 
 // Tudo o que é stock controlado pelo armazém
 const INV_CATEGORIES = [
-  "armas", "armas_fogo", "armas_brancas", "municoes", "acessorios",
-  "drogas", "materiais", "materias_primas", "lixo", "componentes", "consumiveis",
+  "armas", "armas_fogo", "municoes", "acessorios",
+  "droga", "drogas", "equipamento", "componentes",
 ];
 
 async function gateInventory(supabase: unknown, userId: string) {
