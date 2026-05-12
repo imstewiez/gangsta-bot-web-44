@@ -102,7 +102,7 @@ export function MemberAdminPanel({ member }: { member: Member }) {
             >
               {TIER_LIST.map((t) => (
                 <option key={t} value={t}>
-                  {TIER_EMOJI[t]} {TIER_LABELS[t]}
+                  {TIER_LABELS[t]}
                 </option>
               ))}
             </select>
