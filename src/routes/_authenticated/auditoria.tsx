@@ -18,43 +18,39 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
-  member_promoted:    { label: "Promoção",            icon: ArrowUpCircle,   tone: "text-success" },
-  member_demoted:     { label: "Despromoção",         icon: ArrowDownCircle, tone: "text-warning" },
-  member_kicked:      { label: "Expulsão",            icon: UserMinus,       tone: "text-destructive" },
-  member_joined:      { label: "Entrada no bairro",   icon: UserPlus,        tone: "text-success" },
-  member_renamed:     { label: "Renomeação",          icon: Pencil,          tone: "text-info" },
-  member_tier_set:    { label: "Tier alterado",       icon: ArrowUpCircle,   tone: "text-info" },
-  member_stats_adjusted: { label: "Stats ajustadas",  icon: Settings2,       tone: "text-warning" },
-  order_new:          { label: "Encomenda criada",    icon: ShoppingBag,     tone: "text-info" },
-  order_created:      { label: "Encomenda criada",    icon: ShoppingBag,     tone: "text-info" },
-  order_approved:     { label: "Encomenda aceite",    icon: CheckCircle2,    tone: "text-success" },
-  order_denied:       { label: "Encomenda recusada",  icon: XCircle,         tone: "text-destructive" },
-  order_fulfilled:    { label: "Encomenda entregue",  icon: CheckCircle2,    tone: "text-success" },
-  order_cancelled:    { label: "Encomenda cancelada", icon: XCircle,         tone: "text-muted-foreground" },
-  delivery_created:   { label: "Entrega registada",   icon: Truck,           tone: "text-success" },
-  inventory_in:       { label: "Entrada de stock",    icon: Package,         tone: "text-success" },
-  inventory_out:      { label: "Saída de stock",      icon: Package,         tone: "text-destructive" },
-  operation_created:  { label: "Saída planeada",      icon: Crosshair,       tone: "text-info" },
-  operation_started:  { label: "Saída iniciada",      icon: Crosshair,       tone: "text-warning" },
-  operation_finalized:{ label: "Saída finalizada",    icon: CheckCircle2,    tone: "text-success" },
-  operation_closed:   { label: "Saída fechada",       icon: XCircle,         tone: "text-muted-foreground" },
-  prize_set:          { label: "Prémio definido",     icon: Sparkles,        tone: "text-primary" },
-  prize_delivered:    { label: "Prémio entregue",     icon: Trophy,          tone: "text-success" },
-  rankings_recompute: { label: "Ranking recalculado", icon: Activity,        tone: "text-info" },
-  tag_request:        { label: "Pedido de tag",       icon: ScrollText,      tone: "text-info" },
-  tag_approved:       { label: "Tag aprovada",        icon: CheckCircle2,    tone: "text-success" },
-  tag_denied:         { label: "Tag recusada",        icon: XCircle,         tone: "text-destructive" },
+// Apenas ícone + tom por evento. O label vem sempre de formatAuditAction (domain.ts).
+const ACTION_VISUAL: Record<string, { icon: LucideIcon; tone: string }> = {
+  member_promoted:    { icon: ArrowUpCircle,   tone: "text-success" },
+  member_demoted:     { icon: ArrowDownCircle, tone: "text-warning" },
+  member_kicked:      { icon: UserMinus,       tone: "text-destructive" },
+  member_joined:      { icon: UserPlus,        tone: "text-success" },
+  member_renamed:     { icon: Pencil,          tone: "text-info" },
+  member_tier_set:    { icon: ArrowUpCircle,   tone: "text-info" },
+  member_stats_adjusted: { icon: Settings2,    tone: "text-warning" },
+  order_new:          { icon: ShoppingBag,     tone: "text-info" },
+  order_created:      { icon: ShoppingBag,     tone: "text-info" },
+  order_approved:     { icon: CheckCircle2,    tone: "text-success" },
+  order_denied:       { icon: XCircle,         tone: "text-destructive" },
+  order_fulfilled:    { icon: CheckCircle2,    tone: "text-success" },
+  order_cancelled:    { icon: XCircle,         tone: "text-muted-foreground" },
+  delivery_created:   { icon: Truck,           tone: "text-success" },
+  inventory_in:       { icon: Package,         tone: "text-success" },
+  inventory_out:      { icon: Package,         tone: "text-destructive" },
+  operation_created:  { icon: Crosshair,       tone: "text-info" },
+  operation_started:  { icon: Crosshair,       tone: "text-warning" },
+  operation_finalized:{ icon: CheckCircle2,    tone: "text-success" },
+  operation_closed:   { icon: XCircle,         tone: "text-muted-foreground" },
+  prize_set:          { icon: Sparkles,        tone: "text-primary" },
+  prize_delivered:    { icon: Trophy,          tone: "text-success" },
+  rankings_recompute: { icon: Activity,        tone: "text-info" },
+  tag_request:        { icon: ScrollText,      tone: "text-info" },
+  tag_approved:       { icon: CheckCircle2,    tone: "text-success" },
+  tag_denied:         { icon: XCircle,         tone: "text-destructive" },
 };
 
 function actionMeta(action: string) {
-  return (
-    ACTION_META[action] ?? {
-      label: formatAuditAction(action),
-      icon: AlertTriangle,
-      tone: "text-muted-foreground",
-    }
-  );
+  const v = ACTION_VISUAL[action] ?? { icon: AlertTriangle, tone: "text-muted-foreground" };
+  return { ...v, label: formatAuditAction(action) };
 }
 
 export const Route = createFileRoute("/_authenticated/auditoria")({
