@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -19,6 +19,7 @@ type Notif = {
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const router = useRouter();
   const [items, setItems] = useState<Notif[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -84,24 +85,23 @@ export function NotificationBell() {
             <p className="p-4 text-center text-xs text-muted-foreground">Sem notificações.</p>
           )}
           {items.map((n) => {
-            const content = (
-              <div
+            const handleClick = () => {
+              setOpen(false);
+              if (n.link) router.navigate({ to: n.link });
+            };
+            return (
+              <button
+                key={n.id}
+                onClick={handleClick}
                 className={
-                  "border-b border-border px-3 py-2 text-sm hover:bg-accent/40 " +
+                  "block w-full border-b border-border px-3 py-2 text-left text-sm hover:bg-accent/40 " +
                   (n.read_at ? "opacity-60" : "")
                 }
               >
                 <div className="font-medium">{n.title}</div>
                 {n.body && <div className="text-xs text-muted-foreground">{n.body}</div>}
                 <div className="mt-1 text-[10px] text-muted-foreground">{fmtDate(n.created_at)}</div>
-              </div>
-            );
-            return n.link ? (
-              <Link key={n.id} to={n.link} onClick={() => setOpen(false)}>
-                {content}
-              </Link>
-            ) : (
-              <div key={n.id}>{content}</div>
+              </button>
             );
           })}
         </div>
