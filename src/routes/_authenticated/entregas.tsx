@@ -19,16 +19,18 @@ import { Plus, Trash2, Check, X, PackageOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "à espera",
-  approved: "paga",
-  rejected: "rejeitada",
-};
+// Estados por tipo: a label muda consoante seja entrega vs venda
+function statusMeta(tipo: string, status: string): { label: string; color: string } {
+  const isVenda = tipo === "venda";
+  if (status === "pending") return { label: isVenda ? "à espera de compra" : "à espera", color: "bg-muted text-muted-foreground border-border" };
+  if (status === "approved") return { label: isVenda ? "comprado / pago" : "entregue ao bairro", color: "bg-success/15 text-success border-success/30" };
+  if (status === "rejected") return { label: isVenda ? "compra recusada" : "entrega recusada", color: "bg-destructive/15 text-destructive border-destructive/30" };
+  return { label: status, color: "bg-muted text-muted-foreground border-border" };
+}
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: "bg-muted text-muted-foreground border-border",
-  approved: "bg-success/15 text-success border-success/30",
-  rejected: "bg-destructive/15 text-destructive border-destructive/30",
+const TIPO_META: Record<string, { label: string; emoji: string; tone: string }> = {
+  entrega: { label: "Entrega ao bairro", emoji: "📦", tone: "bg-info/15 text-info border-info/30" },
+  venda:   { label: "Venda ao bairro",   emoji: "💰", tone: "bg-warning/15 text-warning border-warning/30" },
 };
 
 function Page() {
