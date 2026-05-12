@@ -50,10 +50,10 @@ export function TopNav() {
   const linkClass = (to: string) => {
     const active = loc.pathname === to || loc.pathname.startsWith(to + "/");
     return (
-      "text-display text-[11px] tracking-[0.12em] px-2.5 py-1.5 rounded-sm transition-colors " +
+      "relative text-display text-[11px] tracking-[0.16em] px-3 py-1.5 rounded-sm transition-all " +
       (active
-        ? "bg-primary text-primary-foreground"
-        : "text-muted-foreground hover:text-foreground hover:bg-accent/50")
+        ? "text-primary-foreground bg-primary shadow-[0_0_18px_-6px_var(--primary)]"
+        : "text-muted-foreground hover:text-foreground hover:bg-accent/40")
     );
   };
 
