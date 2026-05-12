@@ -27,60 +27,72 @@ const GROUPS: Record<string, CatMeta> = {
   armas_orange:     { label: "Armas Orange",       tone: "warning",     order: 2 },
   carregadores:     { label: "Carregadores",       tone: "primary",     order: 3 },
   acessorios_armas: { label: "Acessórios de armas",tone: "info",        order: 4 },
-  coletes:          { label: "Coletes padrão",     tone: "warning",     order: 5 },
+  coletes:          { label: "Coletes",            tone: "warning",     order: 5 },
   drogas:           { label: "Drogas",             tone: "success",     order: 6 },
-  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", tone: "primary", order: 7 },
-  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", tone: "muted", order: 8 },
+  craft_armas:      { label: "Craft de armas (corpos, peças, prints, ferro)", tone: "primary", order: 7 },
+  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)",      tone: "muted",   order: 8 },
 };
+
+// Listas explícitas — baseadas nos itens reais da BD.
+const ORANGE_GUN_NAMES = new Set([
+  "drako", "sns pistol", "sns pistol mk2", "pistol xm3", "compact rifle",
+  "ap pistol", "tec pistol", "tec-9", "pistol", "pistola", "pistol mk2",
+  "ceramic pistol", "vintage pistol", "vintage estragada", "sns estragada",
+  "machine pistol", "micro smg", "mini smg", "revolver", "gadget pistol",
+  "pistola gadget", "pistola tec", "pistola xm3",
+]);
 
 // Devolve a chave do grupo, ou null se o item não interessa ao armazém.
 function classifyRow(r: { category: string | null; item_name: string }): string | null {
   const c = (r.category ?? "").toLowerCase();
-  const n = (r.item_name ?? "").toLowerCase();
+  const nRaw = (r.item_name ?? "").trim();
+  const n = nRaw.toLowerCase();
 
-  // Drogas
-  if (c === "drogas" || /coca|metanfetamina|meta\b|erva|maconha|haxixe|ecstasy|lsd|heroina|opio/.test(n)) {
-    return "drogas";
+  // Armas brancas / melee — fora do armazém
+  if (c === "armas_brancas") return null;
+  if (/\b(faca|adaga|canivete|machete|machado|martelo|cacetete|bast[aã]o|barra|p[eé] de cabra|crowbar|lanterna(?!\s*\d)|garrafa|chave de (cano|tubo)|punhal|soco|soqueira|taco|clube|battle axe|arma de choque)\b/.test(n)) {
+    return null;
   }
 
-  // Coletes padrão (não kevlar nem custom)
-  if (/colete\s*(padr[aã]o|standard|normal)?$/.test(n) || (c === "coletes" && !/kevlar|custom|pesado/.test(n))) {
-    return "coletes";
-  }
+  // Drogas (categoria "droga" no DB)
+  if (c === "droga") return "drogas";
 
-  // Carregadores
-  if (c === "municoes" || c === "municao" || /carregador|magazine|\bmag\b/.test(n)) {
+  // Coletes — só padrão, leve, pesado, tático (categoria equipamento)
+  if (c === "equipamento" && /colete/.test(n)) return "coletes";
+
+  // Carregadores — categoria "municoes"
+  if (c === "municoes") {
+    // "Silenciador 1" foi mal-classificado em municoes — vai para acessórios
+    if (/silenciador|supressor|mira|red\s*dot|holo|grip|punho|lanterna\s*\d/.test(n)) {
+      return "acessorios_armas";
+    }
     return "carregadores";
   }
 
-  // Acessórios de armas: silenciador, mira, lanterna, punho, etc.
-  if (c === "acessorios" || /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano/.test(n)) {
-    return "acessorios_armas";
-  }
+  // Acessórios — silenciador, mira, mag expandido, grip, lanterna numerada, etc.
+  if (c === "acessorios") return "acessorios_armas";
 
-  // Material craft armas
-  if (/\b(pe[çc]a|pe[çc]as|corpo|corpos)\b|\bferro\b|\bprint\b|\bprints\b|esquema/.test(n)) {
-    return "craft_armas";
-  }
-
-  // Material craft carregadores
-  if (/\bcobre\b|\bp[oó]lvora\b/.test(n)) {
-    return "craft_carregadores";
-  }
-
-  // Armas
-  if (c === "armas" || c === "armas_fogo" || c === "armas_brancas") {
-    if (c === "armas_brancas" || /faca|machete|katana|taco|cassetete|martelo|punh[aã]l|navalha/.test(n)) {
-      // Bairro não trabalha com armas brancas — esconder do armazém.
-      return null;
+  // Craft de armas — componentes que servem para fabricar armas
+  if (c === "componentes") {
+    if (/\bcobre\b|\bp[oó]lvora\b/.test(n)) return "craft_carregadores";
+    if (/corpo|pe[çc]a|print|molde|ferro|kevlar|nylon|borracha|couro|saco|tecido|papel|embalagem|latex/.test(n)) {
+      return "craft_armas";
     }
-    if (/compact|drako|sns|xm3/.test(n)) return "armas_orange";
-    if (/red|ak\b|m4|sniper|fuzil|shotgun|caçadeira|cacadeira|g36|scar|fal/.test(n)) return "armas_red";
-    if (/pistola|glock|deagle|desert|colt|revolver|revólver|beretta|usp|uzi|mp5|mp7|smg|p90|vector/.test(n)) return "armas_orange";
+    return null;
+  }
+
+  // Armas — categoria "armas_fogo" (e algumas em "armas")
+  if (c === "armas_fogo" || c === "armas") {
+    if (ORANGE_GUN_NAMES.has(n)) return "armas_orange";
+    // Tudo o resto que seja arma de fogo é Red (rifles, snipers, shotguns, heavy, etc.)
+    if (/rifle|ak\b|sniper|shotgun|espingarda|cano serrado|heavy|combat|tactical|bullpup|carabina|gusenberg|military|musket|p90|pdw|smg|marksman|\.50|deagle|desert|double-action|revolver dourado/.test(n)) {
+      return "armas_red";
+    }
+    // Pistolas curtas/básicas que não estejam na orange list — também Orange
+    if (/pistol|pistola/.test(n)) return "armas_orange";
     return "armas_red";
   }
 
-  // Tudo o resto não interessa ao armazém
   return null;
 }
 
