@@ -77,7 +77,7 @@ export async function resolveCurrentMember(supabase: any, userId: string): Promi
     [profile.discord_id]
   );
   if (!m) return null;
-  return { ...m, is_manager: isManager(m) };
+  return { ...m, is_manager: isManager(m), can_see_inventory: canSeeInventory(m) };
 }
 
 export const getCurrentMember = createServerFn({ method: "GET" })
