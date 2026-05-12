@@ -21,7 +21,7 @@ function Page() {
   });
   return (
     <>
-      <PageHeader eyebrow="Bairro" title="Disponibilidade" description="Sessões diárias e votos." />
+      <PageHeader eyebrow="Bairro" title="Disponibilidade" description="Sessões diárias e votos." icon={CalendarClock} />
       <div className="grid gap-3 lg:grid-cols-2">
         <Card>
           <CardHeader><CardTitle className="text-display text-sm">Sessões</CardTitle></CardHeader>
