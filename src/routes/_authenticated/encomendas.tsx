@@ -97,7 +97,11 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
       transFn({
         data: v as { id: number; to: "pending" | "approved" | "in_progress" | "ready" | "fulfilled" | "denied" | "cancelled" },
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      if (res && "ok" in res && res.ok === false) {
+        toast.error(res.error);
+        return;
+      }
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["stock"] });
       toast.success("Feito.");
