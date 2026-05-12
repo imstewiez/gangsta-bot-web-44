@@ -7,7 +7,8 @@ import { LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./NotificationBell";
 import { getCurrentMember } from "@/lib/pricing.functions";
-import { TIER_LABELS, TIER_EMOJI, tierColor } from "@/lib/domain";
+import { TIER_LABELS, TIER_ACCENT } from "@/lib/domain";
+import { TierIcon } from "@/components/domain/TierIcon";
 import redwoodLogo from "@/assets/redwood-logo.png";
 
 type NavItem = { to: string; label: string; need?: "inventory" };
@@ -41,7 +42,7 @@ export function TopNav() {
   const canSeeInv = me.data?.can_see_inventory ?? false;
   const myTier = me.data?.tier ?? null;
   const myTierLabel = myTier ? TIER_LABELS[myTier] ?? myTier : null;
-  const myEmoji = myTier ? TIER_EMOJI[myTier] : null;
+  const myAccent = myTier ? TIER_ACCENT[myTier] : null;
   const myDisplay = me.data?.display_name ?? profile?.display_name ?? "—";
 
   const visible = NAV.filter((n) => !n.need || (n.need === "inventory" && canSeeInv));
@@ -89,16 +90,20 @@ export function TopNav() {
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell />
           <span
-            className={
-              "hidden items-center gap-1.5 rounded-sm border px-2 py-1 text-display text-[11px] tracking-[0.08em] sm:inline-flex " +
-              (myTier ? tierColor(myTier) : "border-border text-muted-foreground")
-            }
+            className="hidden items-center gap-2 rounded-full border bg-card/40 px-2 py-1 text-display text-[11px] tracking-[0.08em] sm:inline-flex"
+            style={{
+              borderColor: myAccent ? `color-mix(in oklab, ${myAccent} 55%, transparent)` : undefined,
+            }}
             title={myTierLabel ? `${myTierLabel} — ${myDisplay}` : myDisplay}
           >
-            {myEmoji && <span aria-hidden>{myEmoji}</span>}
-            {myTierLabel && <span className="opacity-90">{myTierLabel}</span>}
-            {myTierLabel && <span className="opacity-50">·</span>}
-            <span className="font-semibold tracking-normal normal-case">{myDisplay}</span>
+            <TierIcon tier={myTier} size="sm" />
+            {myTierLabel && (
+              <span className="opacity-90" style={{ color: myAccent ?? undefined }}>
+                {myTierLabel}
+              </span>
+            )}
+            {myTierLabel && <span className="opacity-40">·</span>}
+            <span className="font-semibold tracking-normal normal-case text-foreground">{myDisplay}</span>
           </span>
           <Button size="sm" variant="ghost" onClick={signOut} title="Sair">
             <LogOut className="h-4 w-4" />
