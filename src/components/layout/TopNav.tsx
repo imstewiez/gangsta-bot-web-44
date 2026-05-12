@@ -3,7 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, Menu, X } from "lucide-react";
+import {
+  LogOut, Menu, X,
+  Home, Users, Tags, ShoppingBag, PackageOpen, Package, Hammer,
+  Crosshair, CalendarClock, Trophy, Sparkles, Shield, ScrollText,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./NotificationBell";
 import { getCurrentMember } from "@/lib/pricing.functions";
@@ -11,25 +16,25 @@ import { TIER_LABELS, TIER_ACCENT } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
 import redwoodLogo from "@/assets/redwood-logo.png";
 
-type NavItem = { to: string; label: string; need?: "inventory" };
+type NavItem = { to: string; label: string; icon: LucideIcon; need?: "inventory" };
 
 const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Casa" },
-  { to: "/membros", label: "Membros" },
-  { to: "/precario", label: "Preçário" },
-  { to: "/encomendas", label: "Encomendas" },
-  { to: "/entregas", label: "Entregas" },
-  { to: "/inventario", label: "Armazém", need: "inventory" },
-  { to: "/receitas", label: "Receitas" },
-  { to: "/operacoes", label: "Saídas" },
-  { to: "/disponibilidade", label: "Disp." },
-  { to: "/tops", label: "Leaderboard" },
-  { to: "/premios", label: "Prémios" },
+  { to: "/dashboard",       label: "Casa",        icon: Home },
+  { to: "/membros",         label: "Membros",     icon: Users },
+  { to: "/precario",        label: "Preçário",    icon: Tags },
+  { to: "/encomendas",      label: "Encomendas",  icon: ShoppingBag },
+  { to: "/entregas",        label: "Entregas",    icon: PackageOpen },
+  { to: "/inventario",      label: "Armazém",     icon: Package, need: "inventory" },
+  { to: "/receitas",        label: "Receitas",    icon: Hammer },
+  { to: "/operacoes",       label: "Saídas",      icon: Crosshair },
+  { to: "/disponibilidade", label: "Disp.",       icon: CalendarClock },
+  { to: "/tops",            label: "Leaderboard", icon: Trophy },
+  { to: "/premios",         label: "Prémios",     icon: Sparkles },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/admin", label: "Chefia" },
-  { to: "/auditoria", label: "Auditoria" },
+  { to: "/admin",     label: "Chefia",    icon: Shield },
+  { to: "/auditoria", label: "Auditoria", icon: ScrollText },
 ];
 
 export function TopNav() {
