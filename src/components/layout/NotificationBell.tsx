@@ -60,12 +60,12 @@ export function NotificationBell() {
     load();
   };
 
-  const typeMeta = (t: string): { icon: string; tone: string } => {
-    if (t.startsWith("order")) return { icon: "🛒", tone: "border-l-info" };
-    if (t.startsWith("delivery")) return { icon: "📦", tone: "border-l-warning" };
-    if (t.startsWith("liquidation") || t.startsWith("payout")) return { icon: "💰", tone: "border-l-success" };
-    if (t.includes("warn") || t.includes("alert")) return { icon: "⚠️", tone: "border-l-destructive" };
-    return { icon: "🔔", tone: "border-l-primary" };
+  const typeMeta = (t: string): { Icon: LucideIcon; tone: string; color: string } => {
+    if (t.startsWith("order")) return { Icon: ShoppingCart, tone: "border-l-info", color: "text-info" };
+    if (t.startsWith("delivery")) return { Icon: PackageCheck, tone: "border-l-warning", color: "text-warning" };
+    if (t.startsWith("liquidation") || t.startsWith("payout")) return { Icon: Coins, tone: "border-l-success", color: "text-success" };
+    if (t.includes("warn") || t.includes("alert")) return { Icon: AlertTriangle, tone: "border-l-destructive", color: "text-destructive" };
+    return { Icon: Bell, tone: "border-l-primary", color: "text-primary" };
   };
 
   return (
