@@ -11,16 +11,22 @@ export const Route = createFileRoute("/_authenticated/membros")({ component: Pag
 
 function Page() {
   const fn = useServerFn(listMembers);
-  const { data, isLoading } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
+  const { data, isLoading, error } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
   const [q, setQ] = useState("");
-  const filtered = (data ?? []).filter((m) =>
+  const list = Array.isArray(data) ? data : [];
+  const filtered = list.filter((m) =>
     !q || (m.display_name ?? "").toLowerCase().includes(q.toLowerCase()) ||
     (m.nick ?? "").toLowerCase().includes(q.toLowerCase())
   );
   return (
     <>
-      <PageHeader eyebrow="Bairro" title="Membros" description={`${data?.length ?? 0} no total.`}
+      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} no total.`}
         action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
+      {error && (
+        <div className="mb-3 rounded-sm border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          Erro a carregar membros: {error instanceof Error ? error.message : String(error)}
+        </div>
+      )}
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs">
