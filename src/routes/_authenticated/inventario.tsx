@@ -19,20 +19,19 @@ export const Route = createFileRoute("/_authenticated/inventario")({
   component: Page,
 });
 
-type CatMeta = { label: string; emoji: string; tone: string; order: number };
+type CatMeta = { label: string; tone: string; order: number };
 
 // O bairro só guarda o que vende ou material p/ craftar o que vende.
-// Tudo o resto é descartado da vista (sucata, consumíveis aleatórios, etc).
 const GROUPS: Record<string, CatMeta> = {
-  armas_red:        { label: "Armas Red",          emoji: "🟥", tone: "destructive", order: 1 },
-  armas_orange:     { label: "Armas Orange",       emoji: "🟧", tone: "warning",     order: 2 },
-  armas_brancas:    { label: "Armas Brancas",      emoji: "🔪", tone: "info",        order: 3 },
-  carregadores:     { label: "Carregadores",       emoji: "🧰", tone: "primary",     order: 4 },
-  acessorios_armas: { label: "Acessórios de armas",emoji: "🔧", tone: "info",        order: 5 },
-  coletes:          { label: "Coletes padrão",     emoji: "🦺", tone: "warning",     order: 6 },
-  drogas:           { label: "Drogas",             emoji: "💊", tone: "success",     order: 7 },
-  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", emoji: "⚒️", tone: "primary", order: 8 },
-  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", emoji: "🧪", tone: "muted", order: 9 },
+  armas_red:        { label: "Armas Red",          tone: "destructive", order: 1 },
+  armas_orange:     { label: "Armas Orange",       tone: "warning",     order: 2 },
+  armas_brancas:    { label: "Armas Brancas",      tone: "info",        order: 3 },
+  carregadores:     { label: "Carregadores",       tone: "primary",     order: 4 },
+  acessorios_armas: { label: "Acessórios de armas",tone: "info",        order: 5 },
+  coletes:          { label: "Coletes padrão",     tone: "warning",     order: 6 },
+  drogas:           { label: "Drogas",             tone: "success",     order: 7 },
+  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", tone: "primary", order: 8 },
+  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", tone: "muted", order: 9 },
 };
 
 // Devolve a chave do grupo, ou null se o item não interessa ao armazém.
