@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
+import { resolveCurrentMember } from "./pricing.server";
 
 export type RecipeRow = {
   recipe_id: number;
@@ -24,7 +25,9 @@ export type RecipeRow = {
 
 export const listRecipes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<RecipeRow[]> => {
+  .handler(async ({ context }): Promise<RecipeRow[]> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    const isManager = me?.is_manager ?? false;
     const rows = await pgQuery<{
       recipe_id: number;
       item_id: number;
@@ -86,8 +89,11 @@ export const listRecipes = createServerFn({ method: "GET" })
       }
     }
     for (const r of map.values()) {
-      r.margin = r.estimated_value - r.total_cost;
-      r.margin_pct = r.total_cost > 0 ? (r.margin / r.total_cost) * 100 : null;
+      const margin = r.estimated_value - r.total_cost;
+      const pct = r.total_cost > 0 ? (margin / r.total_cost) * 100 : null;
+      // margem só vai no payload se for chefia
+      r.margin = isManager ? margin : 0;
+      r.margin_pct = isManager ? pct : null;
     }
     return [...map.values()].sort((a, b) => a.item_name.localeCompare(b.item_name));
   });

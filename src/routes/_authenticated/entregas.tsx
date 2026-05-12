@@ -19,16 +19,18 @@ import { Plus, Trash2, Check, X, PackageOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "à espera",
-  approved: "paga",
-  rejected: "rejeitada",
-};
+// Estados por tipo: a label muda consoante seja entrega vs venda
+function statusMeta(tipo: string, status: string): { label: string; color: string } {
+  const isVenda = tipo === "venda";
+  if (status === "pending") return { label: isVenda ? "à espera de compra" : "à espera", color: "bg-muted text-muted-foreground border-border" };
+  if (status === "approved") return { label: isVenda ? "comprado / pago" : "entregue ao bairro", color: "bg-success/15 text-success border-success/30" };
+  if (status === "rejected") return { label: isVenda ? "compra recusada" : "entrega recusada", color: "bg-destructive/15 text-destructive border-destructive/30" };
+  return { label: status, color: "bg-muted text-muted-foreground border-border" };
+}
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: "bg-muted text-muted-foreground border-border",
-  approved: "bg-success/15 text-success border-success/30",
-  rejected: "bg-destructive/15 text-destructive border-destructive/30",
+const TIPO_META: Record<string, { label: string; emoji: string; tone: string }> = {
+  entrega: { label: "Entrega ao bairro", emoji: "📦", tone: "bg-info/15 text-info border-info/30" },
+  venda:   { label: "Venda ao bairro",   emoji: "💰", tone: "bg-warning/15 text-warning border-warning/30" },
 };
 
 function Page() {
@@ -90,15 +92,21 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
 
   return (
     <div className="grid gap-3">
-      {list.data.map((d) => (
+      {list.data.map((d) => {
+        const tipoMeta = TIPO_META[d.tipo] ?? TIPO_META.entrega;
+        const st = statusMeta(d.tipo, d.status);
+        return (
         <Card key={d.id} className="p-4">
           <div className="flex items-start gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
+                  {tipoMeta.emoji} {tipoMeta.label}
+                </span>
                 <span className="font-semibold">{d.requester_name ?? "—"}</span>
                 <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
-                <span className={"ml-auto rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + (STATUS_COLOR[d.status] ?? "")}>
-                  {STATUS_LABEL[d.status] ?? d.status}
+                <span className={"ml-auto rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + st.color}>
+                  {st.label}
                 </span>
               </div>
               <ul className="mt-3 divide-y divide-border/50 text-sm">
@@ -126,16 +134,17 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
             {canDecide && d.status === "pending" && (
               <div className="flex flex-col gap-1.5">
                 <Button size="sm" onClick={() => m.mutate({ id: d.id, approve: true })} disabled={m.isPending}>
-                  <Check className="mr-1 h-3 w-3" />Pagar
+                  <Check className="mr-1 h-3 w-3" />{d.tipo === "venda" ? "Comprar" : "Receber"}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => m.mutate({ id: d.id, approve: false })} disabled={m.isPending}>
-                  <X className="mr-1 h-3 w-3" />Não interessa
+                  <X className="mr-1 h-3 w-3" />Recusar
                 </Button>
               </div>
             )}
           </div>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -149,6 +158,7 @@ function NewDelivery() {
   const items = (cat.data ?? []).filter((i: CatalogItem) => i.side === "compra");
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([{ item_id: "", qty: "1" }]);
   const [notes, setNotes] = useState("");
+  const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
   const m = useMutation({
     mutationFn: () =>
       createFn({
@@ -157,14 +167,16 @@ function NewDelivery() {
             .filter((l) => l.item_id && l.qty)
             .map((l) => ({ item_id: Number(l.item_id), qty: Number(l.qty) })),
           notes: notes || null,
+          tipo,
         },
       }),
     onSuccess: () => {
-      toast.success("Entrega submetida. A chefia confirma.");
+      toast.success(tipo === "venda" ? "Pedido de compra enviado." : "Entrega submetida. A chefia confirma.");
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       setOpen(false);
       setLines([{ item_id: "", qty: "1" }]);
       setNotes("");
+      setTipo("entrega");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -180,6 +192,37 @@ function NewDelivery() {
           <DialogTitle>O que vens largar?</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">É para…</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTipo("entrega")}
+                className={
+                  "rounded-sm border px-3 py-2 text-left text-sm transition-colors " +
+                  (tipo === "entrega"
+                    ? "border-info bg-info/15 text-info"
+                    : "border-border bg-card hover:bg-accent/30")
+                }
+              >
+                <div className="text-display text-[11px] uppercase tracking-wider">📦 Entregar</div>
+                <div className="text-xs text-muted-foreground">Vai para o stock do bairro</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipo("venda")}
+                className={
+                  "rounded-sm border px-3 py-2 text-left text-sm transition-colors " +
+                  (tipo === "venda"
+                    ? "border-warning bg-warning/15 text-warning"
+                    : "border-border bg-card hover:bg-accent/30")
+                }
+              >
+                <div className="text-display text-[11px] uppercase tracking-wider">💰 Vender</div>
+                <div className="text-xs text-muted-foreground">A chefia paga ao morador</div>
+              </button>
+            </div>
+          </div>
           {lines.map((l, idx) => (
             <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
               <Select

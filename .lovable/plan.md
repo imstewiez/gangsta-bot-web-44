@@ -1,88 +1,139 @@
-# Preçário, Encomendas, Entregas e Notificações
+## Resumo
 
-A maior parte da infraestrutura já existe na BD Railway. Não preciso de criar tabelas novas para orders nem entregas — basta seed de preços, uma coluna extra para drogas (preço morador vs civil), pricing engine no servidor, UIs novas e notificações in-app via Supabase.
+Pacote grande com várias áreas. Faço por blocos para conseguir entregar com qualidade. Confirma se queres tudo ou se preferes que parta em fases.
 
-## Mapeamento de escalões (members.tier)
+---
 
-A coluna `members.tier` já existe com exactamente os valores certos:
+## 1. Inventário (`/inventario`)
 
-| Tier (DB) | Nome | Margem sobre preço base | Pode gerir encomendas/entregas |
-|-----------|------|------------------------|-------------------------------|
-| `young_blood` | YB (Bairrista N1) | +1.5% | não |
-| `o_gunao` | GN (Bairrista N2) | +1.0% | não |
-| `gangster_fodido` | GF (Bairrista N3) | +0.5% | não |
-| `patrao_di_zona` | Patrão di Zona | 0% | **sim** |
-| `real_gangster` | Real Gangster (oficial N1) | 0% | não |
-| `og` | OG (oficial N2) | 0% | não |
-| `kingpin` | Kingpin (sub-chefe) | 0% | **sim** |
-| `manda_chuva` | Manda-Chuva (chefe) | 0% | **sim** |
+- Mostrar **todos** os itens organizados por categoria, em vez de uma lista plana só com armas.
+- Categorias visíveis e ordem fixa, com ícones/cores próprias:
+  - 🟧 **Armas Orange**
+  - 🟥 **Armas Red**
+  - 🔪 **Armas Brancas**
+  - 💊 **Drogas**
+  - 📦 **Materiais** com sub-grupos:
+    - Matérias-primas
+    - Lixo / sucata
+    - Outros
+- Cada categoria como secção colapsável com cabeçalho colorido, contagem total e valor.
+- Mantém regra de gating: só Patrão di Zona, OG e Chefia veem/gerem.
 
-`role = 'chefia'` também tem permissão de gestão (já mapeado no `auth.tsx`).
+> Nota técnica: vou ler `items` e usar `category` + `subcategory`. Se faltarem categorias na BD, mapeio no frontend.
 
-## Fase 1 — Seed do catálogo de preços
+---
 
-- Migration na Railway via script (não Supabase) para:
-  - Adicionar `items.morador_purchase_price numeric(12,2)` (NULL = não aplicável; só usado para drogas)
-  - Adicionar `items.subcategory text` para distinguir grupos de venda (`armas_orange`, `armas_red`, `armas_brancas`, `carregadores`, `coletes`, `acessorios`) e de compra (`lixo`, `madeiras`, `materias_primas`, `minerios`, `corpos`, `prints`, `drogas`)
-  - Adicionar `items.side text check (side in ('compra','venda','ambos'))` — define se é item que a org compra a fora ou vende a membros
-- Script `scripts/seed-pricing.ts` que faz UPSERT por `name` com a tabela completa que enviaste (lixo, madeiras, mat-primas, minérios, corpos, prints, drogas com civil+morador, armas brancas/orange/red, carregadores, coletes, acessórios)
-- `purchase_price` = preço que a org paga ao receber (civil para drogas, único para o resto)
-- `min_sale_price` = preço base de venda
-- Output: tabela `items` totalmente alinhada com o teu preçário
+## 2. Entregas (`/entregas`)
 
-## Fase 2 — Pricing engine + página Preçário
+- No formulário de nova entrega, escolher **Tipo**: 
+  - 🟢 **Entregar ao bairro** (vai parar ao stock — atual)
+  - 💰 **Vender ao bairro** (entra como pedido de compra do bairro)
+- Estados visuais distintos:
+  - Entrega: `pendente → entregue`
+  - Venda: `pendente → comprar → comprado/pago`
+- Chefia decide aprovar/recusar, e marca como pago no caso de venda.
+- Stock continua a aumentar quando a operação é finalizada (entregue ou comprado).
 
-- `src/lib/pricing.functions.ts`:
-  - `getCatalog()` → devolve items agrupados por categoria/subcategoria
-  - `getSalePrice({ itemId, memberId })` → aplica margem por tier do member
-  - `tierMargin(tier)` helper puro (1.5/1.0/0.5/0)
-- Página `/_authenticated/precario.tsx` (substitui/expande a actual):
-  - Tabs: **Compramos** (lixo, madeiras, mat-primas, minérios, corpos, prints, drogas) e **Vendemos** (armas brancas, orange, red, carregadores, coletes, acessórios)
-  - Coluna preço base; nas drogas duas colunas (Morador / Civil)
-  - Nas armas/equip mostra o preço final consoante o tier do utilizador autenticado (ex.: "para ti: 65 975 (YB +1.5%)") + tabela colapsável com preço por escalão
-  - Editável só por chefia/manda_chuva/kingpin/patrao_di_zona
+> Tecnicamente uso `inventory_delivery_requests.tipo` (já existe) com valores `entrega` ou `venda` e adapto labels/fluxo.
 
-## Fase 3 — Encomendas (orders)
+---
 
-A tabela `orders` já tem o flow completo (`pending → approved → in_progress → ready → fulfilled | denied | cancelled`).
+## 3. Receitas (`/receitas`)
 
-- `src/lib/orders.functions.ts` (refactor):
-  - `createOrder({ itemId, qty, notes })` — qualquer membro autenticado; valida que o item é de venda; calcula `unit_price` com margem do tier; status inicial `pending`
-  - `listOrders({ scope })` — `mine` para o requisitante; `manage` só para gestores (patrão/kingpin/manda-chuva/chefia)
-  - `transitionOrder({ id, to })` — gestor only; valida transições permitidas; escreve em `order_status_history`; cria notificações
-- Página `/_authenticated/encomendas.tsx` (refactor):
-  - Aba "Minhas encomendas" — qualquer membro
-  - Aba "Gestão" — só gestores; mostra fila pending, em curso, prontas
-  - Botões por estado: Aprovar / Rejeitar / Marcar em curso / Marcar pronta / Confirmar entrega
-  - Mostra preço unitário + total + estado + histórico
+- Margem de lucro da organização **só visível para chefia** (`is_manager`).
+- Restantes membros veem só ingredientes + preço de venda.
 
-## Fase 4 — Entregas de material + Notificações in-app
+---
 
-- Entregas (já existe `inventory_delivery_requests`):
-  - Página `/_authenticated/entregas.tsx`:
-    - Membro entrega material → cria pedido `tipo='entrega'` com linhas (item + qty)
-    - Calcula `total_value` usando `purchase_price` (drogas: usa `morador_purchase_price` se o requisitante é membro, senão `purchase_price`)
-    - Gestor aprova / rejeita; quando aprovado, cria movimentos em `inventory_movements` (já há essa tabela)
-- Notificações in-app:
-  - Migration **Supabase** (não Railway, porque está ligada à auth): tabela `notifications (id, user_id, type, title, body, link, read_at, created_at)` com RLS (user só vê as suas)
-  - Server fn dispara insert para o gestor quando há novo pedido/encomenda; insere para o requisitante quando há mudança de estado
-  - Sino no `TopNav` com contador de não-lidas + dropdown com lista; marca como lida ao abrir
-  - Realtime: `supabase.channel().on('postgres_changes', ...)` para actualizar em vivo
+## 4. Saídas (`/operacoes`) — refeito
 
-## Detalhes técnicos
+- **Apagar** página de Liquidação (`/liquidacao`) e mover tudo para Saídas.
+- Só Patrão di Zona, Real Gangster, OG e Chefia podem **abrir/fechar** sessões e ser líder.
+- Ao abrir sessão:
+  - Líder = utilizador atual (predefinido)
+  - Data/hora = `now()`
+  - Tipo = `Pista` ou `Spot`
+  - Se `Spot` → campo Spot obrigatório + limite de **12 caracterizados**, restantes entram como `trabalhador`.
+  - Se `Pista` → sem campo Spot, sem limite de caracterizados.
+- **Flow membros:**
+  - Sessão aberta aparece com botão "Aderir" → escolhem papel (caracterizado/trabalhador, conforme vagas).
+- **Encerramento:**
+  - Líder fecha manualmente, ou auto-fecha após **12h**.
+  - Ao fechar, se houve fight: admin/líder marca `houve_fight=true` + `inimigo`.
+  - Cada membro presente preenche: morreu? quantos matou?
+  - Fecha mesmo sem todos terem respondido.
+- Liquidação automática nesta mesma tab.
 
-- Mapeamento `member ↔ supabase user_id`: já existe via `profiles.discord_id`. Resolver tier do utilizador autenticado fazendo `members.discord_id = profiles.discord_id`. Vou criar helper `getCurrentMember()` em `src/lib/members.functions.ts`.
-- Permissões "gestor" centralizadas em helper `isOrderManager(member)` baseado em tier∈{patrao_di_zona, kingpin, manda_chuva} OU role='chefia'.
-- Todas as transições escrevem em `order_status_history` (já existe) e disparam notificação.
-- A migration Supabase (Fase 4) precisa de approval do utilizador antes de executar — vou pedir nesse momento.
+> Tecnicamente: novas colunas em `operations` (`enemy`, `had_fight`, `auto_close_at`) + tabela `operation_participants` com `role`, `died`, `kills`, `joined_at`. Cron de 15min a fechar sessões > 12h.
 
-## Ordem de execução
+---
 
-```text
-1. Adicionar colunas + seed preços (Railway, via script)
-2. Pricing engine + página Preçário
-3. Refactor Encomendas (UI + flows)
-4. Entregas + tabela notifications (Supabase migration)
-```
+## 5. Acesso / Onboarding
 
-Pronto a executar quando aprovares. Posso fazer as 4 fases seguidas, ou paro entre cada uma para validares.
+- Remover página de aprovação de acesso (`/onboarding` e fluxo associado).
+- Quem fizer login com Discord → entra direto. O gating efetivo (membros) já vem do bot via `members.discord_id`.
+- Se o utilizador não estiver em `members`, mostro ecrã "Sem acesso — fala com a chefia no Discord" em vez de aprovar.
+
+---
+
+## 6. Auditoria (`/auditoria`)
+
+- Log centralizado de **tudo** o que acontece:
+  - Encomendas criadas/aprovadas/recusadas/entregues
+  - Entregas/vendas criadas e decididas
+  - Movimentos de stock
+  - Saídas abertas/fechadas, adesões, fight, kills
+  - Edições de preçário, receitas, membros
+  - Logins
+- UI: tabela com filtros por tipo, ator, data, pesquisa livre.
+
+> Tecnicamente: tabela `audit_log (actor_member_id, action, entity, entity_id, payload jsonb, created_at)` + helper `logAudit()` chamado em todas as server functions de escrita.
+
+---
+
+## 7. Leaderboards / Tops (`/tops`)
+
+- Três abas: **Geral**, **Mensal**, **Semanal**.
+- Selector de data (semana / mês específico).
+- Para cada vista mostrar:
+  - Pódio top 3 + tabela top 20
+  - KPIs do período: nº encomendas, nº entregas, nº vendas, € movimentados
+  - Stats PvP: kills, mortes, K/D, sessões, fights ganhos
+- Tudo com visual cuidado, medalhas, barras, etc.
+
+---
+
+## 8. Polish geral
+
+- Todos os labels em PT-PT bairrista, sem `_`.
+- Emojis e ícones consistentes em todas as páginas.
+- Cores de status já corrigidas anteriormente — aplico mesma paleta em saídas/entregas/auditoria.
+
+---
+
+## Ordem de execução proposta
+
+1. Inventário por categorias (rápido, frontend)
+2. Entregas com tipo venda/entrega
+3. Receitas — gating margem
+4. Remover onboarding/aprovação
+5. Auditoria (migration + logging em writes existentes)
+6. Saídas refeito + apagar liquidação + cron auto-close
+7. Tops refeito
+8. Polish final
+
+---
+
+## Migrations necessárias
+
+- `audit_log` (nova)
+- `operations`: colunas `enemy text`, `had_fight bool`, `auto_close_at timestamptz`, `max_caracterizados int default 12`
+- `operation_participants`: colunas `role text` ('caracterizado'|'trabalhador'), garantir `died`, `kills`
+- `inventory_delivery_requests`: garantir suporte a `tipo='venda'` + estado `paid`
+- `pg_cron` job para fechar saídas > 12h
+
+---
+
+## Pergunta antes de avançar
+
+Queres que eu **execute tudo de uma vez** (vai demorar, várias migrations e ficheiros), ou preferes que comece pelos blocos 1–4 (sem mexer em saídas/auditoria) e depois faço a parte pesada num segundo passo?

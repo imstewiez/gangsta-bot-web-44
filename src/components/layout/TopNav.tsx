@@ -26,8 +26,6 @@ const NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/admin", label: "Chefia" },
-  { to: "/onboarding", label: "Onboarding" },
-  { to: "/liquidacao", label: "Liquidação" },
   { to: "/auditoria", label: "Auditoria" },
 ];
 

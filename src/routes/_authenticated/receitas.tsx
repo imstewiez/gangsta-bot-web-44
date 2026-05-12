@@ -3,19 +3,23 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { listRecipes, computeCraftFeasibility, type CraftFeasibility } from "@/lib/recipes.functions";
+import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Hammer, Calculator } from "lucide-react";
+import { Hammer, Calculator, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/receitas")({ component: Page });
 
 function Page() {
   const fn = useServerFn(listRecipes);
   const calcFn = useServerFn(computeCraftFeasibility);
+  const meFn = useServerFn(getCurrentMember);
+  const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
+  const isManager = me.data?.is_manager ?? false;
   const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => fn() });
   const [calcRecipe, setCalcRecipe] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
@@ -63,9 +67,15 @@ function Page() {
             </ul>
             <div className="mt-3 flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Custo: {fmtNum(Math.round(r.total_cost))} €</span>
-              <span className={r.margin >= 0 ? "text-emerald-500" : "text-red-500"}>
-                Margem: {fmtNum(Math.round(r.margin))} € {r.margin_pct != null ? `(${r.margin_pct.toFixed(0)}%)` : ""}
-              </span>
+              {isManager ? (
+                <span className={r.margin >= 0 ? "text-success font-medium" : "text-destructive font-medium"}>
+                  Margem firma: {fmtNum(Math.round(r.margin))} € {r.margin_pct != null ? `(${r.margin_pct.toFixed(0)}%)` : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-muted-foreground/70">
+                  <Lock className="h-3 w-3" /> margem só para a chefia
+                </span>
+              )}
             </div>
           </div>
         ))}
