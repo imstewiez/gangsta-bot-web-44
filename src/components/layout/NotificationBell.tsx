@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { Bell, ShoppingCart, PackageCheck, Coins, AlertTriangle, type LucideIcon } from "lucide-react";
+import {
+  Bell, ShoppingCart, PackageCheck, Coins, AlertTriangle, Trash2, CheckCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { fmtDate } from "@/lib/domain";
+import { toast } from "sonner";
 
 type Notif = {
   id: string;
@@ -22,6 +26,7 @@ export function NotificationBell() {
   const router = useRouter();
   const [items, setItems] = useState<Notif[]>([]);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     if (!user) return;
@@ -29,7 +34,7 @@ export function NotificationBell() {
       .from("notifications")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(40);
     setItems((data ?? []) as Notif[]);
   };
 
@@ -41,7 +46,7 @@ export function NotificationBell() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        () => load()
+        () => load(),
       )
       .subscribe();
     return () => {
@@ -51,13 +56,39 @@ export function NotificationBell() {
   }, [user?.id]);
 
   const unread = items.filter((n) => !n.read_at).length;
+  const readCount = items.length - unread;
+
+  const markOneRead = async (id: string) => {
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+  };
 
   const markAllRead = async () => {
-    if (!user) return;
+    if (!user || !unread) return;
     const ids = items.filter((n) => !n.read_at).map((n) => n.id);
-    if (!ids.length) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
-    load();
+    setBusy(true);
+    const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+    setBusy(false);
+    if (error) {
+      toast.error("Não foi possível marcar como lidas.");
+    } else {
+      toast("Tudo posto à vista.");
+      load();
+    }
+  };
+
+  const clearRead = async () => {
+    if (!user || !readCount) return;
+    const ids = items.filter((n) => n.read_at).map((n) => n.id);
+    setBusy(true);
+    const { error } = await supabase.from("notifications").delete().in("id", ids);
+    setBusy(false);
+    if (error) {
+      toast.error("Não foi possível limpar.");
+    } else {
+      toast("Lidas apagadas.");
+      load();
+    }
   };
 
   const typeMeta = (t: string): { Icon: LucideIcon; tone: string; color: string } => {
@@ -69,15 +100,9 @@ export function NotificationBell() {
   };
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) markAllRead();
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="sm" variant="ghost" className="relative">
+        <Button size="sm" variant="ghost" className="relative" title="Recados">
           <Bell className="h-4 w-4" />
           {unread > 0 && (
             <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
@@ -87,20 +112,49 @@ export function NotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0 border-border">
-        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
           <div className="inline-flex items-center gap-1.5 text-display text-xs font-bold uppercase tracking-wider">
             <Bell className="h-3.5 w-3.5 text-primary" />
-            Recados do bairro
+            Recados
           </div>
-          {unread > 0 && <span className="text-[10px] text-muted-foreground">{unread} por ler</span>}
+          <span className="text-[10px] text-muted-foreground">
+            {unread > 0 ? `${unread} por ler` : items.length ? "tudo lido" : ""}
+          </span>
         </div>
+
+        {(unread > 0 || readCount > 0) && (
+          <div className="flex items-center gap-1 border-b border-border bg-card/40 px-2 py-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-[11px]"
+              disabled={!unread || busy}
+              onClick={markAllRead}
+            >
+              <CheckCheck className="mr-1 h-3.5 w-3.5" /> Marcar todas lidas
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+              disabled={!readCount || busy}
+              onClick={clearRead}
+            >
+              <Trash2 className="mr-1 h-3.5 w-3.5" /> Limpar lidas
+            </Button>
+          </div>
+        )}
+
         <div className="max-h-96 overflow-y-auto">
           {items.length === 0 && (
-            <p className="p-6 text-center text-xs text-muted-foreground">Tudo calmo por aqui. Nada de novo no bairro.</p>
+            <p className="p-6 text-center text-xs text-muted-foreground">
+              Tudo calmo. Sem recados novos.
+            </p>
           )}
           {items.map((n) => {
             const meta = typeMeta(n.type);
             const handleClick = () => {
+              if (!n.read_at) markOneRead(n.id);
               setOpen(false);
               if (n.link) router.navigate({ to: n.link });
             };
