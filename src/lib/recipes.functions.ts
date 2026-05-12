@@ -95,7 +95,11 @@ export const listRecipes = createServerFn({ method: "GET" })
       r.margin = isManager ? margin : 0;
       r.margin_pct = isManager ? pct : null;
     }
-    return [...map.values()].sort((a, b) => a.item_name.localeCompare(b.item_name));
+    // Default: maior valor estimado primeiro (ranking financeiro), tie-break alfabético.
+    return [...map.values()].sort(
+      (a, b) => (b.estimated_value ?? 0) - (a.estimated_value ?? 0) ||
+                a.item_name.localeCompare(b.item_name, "pt")
+    );
   });
 
 export type CraftFeasibility = {
