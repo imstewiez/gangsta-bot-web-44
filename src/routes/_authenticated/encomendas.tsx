@@ -13,21 +13,11 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtNum } from "@/lib/domain";
+import { fmtDate, fmtMoney, formatOrderStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, ShoppingBag } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "à espera",
-  approved: "aceite",
-  in_progress: "a tratar",
-  ready: "pronta",
-  fulfilled: "entregue",
-  denied: "recusada",
-  cancelled: "cancelada",
-};
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-muted text-muted-foreground border-border",
@@ -38,6 +28,7 @@ const STATUS_COLOR: Record<string, string> = {
   denied: "bg-destructive/20 text-destructive border-destructive/40",
   cancelled: "bg-muted/60 text-muted-foreground border-border line-through",
 };
+
 
 const NEXT_STATES: Record<string, { to: string; label: string; variant?: "destructive" | "default" }[]> = {
   pending: [
@@ -132,12 +123,12 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
                 <div className="flex items-center gap-2">
                   <span className="text-display text-xs text-muted-foreground">#{o.id}</span>
                   <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + (STATUS_COLOR[o.status] ?? "")}>
-                    {STATUS_LABEL[o.status] ?? o.status}
+                    {formatOrderStatus(o.status)}
                   </span>
                   <span className="text-xs text-muted-foreground">{fmtDate(o.created_at)}</span>
                 </div>
                 <div className="mt-1.5 text-base font-semibold">
-                  {o.quantity}× {o.item_name ?? "—"}
+                  {o.quantity}× {prettyItemName(o.item_name)}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Para <span className="text-foreground">{o.member_name ?? "—"}</span>
@@ -146,10 +137,10 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
               </div>
               <div className="text-right">
                 <div className="font-mono text-lg font-semibold">
-                  {o.total_price != null ? fmtNum(o.total_price) : "—"}
+                  {o.total_price != null ? fmtMoney(o.total_price) : "—"}
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">
-                  {o.unit_price != null ? `${fmtNum(o.unit_price)}/un` : ""}
+                  {o.unit_price != null ? `${fmtMoney(o.unit_price)}/un` : ""}
                 </div>
               </div>
               {next && (
@@ -181,9 +172,14 @@ function NewOrder() {
   const createFn = useServerFn(createOrder);
   const qc = useQueryClient();
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn(), enabled: open });
-  const items = (cat.data ?? []).filter(
-    (i: CatalogItem) => i.side === "venda" && i.subcategory !== "armas_brancas",
-  );
+  const items = (cat.data ?? [])
+    .filter((i: CatalogItem) => i.side === "venda" && i.subcategory !== "armas_brancas")
+    .slice()
+    .sort((a, b) => {
+      const va = a.min_sale_price ?? a.purchase_price ?? a.morador_purchase_price ?? 0;
+      const vb = b.min_sale_price ?? b.purchase_price ?? b.morador_purchase_price ?? 0;
+      return vb - va;
+    });
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("1");
   const [notes, setNotes] = useState("");
@@ -217,11 +213,15 @@ function NewOrder() {
             <Select value={item} onValueChange={setItem}>
               <SelectTrigger><SelectValue placeholder="Escolhe…" /></SelectTrigger>
               <SelectContent>
-                {items.map((i) => (
-                  <SelectItem key={i.id} value={String(i.id)}>
-                    {i.name} <span className="text-muted-foreground">· {i.subcategory}</span>
-                  </SelectItem>
-                ))}
+                {items.map((i) => {
+                  const price = i.min_sale_price ?? i.purchase_price ?? i.morador_purchase_price;
+                  return (
+                    <SelectItem key={i.id} value={String(i.id)}>
+                      {prettyItemName(i.name)}
+                      {price != null && <span className="text-muted-foreground"> · {fmtMoney(price)}</span>}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

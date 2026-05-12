@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { listAuditLogs } from "@/lib/ops.functions";
 import { PageHeader } from "@/components/layout/AppShell";
-import { fmtDate } from "@/lib/domain";
+import { fmtDate, formatAuditAction } from "@/lib/domain";
 import {
   Activity, ArrowUpCircle, ArrowDownCircle, UserMinus, UserPlus,
   Pencil, ShoppingBag, CheckCircle2, XCircle, Truck, Package,
@@ -44,7 +44,7 @@ const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: strin
 function actionMeta(action: string) {
   return (
     ACTION_META[action] ?? {
-      label: action.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()),
+      label: formatAuditAction(action),
       icon: AlertTriangle,
       tone: "text-muted-foreground",
     }
