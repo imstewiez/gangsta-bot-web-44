@@ -3,7 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, Menu, X } from "lucide-react";
+import {
+  LogOut, Menu, X,
+  Home, Users, Tags, ShoppingBag, PackageOpen, Package, Hammer,
+  Crosshair, CalendarClock, Trophy, Sparkles, Shield, ScrollText,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./NotificationBell";
 import { getCurrentMember } from "@/lib/pricing.functions";
@@ -11,25 +16,25 @@ import { TIER_LABELS, TIER_ACCENT } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
 import redwoodLogo from "@/assets/redwood-logo.png";
 
-type NavItem = { to: string; label: string; need?: "inventory" };
+type NavItem = { to: string; label: string; icon: LucideIcon; need?: "inventory" };
 
 const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Casa" },
-  { to: "/membros", label: "Membros" },
-  { to: "/precario", label: "Preçário" },
-  { to: "/encomendas", label: "Encomendas" },
-  { to: "/entregas", label: "Entregas" },
-  { to: "/inventario", label: "Armazém", need: "inventory" },
-  { to: "/receitas", label: "Receitas" },
-  { to: "/operacoes", label: "Saídas" },
-  { to: "/disponibilidade", label: "Disp." },
-  { to: "/tops", label: "Leaderboard" },
-  { to: "/premios", label: "Prémios" },
+  { to: "/dashboard",       label: "Casa",        icon: Home },
+  { to: "/membros",         label: "Membros",     icon: Users },
+  { to: "/precario",        label: "Preçário",    icon: Tags },
+  { to: "/encomendas",      label: "Encomendas",  icon: ShoppingBag },
+  { to: "/entregas",        label: "Entregas",    icon: PackageOpen },
+  { to: "/inventario",      label: "Armazém",     icon: Package, need: "inventory" },
+  { to: "/receitas",        label: "Receitas",    icon: Hammer },
+  { to: "/operacoes",       label: "Saídas",      icon: Crosshair },
+  { to: "/disponibilidade", label: "Disp.",       icon: CalendarClock },
+  { to: "/tops",            label: "Leaderboard", icon: Trophy },
+  { to: "/premios",         label: "Prémios",     icon: Sparkles },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/admin", label: "Chefia" },
-  { to: "/auditoria", label: "Auditoria" },
+  { to: "/admin",     label: "Chefia",    icon: Shield },
+  { to: "/auditoria", label: "Auditoria", icon: ScrollText },
 ];
 
 export function TopNav() {
@@ -50,7 +55,7 @@ export function TopNav() {
   const linkClass = (to: string) => {
     const active = loc.pathname === to || loc.pathname.startsWith(to + "/");
     return (
-      "relative text-display text-[11px] tracking-[0.16em] px-3 py-1.5 rounded-sm transition-all " +
+      "relative inline-flex items-center gap-1.5 text-display text-[11px] tracking-[0.16em] px-2.5 py-1.5 rounded-sm transition-all " +
       (active
         ? "text-primary-foreground bg-primary shadow-[0_0_18px_-6px_var(--primary)]"
         : "text-muted-foreground hover:text-foreground hover:bg-accent/40")
@@ -74,7 +79,8 @@ export function TopNav() {
         <nav className="hidden flex-1 items-center gap-0.5 lg:flex">
           {visible.map((n) => (
             <Link key={n.to} to={n.to} className={linkClass(n.to)}>
-              {n.label}
+              <n.icon className="h-3.5 w-3.5" />
+              <span>{n.label}</span>
             </Link>
           ))}
           {isAdmin && (
@@ -82,7 +88,8 @@ export function TopNav() {
               <span className="mx-1.5 h-4 w-px bg-border" />
               {ADMIN_NAV.map((n) => (
                 <Link key={n.to} to={n.to} className={linkClass(n.to)}>
-                  {n.label}
+                  <n.icon className="h-3.5 w-3.5" />
+                  <span>{n.label}</span>
                 </Link>
               ))}
             </>
@@ -128,9 +135,10 @@ export function TopNav() {
                 key={n.to}
                 to={n.to}
                 onClick={() => setMobileOpen(false)}
-                className={linkClass(n.to) + " text-center"}
+                className={linkClass(n.to) + " justify-center"}
               >
-                {n.label}
+                <n.icon className="h-3.5 w-3.5" />
+                <span>{n.label}</span>
               </Link>
             ))}
             {isAdmin &&
@@ -139,9 +147,10 @@ export function TopNav() {
                   key={n.to}
                   to={n.to}
                   onClick={() => setMobileOpen(false)}
-                  className={linkClass(n.to) + " text-center"}
+                  className={linkClass(n.to) + " justify-center"}
                 >
-                  {n.label}
+                  <n.icon className="h-3.5 w-3.5" />
+                  <span>{n.label}</span>
                 </Link>
               ))}
           </nav>
