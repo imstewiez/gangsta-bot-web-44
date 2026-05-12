@@ -71,20 +71,33 @@ function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-display text-sm">Top da semana</CardTitle></CardHeader>
-          <CardContent>
-            <ol className="space-y-2">
-              {(data?.topWeek ?? []).map((m, i) => (
-                <li key={i} className="flex items-center gap-3 border-b border-border/50 py-2 last:border-0">
-                  <span className="text-display w-6 text-primary">{i + 1}</span>
-                  <span className="text-sm font-medium">{m.display_name ?? m.nick ?? "—"}</span>
-                  <span className="ml-auto text-display text-sm">{fmtNum(Math.round(m.score))}</span>
-                </li>
-              ))}
-              {!data?.topWeek?.length && !isLoading && <li className="text-sm text-muted-foreground">Sem ranking esta semana.</li>}
-            </ol>
+          <CardHeader>
+            <CardTitle className="text-display text-sm">Quem está a marcar pontos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <TopList
+              title="🔥 Esta semana"
+              subtitle={data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null}
+              rows={data?.topWeek}
+              loading={isLoading}
+            />
+            <TopList
+              title="📅 Semana passada"
+              subtitle={data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null}
+              rows={data?.topPrevWeek}
+              loading={isLoading}
+              compact
+            />
+            <TopList
+              title="🏆 Mês"
+              subtitle={data?.topMonthLabel ?? null}
+              rows={data?.topMonth}
+              loading={isLoading}
+              compact
+            />
           </CardContent>
         </Card>
+
       </div>
     </>
   );
