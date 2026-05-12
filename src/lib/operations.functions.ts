@@ -12,9 +12,27 @@ export type SaidaRow = {
   participant_count: number;
 };
 
+// Auto-close any saída older than 12h (opportunistic — runs on every list).
+async function autoCloseStaleOperations(): Promise<void> {
+  try {
+    await pgQuery(
+      `update operations
+         set status = 'fechada_auto',
+             end_time = coalesce(end_time, now()),
+             updated_at = now()
+       where deleted_at is null
+         and status in ('planeada','em_curso','agendada','iniciada','em_liquidacao')
+         and coalesce(start_time, date::timestamp, created_at) < now() - interval '12 hours'`
+    );
+  } catch (err) {
+    console.error("[autoCloseStaleOperations] failed:", err);
+  }
+}
+
 export const listSaidas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<SaidaRow[]> => {
+    await autoCloseStaleOperations();
     return pgQuery<SaidaRow>(
       `select o.id,
               o.operation_type as tipo,

@@ -1,20 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getDashboardKpis } from "@/lib/dashboard.functions";
+import { getHomeKpis } from "@/lib/dashboard.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
-import { Flame, CalendarDays, Trophy, Medal, Award } from "lucide-react";
+import {
+  Flame, CalendarDays, Trophy, Medal, Award,
+  UserPlus, Skull, DoorOpen, Crosshair, Home as HomeIcon, Sparkles, Users,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
 function Dashboard() {
-  const fn = useServerFn(getDashboardKpis);
+  const fn = useServerFn(getHomeKpis);
   const { profile } = useAuth();
-  const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
+  const { data, isLoading, error } = useQuery({ queryKey: ["home-kpis"], queryFn: () => fn() });
 
   const h = new Date().getHours();
   const saud = h < 5 ? "Ainda na rua" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
@@ -26,18 +30,55 @@ function Dashboard() {
         eyebrow="Casa"
         title={`${saud}, ${nome}.`}
         description="O que se passa no bairro, agora."
+        icon={HomeIcon}
       />
       {error && <p className="text-destructive text-sm">Caiu qualquer coisa: {(error as Error).message}</p>}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Gente da casa" value={data?.totalMembers} loading={isLoading} accent />
-        <Kpi label="Saídas em aberto" value={data?.openSaidas} loading={isLoading} />
-        <Kpi label="Tags por tratar" value={data?.pendingTagRequests} loading={isLoading} />
-        <Kpi label="Stock no armazém" value={data?.totalStock} loading={isLoading} />
+        <Kpi icon={UserPlus}  label="Entradas (7d)"   value={data?.newMembersWeek}   loading={isLoading} accent />
+        <Kpi icon={DoorOpen}  label="Saídas fechadas" value={data?.totalSaidasWeek}  loading={isLoading} />
+        <Kpi icon={Crosshair} label="Saídas iniciadas" value={data?.totalOpsWeek}    loading={isLoading} />
+        <Kpi icon={Skull}     label="Kills (7d)"      value={data?.totalKillsWeek}   loading={isLoading} tone="destructive" />
       </div>
+
+      {data?.prize?.winner_name && (
+        <Card className="mt-6 border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card">
+          <CardContent className="flex items-center gap-4 p-5">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-primary/20 ring-1 ring-primary/40">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-display text-[11px] tracking-[0.3em] text-primary uppercase">
+                Premiado da Semana
+              </div>
+              <div className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
+                <TierIcon tier={data.prize.winner_tier} size="sm" />
+                <span className="truncate">{data.prize.winner_name}</span>
+                {data.prize.score != null && (
+                  <span className="text-sm font-mono text-muted-foreground">
+                    · {fmtNum(Math.round(data.prize.score))} pts
+                  </span>
+                )}
+              </div>
+              {data.prize.prize_description && (
+                <div className="text-xs text-muted-foreground italic">"{data.prize.prize_description}"</div>
+              )}
+            </div>
+            <Link to="/premios" className="text-display text-[10px] tracking-[0.2em] text-primary hover:underline">
+              VER PRÉMIOS →
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-display text-sm">Hierarquia do bairro</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-display text-sm flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Hierarquia do bairro
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             {(() => {
               const rows = data?.byTier ?? [];
@@ -74,7 +115,10 @@ function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-display text-sm">Quem está a marcar pontos</CardTitle>
+            <CardTitle className="text-display text-sm flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-warning" />
+              Quem está a marcar pontos
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <TopList
@@ -102,7 +146,6 @@ function Dashboard() {
             />
           </CardContent>
         </Card>
-
       </div>
     </>
   );
@@ -124,19 +167,10 @@ const MEDAL_ICONS = [
 ] as const;
 
 function TopList({
-  title,
-  icon,
-  subtitle,
-  rows,
-  loading,
-  compact,
+  title, icon, subtitle, rows, loading, compact,
 }: {
-  title: string;
-  icon?: React.ReactNode;
-  subtitle?: string | null;
-  rows?: RankRow[];
-  loading?: boolean;
-  compact?: boolean;
+  title: string; icon?: React.ReactNode; subtitle?: string | null;
+  rows?: RankRow[]; loading?: boolean; compact?: boolean;
 }) {
   return (
     <div>
@@ -156,34 +190,19 @@ function TopList({
           if (m.ops) bits.push(`${m.ops} saídas`);
           const medal = MEDAL_ICONS[i];
           return (
-            <li
-              key={i}
-              className={
-                "flex items-center gap-3 rounded-sm px-2 " +
-                (compact ? "py-1.5" : "py-2") +
-                (i === 0 ? " bg-primary/5" : "")
-              }
-            >
+            <li key={i} className={"flex items-center gap-3 rounded-sm px-2 " + (compact ? "py-1.5" : "py-2") + (i === 0 ? " bg-primary/5" : "")}>
               <span className="grid w-7 place-items-center">
-                {medal ? (
-                  <medal.Cmp className={"h-4 w-4 " + medal.cls} />
-                ) : (
-                  <span className="text-muted-foreground text-xs">#{i + 1}</span>
-                )}
+                {medal ? <medal.Cmp className={"h-4 w-4 " + medal.cls} /> : <span className="text-muted-foreground text-xs">#{i + 1}</span>}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{name}</div>
-                {!compact && bits.length > 0 && (
-                  <div className="text-[11px] text-muted-foreground">{bits.join(" · ")}</div>
-                )}
+                {!compact && bits.length > 0 && <div className="text-[11px] text-muted-foreground">{bits.join(" · ")}</div>}
               </div>
               <span className="text-display tabular-nums text-sm">{fmtNum(Math.round(m.score))}</span>
             </li>
           );
         })}
-        {!rows?.length && !loading && (
-          <li className="px-2 py-1.5 text-xs text-muted-foreground">Ainda sem pontos.</li>
-        )}
+        {!rows?.length && !loading && <li className="px-2 py-1.5 text-xs text-muted-foreground">Ainda sem pontos.</li>}
       </ol>
     </div>
   );
@@ -193,17 +212,25 @@ function formatWeek(weekStart: string): string {
   const start = new Date(weekStart);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
-  const f = (d: Date) =>
-    new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "short" }).format(d);
+  const f = (d: Date) => new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "short" }).format(d);
   return `${f(start)} – ${f(end)}`;
 }
 
-
-function Kpi({ label, value, loading, accent }: { label: string; value?: number; loading: boolean; accent?: boolean }) {
+function Kpi({
+  label, value, loading, accent, icon: Icon, tone,
+}: {
+  label: string; value?: number; loading: boolean;
+  accent?: boolean; tone?: "destructive";
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  const valueColor = accent ? "text-primary" : tone === "destructive" ? "text-destructive" : "text-foreground";
   return (
-    <div className={"rounded-sm border bg-card p-4 " + (accent ? "border-primary/40" : "border-border")}>
-      <div className="text-display text-xs text-muted-foreground">{label}</div>
-      <div className={"mt-1 text-3xl font-bold " + (accent ? "text-primary" : "")}>
+    <div className={"rounded-sm border bg-card p-4 transition-colors " + (accent ? "border-primary/40" : "border-border")}>
+      <div className="flex items-center justify-between">
+        <div className="text-display text-[11px] tracking-[0.18em] text-muted-foreground uppercase">{label}</div>
+        {Icon && <Icon className={"h-4 w-4 " + (accent ? "text-primary" : tone === "destructive" ? "text-destructive" : "text-muted-foreground/60")} />}
+      </div>
+      <div className={"mt-1 text-3xl font-bold tabular-nums " + valueColor}>
         {loading ? "…" : fmtNum(value)}
       </div>
     </div>
