@@ -7,6 +7,7 @@ import { tierMargin, TIER_LABELS, type CatalogItem } from "@/lib/pricing.shared"
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { fmtNum } from "@/lib/domain";
+import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 
 export const Route = createFileRoute("/_authenticated/precario")({ component: Page });
 
