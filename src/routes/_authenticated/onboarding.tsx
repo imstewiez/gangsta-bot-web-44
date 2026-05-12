@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, X, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {
