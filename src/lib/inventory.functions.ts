@@ -3,10 +3,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
-// Tudo o que é stock controlado pelo armazém
-const INV_CATEGORIES = [
-  "armas", "armas_fogo", "municoes", "acessorios",
-  "droga", "drogas", "equipamento", "componentes",
+// Subcategorias que aparecem no armazém — espelham o preçário
+// (compra: matérias-primas que craftamos; venda: o que a firma vende)
+// "armas_brancas" fica de fora do armazém.
+const INV_SUBCATEGORIES = [
+  // venda
+  "armas_red", "armas_orange", "carregadores", "coletes", "acessorios",
+  // compra (materiais)
+  "drogas", "minerios", "materias_primas", "corpos", "prints", "madeiras", "lixo",
 ];
 
 async function gateInventory(supabase: unknown, userId: string) {
@@ -19,6 +23,8 @@ export type StockRow = {
   item_id: number;
   item_name: string;
   category: string | null;
+  subcategory: string | null;
+  side: string | null;
   qty: number;
   unit_price: number | null;
 };
@@ -29,15 +35,18 @@ export const getStock = createServerFn({ method: "GET" })
     await gateInventory(context.supabase, context.userId);
     return pgQuery<StockRow>(
       `select i.id as item_id, i.name as item_name, i.category,
+              i.subcategory, i.side,
               coalesce(ib.balance, 0)::float as qty,
-              coalesce(i.min_sale_price, i.estimated_value)::float as unit_price
+              coalesce(i.min_sale_price, i.purchase_price, i.morador_purchase_price, i.estimated_value)::float as unit_price
        from items i
        left join inventory_balance ib on ib.item_id = i.id
        where i.active is not false
          and coalesce(i.deleted_at, 'epoch'::timestamptz) = 'epoch'::timestamptz
-         and i.category = any($1::text[])
-       order by i.category nulls last, i.name`,
-      [INV_CATEGORIES]
+         and i.subcategory = any($1::text[])
+       order by i.subcategory,
+                coalesce(i.min_sale_price, i.purchase_price, i.morador_purchase_price, i.estimated_value) desc nulls last,
+                i.name`,
+      [INV_SUBCATEGORIES]
     );
   });
 
@@ -61,8 +70,8 @@ export const getLedger = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const params: unknown[] = [data.limit, INV_CATEGORIES];
-    let where = "where i.category = any($2::text[])";
+    const params: unknown[] = [data.limit, INV_SUBCATEGORIES];
+    let where = "where i.subcategory = any($2::text[])";
     if (data.type) {
       params.push(data.type);
       where += ` and im.movement_type = $${params.length}`;
