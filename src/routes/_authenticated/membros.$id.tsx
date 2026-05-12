@@ -9,7 +9,7 @@ import { fmtNum, fmtDate, ROLE_LABELS } from "@/lib/domain";
 import { MemberIdentity } from "@/components/domain/RoleBadge";
 import { MemberAdminPanel } from "@/components/domain/MemberAdminPanel";
 
-export const Route = createFileRoute("/_authenticated/membros_/$id")({ component: Page });
+export const Route = createFileRoute("/_authenticated/membros/$id")({ component: Page });
 
 function Page() {
   const { id } = Route.useParams();
