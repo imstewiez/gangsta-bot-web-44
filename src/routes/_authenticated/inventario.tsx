@@ -23,8 +23,7 @@ const GROUPS: Record<string, CatMeta> = {
   armas_orange: { label: "Armas Orange", tone: "warning", order: 2 },
   carregadores: { label: "Carregadores", tone: "primary", order: 3 },
   acessorios_armas: { label: "Acessórios de armas", tone: "info", order: 4 },
-  coletes: { label: "Coletes padrão", tone: "warning", order: 5 },
-  drogas: { label: "Drogas", tone: "success", order: 6 },
+  drogas: { label: "Drogas", tone: "success", order: 5 },
   craft_armas: {
     label: "Craft de armas (peças, corpos, ferro, prints)",
     tone: "primary",
@@ -53,14 +52,6 @@ function classifyRow(r: {
     )
   ) {
     return "drogas";
-  }
-
-  // Coletes padrão (não kevlar nem custom)
-  if (
-    /colete\s*(padr[aã]o|standard|normal)?$/.test(n) ||
-    (c === "coletes" && !/kevlar|custom|pesado/.test(n))
-  ) {
-    return "coletes";
   }
 
   // Carregadores
