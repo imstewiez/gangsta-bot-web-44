@@ -48,10 +48,8 @@ export type CurrentMember = {
   is_manager: boolean;
 };
 
-export async function resolveCurrentMember(
-  supabase: { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { discord_id: string | null } | null }> } } } },
-  userId: string
-): Promise<CurrentMember | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function resolveCurrentMember(supabase: any, userId: string): Promise<CurrentMember | null> {
   const { data: profile } = await supabase
     .from("profiles")
     .select("discord_id")
