@@ -20,23 +20,23 @@ import { Plus, ShoppingBag } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: "à espera",
-  approved: "aceite",
-  in_progress: "a tratar",
-  ready: "pronta",
-  fulfilled: "entregue",
-  denied: "recusada",
-  cancelled: "cancelada",
+  pending: "⌛ à espera",
+  approved: "✅ aceite",
+  in_progress: "🔧 a tratar",
+  ready: "📦 pronta",
+  fulfilled: "🤝 entregue",
+  denied: "🚫 recusada",
+  cancelled: "❌ cancelada",
 };
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-muted text-muted-foreground border-border",
-  approved: "bg-warning/15 text-warning border-warning/30",
-  in_progress: "bg-primary/15 text-primary border-primary/30",
-  ready: "bg-primary/25 text-primary border-primary/40",
-  fulfilled: "bg-success/15 text-success border-success/30",
-  denied: "bg-destructive/15 text-destructive border-destructive/30",
-  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+  approved: "bg-warning/20 text-warning border-warning/40",
+  in_progress: "bg-info/20 text-info border-info/40",
+  ready: "bg-info/30 text-info border-info/50",
+  fulfilled: "bg-success/20 text-success border-success/40",
+  denied: "bg-destructive/20 text-destructive border-destructive/40",
+  cancelled: "bg-muted/60 text-muted-foreground border-border line-through",
 };
 
 const NEXT_STATES: Record<string, { to: string; label: string; variant?: "destructive" | "default" }[]> = {
