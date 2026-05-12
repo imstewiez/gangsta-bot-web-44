@@ -58,26 +58,38 @@ export const TIER_ACCENT: Record<string, string> = {
 // Tag "Chefia de RedWood" — vermelho sólido da firma.
 export const REDWOOD_GRADIENT = "linear-gradient(135deg, #ff2c3a 0%, #8a000f 100%)";
 
-// Ordem hierárquica (mais baixo → mais alto).
+// Hierarquia oficial do bairro (mais baixo → mais alto):
+// 1 Young Blood · 2 O Gunão · 3 Gangster Fodido · 4 Real Gangster
+// 5 OG · 6 Patrão di Zona · 7 Kingpin · 8 Manda-Chuva
 export const TIER_ORDER: string[] = [
   "young_blood",
   "o_gunao",
   "gangster_fodido",
-  "patrao_di_zona",
   "real_gangster",
   "og",
+  "patrao_di_zona",
   "kingpin",
   "manda_chuva",
 ];
 
-// Tag "Chefia de RedWood" — patrões di zona e acima representam a firma.
+// Tier numérico (1–8) — útil para filtros, ordenação e comparações.
+export const TIER_TIER: Record<string, number> = TIER_ORDER.reduce(
+  (acc, t, i) => ({ ...acc, [t]: i + 1 }),
+  {} as Record<string, number>
+);
+
+export function tierTier(tier: string | null | undefined): number {
+  if (!tier) return 0;
+  return TIER_TIER[tier] ?? 0;
+}
+
+// Tag "Chefia de RedWood" — Patrão di Zona e acima representam a firma.
 export const CHEFIA_TIERS = new Set<string>([
   "patrao_di_zona",
-  "real_gangster",
-  "og",
   "kingpin",
   "manda_chuva",
 ]);
+
 
 export function isChefia(tier: string | null | undefined): boolean {
   return !!tier && CHEFIA_TIERS.has(tier);
