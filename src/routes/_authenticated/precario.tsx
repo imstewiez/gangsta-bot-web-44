@@ -103,7 +103,45 @@ function Page() {
   );
 }
 
-function BuyTable({ title, items, catKey }: { title: string; items: CatalogItem[]; catKey: string }) {
+function CategoryChips({
+  groups, grouped, value, onChange,
+}: {
+  groups: { key: string; label: string }[];
+  grouped: Record<string, CatalogItem[]>;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const visible = groups.filter((g) => (grouped[g.key]?.length ?? 0) > 0);
+  if (!visible.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <Button
+        size="sm"
+        variant={value === "todas" ? "default" : "outline"}
+        className="h-7 px-3 text-[11px] uppercase tracking-wider"
+        onClick={() => onChange("todas")}
+      >
+        Todas
+      </Button>
+      {visible.map((g) => {
+        const active = value === g.key;
+        return (
+          <Button
+            key={g.key}
+            size="sm"
+            variant={active ? "default" : "outline"}
+            className="h-7 px-3 text-[11px] uppercase tracking-wider"
+            onClick={() => onChange(g.key)}
+          >
+            <CategoryIcon category={g.key} size={12} />
+            <span className="ml-1.5">{g.label}</span>
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
   if (!items.length) return null;
   const isDrogas = items[0]?.subcategory === "drogas";
   return (
