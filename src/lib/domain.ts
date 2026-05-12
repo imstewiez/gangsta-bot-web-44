@@ -25,18 +25,8 @@ export const TIER_LABELS: Record<string, string> = {
   bairrista: "Bairrista",
 };
 
-// Emoji por rank — fallback (igual ao Discord). O ideal é usar <TierIcon /> que rende SVGs.
-export const TIER_EMOJI: Record<string, string> = {
-  young_blood: "🏷️",
-  o_gunao: "🚬",
-  gangster_fodido: "♟️",
-  patrao_di_zona: "👑",
-  real_gangster: "🗡️",
-  og: "💀",
-  kingpin: "💎",
-  manda_chuva: "🩸",
-  bairrista: "🏠",
-};
+// (TIER_EMOJI removido — usar <TierIcon /> em todo o lado.)
+
 
 // Gradiente por tier — replicado do servidor de Discord.
 // Linear-gradient ~135deg, dois stops.
