@@ -50,23 +50,24 @@ export function TopNav() {
   const linkClass = (to: string) => {
     const active = loc.pathname === to || loc.pathname.startsWith(to + "/");
     return (
-      "text-display text-[11px] tracking-[0.12em] px-2.5 py-1.5 rounded-sm transition-colors " +
+      "relative text-display text-[11px] tracking-[0.16em] px-3 py-1.5 rounded-sm transition-all " +
       (active
-        ? "bg-primary text-primary-foreground"
-        : "text-muted-foreground hover:text-foreground hover:bg-accent/50")
+        ? "text-primary-foreground bg-primary shadow-[0_0_18px_-6px_var(--primary)]"
+        : "text-muted-foreground hover:text-foreground hover:bg-accent/40")
     );
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
-        <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
+      <div aria-hidden className="absolute inset-x-0 -bottom-px hairline-top" />
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4">
+        <Link to="/dashboard" className="flex items-center gap-2.5 shrink-0 group">
           <img
             src={redwoodLogo}
             alt="RedWood"
-            className="h-9 w-9 rounded-sm object-contain drop-shadow-[0_0_10px_color-mix(in_oklab,var(--primary)_55%,transparent)]"
+            className="h-10 w-10 rounded-sm object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_60%,transparent)] transition-transform group-hover:scale-105"
           />
-          <span className="hidden text-display text-sm tracking-[0.2em] sm:block">
+          <span className="hidden text-display text-sm tracking-[0.24em] sm:block">
             RedWood
           </span>
         </Link>
