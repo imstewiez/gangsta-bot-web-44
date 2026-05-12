@@ -107,6 +107,7 @@ function StockTable() {
   const fn = useServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
+  const [filter, setFilter] = useState<string>("todas");
 
   // Agrupa pela subcategory vinda da BD (mesma fonte do preçário).
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
@@ -117,7 +118,17 @@ function StockTable() {
   }, {});
   const total = Object.values(groups).reduce((s, arr) => s + arr.length, 0);
 
-  if (q.isLoading) return <p className="text-muted-foreground">A contar…</p>;
+  if (q.isLoading) {
+    return (
+      <div className="overflow-hidden rounded-sm border border-border">
+        <table className="w-full text-sm">
+          <tbody>
+            <TableRowsSkeleton rows={8} cols={3} widths={["w-40", "w-16", "w-20"]} />
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   if (!total)
     return (
       <Card className="p-8 text-center text-muted-foreground">
@@ -125,9 +136,9 @@ function StockTable() {
       </Card>
     );
 
-  const ordered = Object.entries(groups).sort(
-    (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50)
-  );
+  const ordered = Object.entries(groups)
+    .sort((a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50))
+    .filter(([cat]) => filter === "todas" || cat === filter);
 
   return (
     <div className="space-y-6">
