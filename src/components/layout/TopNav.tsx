@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { NotificationBell } from "./NotificationBell";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard" },
@@ -77,6 +78,7 @@ export function TopNav() {
           })}
         </nav>
         <div className="ml-auto flex items-center gap-3">
+          <NotificationBell />
           <span className="hidden text-sm text-muted-foreground sm:block">
             {profile?.display_name ?? "—"}
           </span>
