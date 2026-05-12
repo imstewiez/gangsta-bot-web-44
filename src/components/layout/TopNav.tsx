@@ -20,7 +20,6 @@ const ADMIN_NAV = [
   { to: "/admin", label: "Chefia" },
   { to: "/onboarding", label: "Onboarding" },
   { to: "/liquidacao", label: "Liquidação" },
-  { to: "/sync", label: "Sync" },
   { to: "/auditoria", label: "Auditoria" },
 ] as const;
 

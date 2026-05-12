@@ -13,7 +13,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/tops'
-import { Route as AuthenticatedSyncRouteImport } from './routes/_authenticated/sync'
 import { Route as AuthenticatedReceitasRouteImport } from './routes/_authenticated/receitas'
 import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticated/premios'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
@@ -46,11 +45,6 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedTopsRoute = AuthenticatedTopsRouteImport.update({
   id: '/tops',
   path: '/tops',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSyncRoute = AuthenticatedSyncRouteImport.update({
-  id: '/sync',
-  path: '/sync',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedReceitasRoute = AuthenticatedReceitasRouteImport.update({
@@ -141,7 +135,6 @@ export interface FileRoutesByFullPath {
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
-  '/sync': typeof AuthenticatedSyncRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
@@ -161,7 +154,6 @@ export interface FileRoutesByTo {
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
-  '/sync': typeof AuthenticatedSyncRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
@@ -183,7 +175,6 @@ export interface FileRoutesById {
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
-  '/_authenticated/sync': typeof AuthenticatedSyncRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
   '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
 }
@@ -205,7 +196,6 @@ export interface FileRouteTypes {
     | '/operacoes'
     | '/premios'
     | '/receitas'
-    | '/sync'
     | '/tops'
     | '/membros/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -225,7 +215,6 @@ export interface FileRouteTypes {
     | '/operacoes'
     | '/premios'
     | '/receitas'
-    | '/sync'
     | '/tops'
     | '/membros/$id'
   id:
@@ -246,7 +235,6 @@ export interface FileRouteTypes {
     | '/_authenticated/operacoes'
     | '/_authenticated/premios'
     | '/_authenticated/receitas'
-    | '/_authenticated/sync'
     | '/_authenticated/tops'
     | '/_authenticated/membros/$id'
   fileRoutesById: FileRoutesById
@@ -285,13 +273,6 @@ declare module '@tanstack/react-router' {
       path: '/tops'
       fullPath: '/tops'
       preLoaderRoute: typeof AuthenticatedTopsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/sync': {
-      id: '/_authenticated/sync'
-      path: '/sync'
-      fullPath: '/sync'
-      preLoaderRoute: typeof AuthenticatedSyncRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/receitas': {
@@ -420,7 +401,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
-  AuthenticatedSyncRoute: typeof AuthenticatedSyncRoute
   AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
 }
 
@@ -438,7 +418,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,
-  AuthenticatedSyncRoute: AuthenticatedSyncRoute,
   AuthenticatedTopsRoute: AuthenticatedTopsRoute,
 }
 
