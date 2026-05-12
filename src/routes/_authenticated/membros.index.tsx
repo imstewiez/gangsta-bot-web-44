@@ -10,7 +10,7 @@ import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
 import { Users } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/membros")({ component: Page });
+export const Route = createFileRoute("/_authenticated/membros/")({ component: Page });
 
 function Page() {
   const fn = useServerFn(listMembers);

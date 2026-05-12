@@ -18,7 +18,6 @@ import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
 import { Route as AuthenticatedLiquidacaoRouteImport } from './routes/_authenticated/liquidacao'
 import { Route as AuthenticatedInventarioRouteImport } from './routes/_authenticated/inventario'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
@@ -27,7 +26,8 @@ import { Route as AuthenticatedDisponibilidadeRouteImport } from './routes/_auth
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros_.$id'
+import { Route as AuthenticatedMembrosIndexRouteImport } from './routes/_authenticated/membros.index'
+import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -73,11 +73,6 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedMembrosRoute = AuthenticatedMembrosRouteImport.update({
-  id: '/membros',
-  path: '/membros',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedLiquidacaoRoute = AuthenticatedLiquidacaoRouteImport.update({
   id: '/liquidacao',
   path: '/liquidacao',
@@ -119,8 +114,14 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMembrosIndexRoute =
+  AuthenticatedMembrosIndexRouteImport.update({
+    id: '/membros/',
+    path: '/membros/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMembrosIdRoute = AuthenticatedMembrosIdRouteImport.update({
-  id: '/membros_/$id',
+  id: '/membros/$id',
   path: '/membros/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
@@ -136,7 +137,6 @@ export interface FileRoutesByFullPath {
   '/entregas': typeof AuthenticatedEntregasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
-  '/membros': typeof AuthenticatedMembrosRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/precario': typeof AuthenticatedPrecarioRoute
@@ -144,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
+  '/membros/': typeof AuthenticatedMembrosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -156,7 +157,6 @@ export interface FileRoutesByTo {
   '/entregas': typeof AuthenticatedEntregasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
-  '/membros': typeof AuthenticatedMembrosRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/precario': typeof AuthenticatedPrecarioRoute
@@ -164,6 +164,7 @@ export interface FileRoutesByTo {
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
+  '/membros': typeof AuthenticatedMembrosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -178,14 +179,14 @@ export interface FileRoutesById {
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/inventario': typeof AuthenticatedInventarioRoute
   '/_authenticated/liquidacao': typeof AuthenticatedLiquidacaoRoute
-  '/_authenticated/membros': typeof AuthenticatedMembrosRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
-  '/_authenticated/membros_/$id': typeof AuthenticatedMembrosIdRoute
+  '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
+  '/_authenticated/membros/': typeof AuthenticatedMembrosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -200,7 +201,6 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/inventario'
     | '/liquidacao'
-    | '/membros'
     | '/onboarding'
     | '/operacoes'
     | '/precario'
@@ -208,6 +208,7 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/tops'
     | '/membros/$id'
+    | '/membros/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -220,7 +221,6 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/inventario'
     | '/liquidacao'
-    | '/membros'
     | '/onboarding'
     | '/operacoes'
     | '/precario'
@@ -228,6 +228,7 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/tops'
     | '/membros/$id'
+    | '/membros'
   id:
     | '__root__'
     | '/'
@@ -241,14 +242,14 @@ export interface FileRouteTypes {
     | '/_authenticated/entregas'
     | '/_authenticated/inventario'
     | '/_authenticated/liquidacao'
-    | '/_authenticated/membros'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
     | '/_authenticated/precario'
     | '/_authenticated/premios'
     | '/_authenticated/receitas'
     | '/_authenticated/tops'
-    | '/_authenticated/membros_/$id'
+    | '/_authenticated/membros/$id'
+    | '/_authenticated/membros/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -322,13 +323,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/membros': {
-      id: '/_authenticated/membros'
-      path: '/membros'
-      fullPath: '/membros'
-      preLoaderRoute: typeof AuthenticatedMembrosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/liquidacao': {
       id: '/_authenticated/liquidacao'
       path: '/liquidacao'
@@ -385,8 +379,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/membros_/$id': {
-      id: '/_authenticated/membros_/$id'
+    '/_authenticated/membros/': {
+      id: '/_authenticated/membros/'
+      path: '/membros'
+      fullPath: '/membros/'
+      preLoaderRoute: typeof AuthenticatedMembrosIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/membros/$id': {
+      id: '/_authenticated/membros/$id'
       path: '/membros/$id'
       fullPath: '/membros/$id'
       preLoaderRoute: typeof AuthenticatedMembrosIdRouteImport
@@ -404,7 +405,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedInventarioRoute: typeof AuthenticatedInventarioRoute
   AuthenticatedLiquidacaoRoute: typeof AuthenticatedLiquidacaoRoute
-  AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
@@ -412,6 +412,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
   AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
   AuthenticatedMembrosIdRoute: typeof AuthenticatedMembrosIdRoute
+  AuthenticatedMembrosIndexRoute: typeof AuthenticatedMembrosIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -423,7 +424,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedInventarioRoute: AuthenticatedInventarioRoute,
   AuthenticatedLiquidacaoRoute: AuthenticatedLiquidacaoRoute,
-  AuthenticatedMembrosRoute: AuthenticatedMembrosRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
@@ -431,6 +431,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,
   AuthenticatedTopsRoute: AuthenticatedTopsRoute,
   AuthenticatedMembrosIdRoute: AuthenticatedMembrosIdRoute,
+  AuthenticatedMembrosIndexRoute: AuthenticatedMembrosIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
