@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, X, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {
@@ -44,7 +44,7 @@ function Page() {
   });
   return (
     <>
-      <PageHeader eyebrow="Chefia" title="Onboarding" description="Pedidos de tag." />
+      <PageHeader eyebrow="Chefia" title="Onboarding" description="Pedidos de tag." icon={UserPlus} />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>{["pending", "approved", "denied", "all"].map((s) => <TabsTrigger key={s} value={s}>{s}</TabsTrigger>)}</TabsList>
       </Tabs>

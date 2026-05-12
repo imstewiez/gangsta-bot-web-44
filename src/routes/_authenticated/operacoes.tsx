@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate } from "@/lib/domain";
-import { Plus } from "lucide-react";
+import { Plus, Crosshair } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/operacoes")({ component: Page });
@@ -30,7 +30,7 @@ function Page() {
   const { data, isLoading } = useQuery({ queryKey: ["saidas"], queryFn: () => fn() });
   return (
     <>
-      <PageHeader eyebrow="PvP" title="Operações / Saídas" description={`${data?.length ?? 0} registos.`} action={<NewSaida />} />
+      <PageHeader eyebrow="PvP" title="Operações / Saídas" description={`${data?.length ?? 0} registos.`} icon={Crosshair} action={<NewSaida />} />
       <div className="grid gap-3">
         {isLoading && <p className="text-muted-foreground">A carregar…</p>}
         {(data ?? []).map((s) => (

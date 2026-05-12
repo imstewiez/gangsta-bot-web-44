@@ -39,6 +39,7 @@ function Page() {
   return (
     <>
       <PageHeader eyebrow="Crafting" title="Receitas"
+        icon={Hammer}
         description="Custo real por receita, com base nos preços de compra dos ingredientes." />
       <div className="mb-4 max-w-sm">
         <Input placeholder="Procurar item…" value={search} onChange={(e) => setSearch(e.target.value)} />

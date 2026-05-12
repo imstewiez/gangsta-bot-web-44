@@ -46,6 +46,7 @@ function Page() {
         eyebrow="Largar à firma"
         title="Entregas"
         description="Lixo, madeiras, mat-primas, minérios, corpos, prints e drogas. A firma paga."
+        icon={PackageOpen}
         action={<NewDelivery />}
       />
       <Tabs value={tab} onValueChange={setTab}>

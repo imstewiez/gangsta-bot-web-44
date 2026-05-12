@@ -48,6 +48,7 @@ function Page() {
   return (
     <>
       <PageHeader eyebrow="Operações" title="Liquidação de saídas"
+        icon={CheckCircle2}
         description="Encerra a saída, calcula valores por participante a partir dos materiais e atualiza o net." />
       <div className="space-y-2">
         {list.isLoading && <p className="text-muted-foreground">A carregar…</p>}
