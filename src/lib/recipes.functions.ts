@@ -89,8 +89,11 @@ export const listRecipes = createServerFn({ method: "GET" })
       }
     }
     for (const r of map.values()) {
-      r.margin = r.estimated_value - r.total_cost;
-      r.margin_pct = r.total_cost > 0 ? (r.margin / r.total_cost) * 100 : null;
+      const margin = r.estimated_value - r.total_cost;
+      const pct = r.total_cost > 0 ? (margin / r.total_cost) * 100 : null;
+      // margem só vai no payload se for chefia
+      r.margin = isManager ? margin : 0;
+      r.margin_pct = isManager ? pct : null;
     }
     return [...map.values()].sort((a, b) => a.item_name.localeCompare(b.item_name));
   });
