@@ -83,8 +83,11 @@ export function tierTier(tier: string | null | undefined): number {
   return TIER_TIER[tier] ?? 0;
 }
 
-// Tag "Chefia de RedWood" — Patrão di Zona e acima representam a firma.
+// Tag "Chefia de RedWood" — Real Gangster e acima representam a firma.
+// (Mantido como estava: chefia = ranks ≥ 4 na hierarquia oficial.)
 export const CHEFIA_TIERS = new Set<string>([
+  "real_gangster",
+  "og",
   "patrao_di_zona",
   "kingpin",
   "manda_chuva",
