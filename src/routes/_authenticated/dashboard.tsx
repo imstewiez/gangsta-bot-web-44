@@ -71,24 +71,114 @@ function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-display text-sm">Top da semana</CardTitle></CardHeader>
-          <CardContent>
-            <ol className="space-y-2">
-              {(data?.topWeek ?? []).map((m, i) => (
-                <li key={i} className="flex items-center gap-3 border-b border-border/50 py-2 last:border-0">
-                  <span className="text-display w-6 text-primary">{i + 1}</span>
-                  <span className="text-sm font-medium">{m.display_name ?? m.nick ?? "—"}</span>
-                  <span className="ml-auto text-display text-sm">{fmtNum(Math.round(m.score))}</span>
-                </li>
-              ))}
-              {!data?.topWeek?.length && !isLoading && <li className="text-sm text-muted-foreground">Sem ranking esta semana.</li>}
-            </ol>
+          <CardHeader>
+            <CardTitle className="text-display text-sm">Quem está a marcar pontos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <TopList
+              title="🔥 Esta semana"
+              subtitle={data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null}
+              rows={data?.topWeek}
+              loading={isLoading}
+            />
+            <TopList
+              title="📅 Semana passada"
+              subtitle={data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null}
+              rows={data?.topPrevWeek}
+              loading={isLoading}
+              compact
+            />
+            <TopList
+              title="🏆 Mês"
+              subtitle={data?.topMonthLabel ?? null}
+              rows={data?.topMonth}
+              loading={isLoading}
+              compact
+            />
           </CardContent>
         </Card>
+
       </div>
     </>
   );
 }
+
+type RankRow = {
+  display_name: string | null;
+  nick: string | null;
+  score: number;
+  deliveries: number;
+  sales: number;
+  ops: number;
+};
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+function TopList({
+  title,
+  subtitle,
+  rows,
+  loading,
+  compact,
+}: {
+  title: string;
+  subtitle?: string | null;
+  rows?: RankRow[];
+  loading?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-display text-xs tracking-[0.2em] text-muted-foreground">{title}</span>
+        {subtitle && <span className="text-[10px] text-muted-foreground/70">{subtitle}</span>}
+      </div>
+      <ol className="space-y-1">
+        {(rows ?? []).map((m, i) => {
+          const name = m.display_name ?? m.nick ?? "Anónimo";
+          const bits: string[] = [];
+          if (m.deliveries) bits.push(`${m.deliveries} entregas`);
+          if (m.sales) bits.push(`${m.sales} vendas`);
+          if (m.ops) bits.push(`${m.ops} saídas`);
+          return (
+            <li
+              key={i}
+              className={
+                "flex items-center gap-3 rounded-sm px-2 " +
+                (compact ? "py-1.5" : "py-2") +
+                (i === 0 ? " bg-primary/5" : "")
+              }
+            >
+              <span className="w-7 text-display text-base">
+                {MEDALS[i] ?? <span className="text-muted-foreground text-xs">#{i + 1}</span>}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{name}</div>
+                {!compact && bits.length > 0 && (
+                  <div className="text-[11px] text-muted-foreground">{bits.join(" · ")}</div>
+                )}
+              </div>
+              <span className="text-display tabular-nums text-sm">{fmtNum(Math.round(m.score))}</span>
+            </li>
+          );
+        })}
+        {!rows?.length && !loading && (
+          <li className="px-2 py-1.5 text-xs text-muted-foreground">Ainda sem pontos.</li>
+        )}
+      </ol>
+    </div>
+  );
+}
+
+function formatWeek(weekStart: string): string {
+  const start = new Date(weekStart);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const f = (d: Date) =>
+    new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "short" }).format(d);
+  return `${f(start)} – ${f(end)}`;
+}
+
 
 function Kpi({ label, value, loading, accent }: { label: string; value?: number; loading: boolean; accent?: boolean }) {
   return (
