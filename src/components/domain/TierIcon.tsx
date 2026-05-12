@@ -4,7 +4,6 @@ import {
   Skull,
   Sword,
   Crown,
-  Cigarette,
   Tag,
   Home,
   type LucideIcon,
@@ -14,7 +13,15 @@ import { TIER_GRADIENT, REDWOOD_GRADIENT } from "@/lib/domain";
 // Pawn (Gangster Fodido) — lucide não tem peças de xadrez.
 function Pawn(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <circle cx="12" cy="6" r="3" />
       <path d="M9 9c0 2 1 3 3 3s3-1 3-3" />
       <path d="M10 12l-1 5h6l-1-5" />
@@ -23,14 +30,35 @@ function Pawn(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-const ICON: Record<string, LucideIcon | typeof Pawn> = {
+// Gun (O Gunão) — custom SVG to replace removed lucide Cigarette icon.
+function GunIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M4 14v4" />
+      <path d="M6 12h10l3-3" />
+      <path d="M6 12v6h8v-6" />
+      <path d="M19 9l-3 3" />
+      <circle cx="18" cy="7" r="1.5" />
+    </svg>
+  );
+}
+
+const ICON: Record<string, LucideIcon | typeof Pawn | typeof GunIcon> = {
   manda_chuva: Droplet,
   kingpin: Gem,
   og: Skull,
   real_gangster: Sword,
   patrao_di_zona: Crown,
   gangster_fodido: Pawn,
-  o_gunao: Cigarette,
+  o_gunao: GunIcon,
   young_blood: Tag,
   bairrista: Home,
 };
@@ -84,7 +112,9 @@ export function RedWoodIcon({ size = "sm" }: { size?: Size }) {
   return (
     <span
       aria-hidden
-      className={"inline-grid place-items-center rounded-full ring-1 ring-black/40 shrink-0"}
+      className={
+        "inline-grid place-items-center rounded-full ring-1 ring-black/40 shrink-0"
+      }
       style={{ background: REDWOOD_GRADIENT, width: s.box, height: s.box }}
     >
       <span

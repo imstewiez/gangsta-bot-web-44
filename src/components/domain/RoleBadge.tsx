@@ -1,8 +1,4 @@
-import {
-  TIER_LABELS,
-  TIER_ACCENT,
-  isChefia,
-} from "@/lib/domain";
+import { TIER_LABELS, TIER_ACCENT, isChefia } from "@/lib/domain";
 import { TierIcon, RedWoodIcon } from "./TierIcon";
 
 type Size = "xs" | "sm" | "md";

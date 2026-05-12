@@ -2,6 +2,7 @@
 // Inserts go into Supabase `notifications` table (created via migration).
 
 import { pgQuery } from "./pg.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export type NotifPayload = {
   type: string;
@@ -10,8 +11,10 @@ export type NotifPayload = {
   link?: string | null;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function insertNotifs(supabase: any, userIds: string[], n: NotifPayload) {
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+async function insertNotifs(userIds: string[], n: NotifPayload) {
   if (!userIds.length) return;
   const rows = userIds.map((uid) => ({
     user_id: uid,
@@ -20,36 +23,48 @@ async function insertNotifs(supabase: any, userIds: string[], n: NotifPayload) {
     body: n.body ?? null,
     link: n.link ?? null,
   }));
-  const { error } = await supabase.from("notifications").insert(rows);
+  const { error } = await supabaseAdmin.from("notifications").insert(rows);
   if (error) console.error("[notifications] insert failed:", error.message);
 }
 
 // Notify by Supabase user IDs (already known)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function notifyUserIds(supabase: any, userIds: string[], n: NotifPayload) {
-  return insertNotifs(supabase, userIds, n);
+export async function notifyUserIds(
+  _supabase: SupabaseClient<Database>,
+  userIds: string[],
+  n: NotifPayload,
+) {
+  return insertNotifs(userIds, n);
 }
 
 // Notify by discord IDs — resolves to user_ids via profiles
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function notifyUsers(supabase: any, discordIds: string[], n: NotifPayload) {
+export async function notifyUsers(
+  supabase: SupabaseClient<Database>,
+  discordIds: string[],
+  n: NotifPayload,
+) {
   if (!discordIds.length) return;
   const { data } = await supabase
     .from("profiles")
     .select("user_id, discord_id")
     .in("discord_id", discordIds);
   const ids = (data ?? []).map((r: { user_id: string }) => r.user_id);
-  return insertNotifs(supabase, ids, n);
+  return insertNotifs(ids, n);
 }
 
 // Notify all managers (patrão di zona, kingpin, manda-chuva, chefia)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function notifyManagers(supabase: any, n: NotifPayload) {
+export async function notifyManagers(
+  supabase: SupabaseClient<Database>,
+  n: NotifPayload,
+) {
   const managers = await pgQuery<{ discord_id: string }>(
     `select discord_id from members
      where deleted_at is null
        and discord_id is not null
-       and (tier in ('patrao_di_zona','kingpin','manda_chuva') or role in ('chefia','manda_chuva','kingpin'))`
+       and (tier in ('patrao_di_zona','kingpin','manda_chuva') or role in ('chefia','manda_chuva','kingpin'))`,
   );
-  return notifyUsers(supabase, managers.map((m) => m.discord_id), n);
+  return notifyUsers(
+    supabase,
+    managers.map((m) => m.discord_id),
+    n,
+  );
 }

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
+import { resolveCurrentMember } from "./pricing.server";
 
 export type PrizeRow = {
   id: number;
@@ -30,14 +31,23 @@ export const listPrizes = createServerFn({ method: "GET" })
        from weekly_prizes wp
        left join members m on m.id = wp.winner_member_id
        order by wp.week_start desc
-       limit 60`
+       limit 60`,
     );
   });
 
 export const setPrize = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: number; description?: string | null; status?: string | null; notes?: string | null }) => d)
+  .inputValidator(
+    (d: {
+      id: number;
+      description?: string | null;
+      status?: string | null;
+      notes?: string | null;
+    }) => d,
+  )
   .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
     const isDelivered = data.status === "entregue";
     await pgQuery(
       `update weekly_prizes set
@@ -50,7 +60,14 @@ export const setPrize = createServerFn({ method: "POST" })
          delivered_at = case when $6 then now() else delivered_at end,
          updated_at = now()
        where id = $1`,
-      [data.id, data.description ?? null, data.status ?? null, data.notes ?? null, `web:${context.userId}`, isDelivered]
+      [
+        data.id,
+        data.description ?? null,
+        data.status ?? null,
+        data.notes ?? null,
+        `web:${context.userId}`,
+        isDelivered,
+      ],
     );
     return { ok: true };
   });
@@ -58,19 +75,26 @@ export const setPrize = createServerFn({ method: "POST" })
 export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
     // Take the most recent week_start in weekly_rankings; pick the top hybrid_score.
-    const top = await pgOne<{ member_id: number; week_start: string; week_end: string; score: number | null }>(
+    const top = await pgOne<{
+      member_id: number;
+      week_start: string;
+      week_end: string;
+      score: number | null;
+    }>(
       `select wr.member_id, wr.week_start, wr.week_end,
               coalesce(wr.hybrid_score, wr.normalized_score, wr.performance_score)::float as score
        from weekly_rankings wr
        where wr.week_start = (select max(week_start) from weekly_rankings)
        order by score desc nulls last
-       limit 1`
+       limit 1`,
     );
     if (!top) throw new Error("Sem ranking para a semana actual");
     const existing = await pgOne<{ id: number }>(
       `select id from weekly_prizes where week_start = $1`,
-      [top.week_start]
+      [top.week_start],
     );
     if (existing) return { id: existing.id, created: false };
     const row = await pgOne<{ id: number }>(
@@ -78,7 +102,13 @@ export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
          (week_start, week_end, winner_member_id, hybrid_score, prize_status, defined_by, defined_at, created_at, updated_at)
        values ($1, $2, $3, $4, 'por_definir', $5, now(), now(), now())
        returning id`,
-      [top.week_start, top.week_end, top.member_id, top.score, `web:${context.userId}`]
+      [
+        top.week_start,
+        top.week_end,
+        top.member_id,
+        top.score,
+        `web:${context.userId}`,
+      ],
     );
     return { id: row?.id, created: true };
   });

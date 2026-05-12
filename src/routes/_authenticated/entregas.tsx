@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { listDeliveries, createDelivery, decideDelivery } from "@/lib/deliveries.functions";
+import {
+  listDeliveries,
+  createDelivery,
+  decideDelivery,
+} from "@/lib/deliveries.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -10,30 +14,81 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtMoney, prettyItemName } from "@/lib/domain";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Plus, Trash2, Check, X, PackageOpen, Package, Coins } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Check,
+  X,
+  PackageOpen,
+  Package,
+  Coins,
+} from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
-import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
-export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
+export const Route = createFileRoute("/_authenticated/entregas")({
+  component: Page,
+});
 
 // Estados por tipo: a label muda consoante seja entrega vs venda
-function statusMeta(tipo: string, status: string): { label: string; color: string } {
+function statusMeta(
+  tipo: string,
+  status: string,
+): { label: string; color: string } {
   const isVenda = tipo === "venda";
-  if (status === "pending") return { label: isVenda ? "à espera de compra" : "à espera", color: "bg-muted text-muted-foreground border-border" };
-  if (status === "approved") return { label: isVenda ? "comprado / pago" : "entregue ao bairro", color: "bg-success/15 text-success border-success/30" };
-  if (status === "rejected") return { label: isVenda ? "compra recusada" : "entrega recusada", color: "bg-destructive/15 text-destructive border-destructive/30" };
-  return { label: status, color: "bg-muted text-muted-foreground border-border" };
+  if (status === "pending")
+    return {
+      label: isVenda ? "à espera de compra" : "à espera",
+      color: "bg-muted text-muted-foreground border-border",
+    };
+  if (status === "approved")
+    return {
+      label: isVenda ? "comprado / pago" : "entregue ao bairro",
+      color: "bg-success/15 text-success border-success/30",
+    };
+  if (status === "rejected")
+    return {
+      label: isVenda ? "compra recusada" : "entrega recusada",
+      color: "bg-destructive/15 text-destructive border-destructive/30",
+    };
+  return {
+    label: status,
+    color: "bg-muted text-muted-foreground border-border",
+  };
 }
 
-const TIPO_META: Record<string, { label: string; Icon: LucideIcon; tone: string }> = {
-  entrega: { label: "Entrega ao bairro", Icon: Package, tone: "bg-info/15 text-info border-info/30" },
-  venda:   { label: "Venda ao bairro",   Icon: Coins,   tone: "bg-warning/15 text-warning border-warning/30" },
+const TIPO_META: Record<
+  string,
+  { label: string; Icon: LucideIcon; tone: string }
+> = {
+  entrega: {
+    label: "Entrega ao bairro",
+    Icon: Package,
+    tone: "bg-info/15 text-info border-info/30",
+  },
+  venda: {
+    label: "Venda ao bairro",
+    Icon: Coins,
+    tone: "bg-warning/15 text-warning border-warning/30",
+  },
 };
 
 function Page() {
@@ -47,7 +102,6 @@ function Page() {
         eyebrow="Largar à firma"
         title="Entregas"
         description="Lixo, madeiras, mat-primas, minérios, corpos, prints e drogas. A firma paga."
-        icon={PackageOpen}
         action={<NewDelivery />}
       />
       <Tabs value={tab} onValueChange={setTab}>
@@ -68,11 +122,20 @@ function Page() {
   );
 }
 
-function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: boolean }) {
+function DelList({
+  scope,
+  canDecide,
+}: {
+  scope: "mine" | "manage";
+  canDecide: boolean;
+}) {
   const fn = useServerFn(listDeliveries);
   const decFn = useServerFn(decideDelivery);
   const qc = useQueryClient();
-  const list = useQuery({ queryKey: ["deliveries", scope], queryFn: () => fn({ data: { scope } }) });
+  const list = useQuery({
+    queryKey: ["deliveries", scope],
+    queryFn: () => fn({ data: { scope } }),
+  });
   const m = useMutation({
     mutationFn: (v: { id: string; approve: boolean }) => decFn({ data: v }),
     onSuccess: () => {
@@ -83,13 +146,16 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (list.isLoading) return <div className="grid gap-3"><CardGridSkeleton count={4} /></div>;
+  if (list.isLoading)
+    return <p className="text-muted-foreground">A puxar entregas…</p>;
   if (!list.data?.length)
     return (
       <Card className="p-10 text-center">
         <PackageOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
-          {scope === "mine" ? "Ainda não largaste nada à firma." : "Sem entregas para conferir."}
+          {scope === "mine"
+            ? "Ainda não largaste nada à firma."
+            : "Sem entregas para conferir."}
         </p>
       </Card>
     );
@@ -100,54 +166,87 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
         const tipoMeta = TIPO_META[d.tipo] ?? TIPO_META.entrega;
         const st = statusMeta(d.tipo, d.status);
         return (
-        <Card key={d.id} className="p-4">
-          <div className="flex items-start gap-4">
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={"inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
-                  <tipoMeta.Icon className="h-3 w-3" /> {tipoMeta.label}
-                </span>
-                <span className="font-semibold">{d.requester_name ?? "—"}</span>
-                <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
-                <span className={"ml-auto rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + st.color}>
-                  {st.label}
-                </span>
-              </div>
-              <ul className="mt-3 divide-y divide-border/50 text-sm">
-                {d.lines.map((l, i) => (
-                  <li key={i} className="flex justify-between py-1">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="font-mono text-muted-foreground">{l.qty}×</span>
-                      <ItemIcon name={l.item_name ?? ""} size={14} />
-                      {prettyItemName(l.item_name) ?? `#${l.item_id}`}
+          <Card key={d.id} className="p-4">
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={
+                      "inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " +
+                      tipoMeta.tone
+                    }
+                  >
+                    <tipoMeta.Icon className="h-3 w-3" /> {tipoMeta.label}
+                  </span>
+                  <span className="font-semibold">
+                    {d.requester_name ?? "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {fmtDate(d.created_at)}
+                  </span>
+                  <span
+                    className={
+                      "ml-auto rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " +
+                      st.color
+                    }
+                  >
+                    {st.label}
+                  </span>
+                </div>
+                <ul className="mt-3 divide-y divide-border/50 text-sm">
+                  {d.lines.map((l, i) => (
+                    <li key={i} className="flex justify-between py-1">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="font-mono text-muted-foreground">
+                          {l.qty}×
+                        </span>
+                        <ItemIcon name={l.item_name ?? ""} size={14} />
+                        {l.item_name ?? `#${l.item_id}`}
+                      </span>
+                      <span className="font-mono text-muted-foreground">
+                        {l.unit_value != null
+                          ? fmtNum(l.unit_value * l.qty)
+                          : "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-end justify-between border-t border-border pt-2">
+                  {d.notes ? (
+                    <span className="text-xs italic text-muted-foreground">
+                      "{d.notes}"
                     </span>
-                    <span className="font-mono text-muted-foreground">
-                      {l.unit_value != null ? fmtMoney(l.unit_value * l.qty) : "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 flex items-end justify-between border-t border-border pt-2">
-                {d.notes ? (
-                  <span className="text-xs italic text-muted-foreground">"{d.notes}"</span>
-                ) : <span />}
-                <span className="font-mono text-base font-semibold">
-                  {fmtMoney(d.total_value)}
-                </span>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="font-mono text-base font-semibold">
+                    {fmtNum(d.total_value)}
+                  </span>
+                </div>
               </div>
+              {canDecide && d.status === "pending" && (
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    size="sm"
+                    onClick={() => m.mutate({ id: d.id, approve: true })}
+                    disabled={m.isPending}
+                  >
+                    <Check className="mr-1 h-3 w-3" />
+                    {d.tipo === "venda" ? "Comprar" : "Receber"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => m.mutate({ id: d.id, approve: false })}
+                    disabled={m.isPending}
+                  >
+                    <X className="mr-1 h-3 w-3" />
+                    Recusar
+                  </Button>
+                </div>
+              )}
             </div>
-            {canDecide && d.status === "pending" && (
-              <div className="flex flex-col gap-1.5">
-                <Button size="sm" onClick={() => m.mutate({ id: d.id, approve: true })} disabled={m.isPending}>
-                  <Check className="mr-1 h-3 w-3" />{d.tipo === "venda" ? "Comprar" : "Receber"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => m.mutate({ id: d.id, approve: false })} disabled={m.isPending}>
-                  <X className="mr-1 h-3 w-3" />Recusar
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
+          </Card>
         );
       })}
     </div>
@@ -159,12 +258,17 @@ function NewDelivery() {
   const catFn = useServerFn(getCatalog);
   const createFn = useServerFn(createDelivery);
   const qc = useQueryClient();
-  const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn(), enabled: open });
-  const items = (cat.data ?? [])
-    .filter((i: CatalogItem) => i.side === "compra")
-    .slice()
-    .sort((a, b) => (b.purchase_price ?? 0) - (a.purchase_price ?? 0));
-  const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([{ item_id: "", qty: "1" }]);
+  const cat = useQuery({
+    queryKey: ["catalog"],
+    queryFn: () => catFn(),
+    enabled: open,
+  });
+  const items = (cat.data ?? []).filter(
+    (i: CatalogItem) => i.side === "compra",
+  );
+  const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([
+    { item_id: "", qty: "1" },
+  ]);
   const [notes, setNotes] = useState("");
   const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
   const m = useMutation({
@@ -179,7 +283,11 @@ function NewDelivery() {
         },
       }),
     onSuccess: () => {
-      toast.success(tipo === "venda" ? "Pedido de compra enviado." : "Entrega submetida. A chefia confirma.");
+      toast.success(
+        tipo === "venda"
+          ? "Pedido de compra enviado."
+          : "Entrega submetida. A chefia confirma.",
+      );
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       setOpen(false);
       setLines([{ item_id: "", qty: "1" }]);
@@ -192,7 +300,8 @@ function NewDelivery() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <Plus className="mr-1 h-4 w-4" />Largar material
+          <Plus className="mr-1 h-4 w-4" />
+          Largar material
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
@@ -201,7 +310,9 @@ function NewDelivery() {
         </DialogHeader>
         <div className="grid gap-3">
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">É para…</label>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              É para…
+            </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -213,8 +324,12 @@ function NewDelivery() {
                     : "border-border bg-card hover:bg-accent/30")
                 }
               >
-                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider"><Package className="h-3 w-3" /> Entregar</div>
-                <div className="text-xs text-muted-foreground">Vai para o stock do bairro</div>
+                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider">
+                  <Package className="h-3 w-3" /> Entregar
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Vai para o stock do bairro
+                </div>
               </button>
               <button
                 type="button"
@@ -226,8 +341,12 @@ function NewDelivery() {
                     : "border-border bg-card hover:bg-accent/30")
                 }
               >
-                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider"><Coins className="h-3 w-3" /> Vender</div>
-                <div className="text-xs text-muted-foreground">A chefia paga ao morador</div>
+                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider">
+                  <Coins className="h-3 w-3" /> Vender
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  A chefia paga ao morador
+                </div>
               </button>
             </div>
           </div>
@@ -235,14 +354,22 @@ function NewDelivery() {
             <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
               <Select
                 value={l.item_id}
-                onValueChange={(v) => setLines(lines.map((x, i) => (i === idx ? { ...x, item_id: v } : x)))}
+                onValueChange={(v) =>
+                  setLines(
+                    lines.map((x, i) => (i === idx ? { ...x, item_id: v } : x)),
+                  )
+                }
               >
-                <SelectTrigger><SelectValue placeholder="Item…" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Item…" />
+                </SelectTrigger>
                 <SelectContent>
                   {items.map((i) => (
                     <SelectItem key={i.id} value={String(i.id)}>
-                      {prettyItemName(i.name)}
-                      {i.purchase_price != null && <span className="text-muted-foreground"> · {fmtMoney(i.purchase_price)}</span>}
+                      {i.name}{" "}
+                      <span className="text-muted-foreground">
+                        · {i.subcategory}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -251,7 +378,13 @@ function NewDelivery() {
                 type="number"
                 min={1}
                 value={l.qty}
-                onChange={(e) => setLines(lines.map((x, i) => (i === idx ? { ...x, qty: e.target.value } : x)))}
+                onChange={(e) =>
+                  setLines(
+                    lines.map((x, i) =>
+                      i === idx ? { ...x, qty: e.target.value } : x,
+                    ),
+                  )
+                }
               />
               <Button
                 size="sm"
@@ -268,15 +401,24 @@ function NewDelivery() {
             variant="outline"
             onClick={() => setLines([...lines, { item_id: "", qty: "1" }])}
           >
-            <Plus className="mr-1 h-4 w-4" />Mais uma linha
+            <Plus className="mr-1 h-4 w-4" />
+            Mais uma linha
           </Button>
           <div>
-            <label className="text-xs text-muted-foreground">Recado (opcional)</label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <label className="text-xs text-muted-foreground">
+              Recado (opcional)
+            </label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button disabled={m.isPending} onClick={() => m.mutate()}>
             {m.isPending ? "A enviar…" : "Submeter"}
           </Button>

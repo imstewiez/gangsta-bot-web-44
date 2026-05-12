@@ -18,6 +18,7 @@ import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
 import { Route as AuthenticatedLiquidacaoRouteImport } from './routes/_authenticated/liquidacao'
 import { Route as AuthenticatedInventarioRouteImport } from './routes/_authenticated/inventario'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
@@ -73,6 +74,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMembrosRoute = AuthenticatedMembrosRouteImport.update({
+  id: '/membros',
+  path: '/membros',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedLiquidacaoRoute = AuthenticatedLiquidacaoRouteImport.update({
   id: '/liquidacao',
   path: '/liquidacao',
@@ -116,14 +122,14 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
 } as any)
 const AuthenticatedMembrosIndexRoute =
   AuthenticatedMembrosIndexRouteImport.update({
-    id: '/membros/',
-    path: '/membros/',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedMembrosRoute,
   } as any)
 const AuthenticatedMembrosIdRoute = AuthenticatedMembrosIdRouteImport.update({
-  id: '/membros/$id',
-  path: '/membros/$id',
-  getParentRoute: () => AuthenticatedRoute,
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedMembrosRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/entregas': typeof AuthenticatedEntregasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
+  '/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
   '/precario': typeof AuthenticatedPrecarioRoute
@@ -179,6 +186,7 @@ export interface FileRoutesById {
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/inventario': typeof AuthenticatedInventarioRoute
   '/_authenticated/liquidacao': typeof AuthenticatedLiquidacaoRoute
+  '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
@@ -201,6 +209,7 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/inventario'
     | '/liquidacao'
+    | '/membros'
     | '/onboarding'
     | '/operacoes'
     | '/precario'
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/_authenticated/entregas'
     | '/_authenticated/inventario'
     | '/_authenticated/liquidacao'
+    | '/_authenticated/membros'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
     | '/_authenticated/precario'
@@ -323,6 +333,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/membros': {
+      id: '/_authenticated/membros'
+      path: '/membros'
+      fullPath: '/membros'
+      preLoaderRoute: typeof AuthenticatedMembrosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/liquidacao': {
       id: '/_authenticated/liquidacao'
       path: '/liquidacao'
@@ -381,20 +398,33 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/membros/': {
       id: '/_authenticated/membros/'
-      path: '/membros'
+      path: '/'
       fullPath: '/membros/'
       preLoaderRoute: typeof AuthenticatedMembrosIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedMembrosRoute
     }
     '/_authenticated/membros/$id': {
       id: '/_authenticated/membros/$id'
-      path: '/membros/$id'
+      path: '/$id'
       fullPath: '/membros/$id'
       preLoaderRoute: typeof AuthenticatedMembrosIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedMembrosRoute
     }
   }
 }
+
+interface AuthenticatedMembrosRouteChildren {
+  AuthenticatedMembrosIdRoute: typeof AuthenticatedMembrosIdRoute
+  AuthenticatedMembrosIndexRoute: typeof AuthenticatedMembrosIndexRoute
+}
+
+const AuthenticatedMembrosRouteChildren: AuthenticatedMembrosRouteChildren = {
+  AuthenticatedMembrosIdRoute: AuthenticatedMembrosIdRoute,
+  AuthenticatedMembrosIndexRoute: AuthenticatedMembrosIndexRoute,
+}
+
+const AuthenticatedMembrosRouteWithChildren =
+  AuthenticatedMembrosRoute._addFileChildren(AuthenticatedMembrosRouteChildren)
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
@@ -405,14 +435,13 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedInventarioRoute: typeof AuthenticatedInventarioRoute
   AuthenticatedLiquidacaoRoute: typeof AuthenticatedLiquidacaoRoute
+  AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
   AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
-  AuthenticatedMembrosIdRoute: typeof AuthenticatedMembrosIdRoute
-  AuthenticatedMembrosIndexRoute: typeof AuthenticatedMembrosIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -424,14 +453,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedInventarioRoute: AuthenticatedInventarioRoute,
   AuthenticatedLiquidacaoRoute: AuthenticatedLiquidacaoRoute,
+  AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,
   AuthenticatedTopsRoute: AuthenticatedTopsRoute,
-  AuthenticatedMembrosIdRoute: AuthenticatedMembrosIdRoute,
-  AuthenticatedMembrosIndexRoute: AuthenticatedMembrosIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -446,3 +474,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

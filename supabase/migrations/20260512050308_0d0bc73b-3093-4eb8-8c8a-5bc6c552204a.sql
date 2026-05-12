@@ -71,7 +71,7 @@ create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute function public.tg_set_updated_at();
 
--- Auto-create profile + member role on signup
+-- Auto-create profile + member role on signup (Discord OAuth)
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -82,9 +82,20 @@ begin
   insert into public.profiles (user_id, display_name, avatar_url, discord_id)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
-    new.raw_user_meta_data->>'avatar_url',
-    new.raw_user_meta_data->>'provider_id'
+    coalesce(
+      new.raw_user_meta_data->>'full_name',
+      new.raw_user_meta_data->>'name',
+      new.raw_user_meta_data->>'custom_claims'->>'global_name',
+      split_part(new.email, '@', 1)
+    ),
+    coalesce(
+      new.raw_user_meta_data->>'avatar_url',
+      new.raw_user_meta_data->>'avatar'
+    ),
+    coalesce(
+      new.raw_user_meta_data->>'provider_id',
+      new.raw_user_meta_data->>'sub'
+    )
   );
   insert into public.user_roles (user_id, role) values (new.id, 'member');
   return new;

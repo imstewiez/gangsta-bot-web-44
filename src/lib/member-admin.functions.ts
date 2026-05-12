@@ -5,19 +5,24 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyBot } from "./discord.server";
 
-// Hierarquia descendente — chefia primeiro, base por baixo.
 const TIERS = [
-  "manda_chuva",
-  "kingpin",
-  "og",
-  "real_gangster",
-  "patrao_di_zona",
-  "gangster_fodido",
-  "o_gunao",
   "young_blood",
+  "o_gunao",
+  "gangster_fodido",
+  "patrao_di_zona",
+  "real_gangster",
+  "og",
+  "kingpin",
+  "manda_chuva",
 ] as const;
 
-async function assertManager(supabase: any, userId: string) {
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+async function assertManager(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+) {
   const me = await resolveCurrentMember(supabase, userId);
   if (!me?.is_manager) throw new Error("Só a chefia pode fazer isto.");
   return me;
@@ -48,7 +53,12 @@ export const adminRenameMember = createServerFn({ method: "POST" })
       [data.id, data.display_name, data.nickname ?? null],
     );
     const did = await getDiscordId(data.id);
-    if (did) await notifyBot({ action: "rename", discord_id: did, new_name: data.display_name });
+    if (did)
+      await notifyBot({
+        action: "rename",
+        discord_id: did,
+        new_name: data.display_name,
+      });
     return { ok: true };
   });
 
@@ -63,17 +73,19 @@ export const adminSetTier = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.supabase, context.userId);
-    const before = await pgOne<{ tier: string | null; discord_id: string | null }>(
-      "select tier, discord_id from members where id = $1",
-      [data.id],
-    );
+    const before = await pgOne<{
+      tier: string | null;
+      discord_id: string | null;
+    }>("select tier, discord_id from members where id = $1", [data.id]);
     await pgQuery(
       "update members set tier = $2, role = $2, updated_at = now() where id = $1",
       [data.id, data.tier],
     );
     if (before?.discord_id) {
-      const fromIdx = TIERS.indexOf((before.tier ?? "young_blood") as any);
-      const toIdx = TIERS.indexOf(data.tier as any);
+      const fromIdx = TIERS.indexOf(
+        (before.tier ?? "young_blood") as (typeof TIERS)[number],
+      );
+      const toIdx = TIERS.indexOf(data.tier as (typeof TIERS)[number]);
       const action = toIdx >= fromIdx ? "promote" : "demote";
       await notifyBot({
         action,
@@ -101,7 +113,8 @@ export const adminKickMember = createServerFn({ method: "POST" })
       "update members set deleted_at = now(), updated_at = now() where id = $1",
       [data.id],
     );
-    if (did) await notifyBot({ action: "kick", discord_id: did, reason: data.reason });
+    if (did)
+      await notifyBot({ action: "kick", discord_id: did, reason: data.reason });
     return { ok: true };
   });
 

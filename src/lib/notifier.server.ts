@@ -33,7 +33,7 @@ export async function enqueueNotification(opts: {
       `insert into pending_notifications
          (channel_id, payload, priority, attempts, max_attempts, next_retry_at, created_at)
        values ($1, $2::jsonb, $3, 0, 5, now(), now())`,
-      [opts.channelId ?? null, JSON.stringify(payload), opts.priority ?? 5]
+      [opts.channelId ?? null, JSON.stringify(payload), opts.priority ?? 5],
     );
   } catch (e) {
     // Don't fail the user-visible action if the queue insert hiccups.

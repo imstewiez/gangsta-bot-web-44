@@ -4,7 +4,12 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyUsers, notifyManagers } from "./notifications.server";
 
-export type DeliveryLine = { item_id: number; item_name?: string; qty: number; unit_value?: number };
+export type DeliveryLine = {
+  item_id: number;
+  item_name?: string;
+  qty: number;
+  unit_value?: number;
+};
 export type DeliveryRow = {
   id: string;
   requester_member_id: number;
@@ -22,7 +27,9 @@ export type DeliveryRow = {
 
 export const listDeliveries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { scope?: "mine" | "manage" }) => ({ scope: d?.scope ?? "mine" }))
+  .inputValidator((d: { scope?: "mine" | "manage" }) => ({
+    scope: d?.scope ?? "mine",
+  }))
   .handler(async ({ data, context }): Promise<DeliveryRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const params: unknown[] = [];
@@ -44,31 +51,46 @@ export const listDeliveries = createServerFn({ method: "GET" })
        ${where}
        order by r.created_at desc
        limit 200`,
-      params
+      params,
     );
   });
 
 export const createDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { lines: { item_id: number; qty: number }[]; notes?: string | null; tipo?: "entrega" | "venda" }) => {
-    if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Sem linhas");
-    for (const l of d.lines) {
-      if (!Number.isFinite(l.item_id) || !Number.isFinite(l.qty) || l.qty <= 0) throw new Error("Linha inválida");
-    }
-    return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
-  })
+  .inputValidator(
+    (d: {
+      lines: { item_id: number; qty: number }[];
+      notes?: string | null;
+      tipo?: "entrega" | "venda";
+    }) => {
+      if (!Array.isArray(d.lines) || d.lines.length === 0)
+        throw new Error("Sem linhas");
+      for (const l of d.lines) {
+        if (
+          !Number.isFinite(l.item_id) ||
+          !Number.isFinite(l.qty) ||
+          l.qty <= 0
+        )
+          throw new Error("Linha inválida");
+      }
+      return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
+    },
+  )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
     if (!me.discord_id) throw new Error("Membro sem Discord ID");
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
-      id: number; name: string; purchase_price: number | null; morador_purchase_price: number | null;
+      id: number;
+      name: string;
+      purchase_price: number | null;
+      morador_purchase_price: number | null;
     }>(
       `select id, name, purchase_price::float as purchase_price,
               morador_purchase_price::float as morador_purchase_price
        from items where id = any($1::int[])`,
-      [itemIds]
+      [itemIds],
     );
     const map = new Map(items.map((i) => [i.id, i]));
     let totalQty = 0;
@@ -78,19 +100,34 @@ export const createDelivery = createServerFn({ method: "POST" })
       const unit = it?.morador_purchase_price ?? it?.purchase_price ?? 0;
       totalQty += l.qty;
       totalValue += unit * l.qty;
-      return { item_id: l.item_id, item_name: it?.name ?? "?", qty: l.qty, unit_value: unit };
+      return {
+        item_id: l.item_id,
+        item_name: it?.name ?? "?",
+        qty: l.qty,
+        unit_value: unit,
+      };
     });
     const row = await pgOne<{ id: string }>(
       `insert into inventory_delivery_requests
          (id, requester_member_id, requester_discord_id, status, lines, notes, total_qty, total_value, created_by, tipo)
        values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, $8)
        returning id`,
-      [me.id, me.discord_id, JSON.stringify(enriched), data.notes ?? "", totalQty, totalValue, `web:${context.userId}`, data.tipo]
+      [
+        me.id,
+        me.discord_id,
+        JSON.stringify(enriched),
+        data.notes ?? "",
+        totalQty,
+        totalValue,
+        `web:${context.userId}`,
+        data.tipo,
+      ],
     );
     const verb = data.tipo === "venda" ? "quer vender" : "vai entregar";
     await notifyManagers(context.supabase, {
       type: "delivery_new",
-      title: data.tipo === "venda" ? "Pedido de compra" : "Nova entrega de material",
+      title:
+        data.tipo === "venda" ? "Pedido de compra" : "Nova entrega de material",
       body: `${me.display_name ?? "Membro"} ${verb} ${totalQty} itens (€${Math.round(totalValue)})`,
       link: "/entregas",
     });
@@ -99,14 +136,20 @@ export const createDelivery = createServerFn({ method: "POST" })
 
 export const decideDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; approve: boolean; reason?: string | null }) => d)
+  .inputValidator(
+    (d: { id: string; approve: boolean; reason?: string | null }) => d,
+  )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
     const status = data.approve ? "approved" : "rejected";
-    const before = await pgOne<{ requester_discord_id: string; lines: DeliveryLine[]; status: string }>(
+    const before = await pgOne<{
+      requester_discord_id: string;
+      lines: DeliveryLine[];
+      status: string;
+    }>(
       `select requester_discord_id, lines, status from inventory_delivery_requests where id = $1`,
-      [data.id]
+      [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
     if (before.status !== "pending") throw new Error("Já decidido");
@@ -115,7 +158,13 @@ export const decideDelivery = createServerFn({ method: "POST" })
          status = $2, decision_by = $3, decision_reason = $4, decided_at = now(), updated_at = now(),
          approver_discord_id = coalesce(approver_discord_id, $5)
        where id = $1`,
-      [data.id, status, `web:${context.userId}`, data.reason ?? "", me.discord_id]
+      [
+        data.id,
+        status,
+        `web:${context.userId}`,
+        data.reason ?? "",
+        me.discord_id,
+      ],
     );
     if (data.approve) {
       // post inventory movements: incoming (positive) using allowed type
@@ -124,7 +173,13 @@ export const decideDelivery = createServerFn({ method: "POST" })
           `insert into inventory_movements
              (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
            values ('entrega_bairrista', $1, $2, $3, 'armazem', $4, $5, now())`,
-          [l.item_id, l.qty, null, `delivery:${data.id}`, `web:${context.userId}`]
+          [
+            l.item_id,
+            l.qty,
+            null,
+            `delivery:${data.id}`,
+            `web:${context.userId}`,
+          ],
         );
       }
     }

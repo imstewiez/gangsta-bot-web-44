@@ -36,8 +36,8 @@ export function MemberAdminPanel({ member }: { member: Member }) {
   const [name, setName] = useState(member.display_name ?? "");
   const [nick, setNick] = useState(member.nick ?? "");
   const [tier, setTier] = useState<string>(member.tier ?? "young_blood");
-  const [killsDelta, setKillsDelta] = useState(0);
-  const [deathsDelta, setDeathsDelta] = useState(0);
+  const [killsStr, setKillsStr] = useState("0");
+  const [deathsStr, setDeathsStr] = useState("0");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -82,7 +82,18 @@ export function MemberAdminPanel({ member }: { member: Member }) {
             size="sm"
             disabled={busy !== null || !name.trim()}
             onClick={() =>
-              run("rename", () => renameFn({ data: { id: member.id, display_name: name.trim(), nickname: nick.trim() || null } }), "Nome atualizado")
+              run(
+                "rename",
+                () =>
+                  renameFn({
+                    data: {
+                      id: member.id,
+                      display_name: name.trim(),
+                      nickname: nick.trim() || null,
+                    },
+                  }),
+                "Nome atualizado",
+              )
             }
           >
             Guardar nome
@@ -111,7 +122,17 @@ export function MemberAdminPanel({ member }: { member: Member }) {
               variant="secondary"
               disabled={busy !== null || tier === member.tier}
               onClick={() =>
-                run("tier", () => tierFn({ data: { id: member.id, tier: tier as any } }), "Tier atualizado e enviado ao bot")
+                run(
+                  "tier",
+                  () =>
+                    tierFn({
+                      data: {
+                        id: member.id,
+                        tier: tier,
+                      },
+                    }),
+                  "Tier atualizado e enviado ao bot",
+                )
               }
             >
               Aplicar
@@ -122,23 +143,24 @@ export function MemberAdminPanel({ member }: { member: Member }) {
         {/* Ajustar stats */}
         <section className="space-y-2 border-t border-border pt-4">
           <div className="flex items-center gap-2 text-display text-xs text-muted-foreground">
-            <Activity className="h-3.5 w-3.5" /> Ajustar stats (enganos / testes)
+            <Activity className="h-3.5 w-3.5" /> Ajustar stats (enganos /
+            testes)
           </div>
           <div className="grid gap-2 md:grid-cols-3">
             <div>
               <Label className="text-xs">Kills (+/-)</Label>
               <Input
                 type="number"
-                value={killsDelta}
-                onChange={(e) => setKillsDelta(Number(e.target.value) || 0)}
+                value={killsStr}
+                onChange={(e) => setKillsStr(e.target.value)}
               />
             </div>
             <div>
               <Label className="text-xs">Mortes (+/-)</Label>
               <Input
                 type="number"
-                value={deathsDelta}
-                onChange={(e) => setDeathsDelta(Number(e.target.value) || 0)}
+                value={deathsStr}
+                onChange={(e) => setDeathsStr(e.target.value)}
               />
             </div>
             <div>
@@ -153,7 +175,10 @@ export function MemberAdminPanel({ member }: { member: Member }) {
           <Button
             size="sm"
             variant="secondary"
-            disabled={busy !== null || (killsDelta === 0 && deathsDelta === 0)}
+            disabled={
+              busy !== null ||
+              (Number(killsStr) === 0 && Number(deathsStr) === 0)
+            }
             onClick={() =>
               run(
                 "adjust",
@@ -173,7 +198,8 @@ export function MemberAdminPanel({ member }: { member: Member }) {
             Aplicar ajuste
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            Para encomendas / entregas / vendas / saídas, ajusta nas próprias páginas — aqui só PvP.
+            Para encomendas / entregas / vendas / saídas, ajusta nas próprias
+            páginas — aqui só PvP.
           </p>
         </section>
 
@@ -183,17 +209,22 @@ export function MemberAdminPanel({ member }: { member: Member }) {
             <UserMinus className="h-3.5 w-3.5" /> Expulsar do bairro
           </div>
           <p className="text-xs text-muted-foreground">
-            Marca o membro como saído e dá kick no Discord automaticamente via bot.
+            Marca o membro como saído e dá kick no Discord automaticamente via
+            bot.
           </p>
           <Button
             size="sm"
             variant="destructive"
             disabled={busy !== null}
             onClick={() => {
-              if (!confirm(`Confirmar expulsão de ${member.display_name}?`)) return;
+              if (!confirm(`Confirmar expulsão de ${member.display_name}?`))
+                return;
               run(
                 "kick",
-                () => kickFn({ data: { id: member.id, reason: reason || undefined } }),
+                () =>
+                  kickFn({
+                    data: { id: member.id, reason: reason || undefined },
+                  }),
                 "Membro expulso",
               ).then(() => nav({ to: "/membros" }));
             }}

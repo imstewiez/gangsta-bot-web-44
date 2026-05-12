@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne, withClient } from "./pg.server";
 import { enqueueNotification } from "./notifier.server";
+import { resolveCurrentMember } from "./pricing.server";
 
 export type UnfinalizedSaida = {
   id: number;
@@ -24,7 +25,7 @@ export const listUnfinalizedSaidas = createServerFn({ method: "GET" })
         where o.deleted_at is null
           and (o.status is null or o.status not in ('finalizada','cancelada'))
         order by coalesce(o.start_time, o.date::timestamp, o.created_at) desc
-        limit 100`
+        limit 100`,
     );
   });
 
@@ -86,7 +87,7 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
               coalesce(o.net_value,0)::float as net_value
          from operations o
         where o.id = $1 and o.deleted_at is null`,
-      [data.id]
+      [data.id],
     );
     if (!op) return null;
     const participants = await pgQuery<SaidaDetail["participants"][number]>(
@@ -101,7 +102,7 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
          left join members m on m.id = p.member_id
         where p.operation_id = $1
         order by p.id`,
-      [data.id]
+      [data.id],
     );
     const materials = await pgQuery<SaidaDetail["materials"][number]>(
       `select om.id, om.item_id, i.name as item_name, om.direction, om.quantity, om.member_id
@@ -109,7 +110,7 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
          left join items i on i.id = om.item_id
         where om.operation_id = $1
         order by om.id`,
-      [data.id]
+      [data.id],
     );
     return { operation: op, participants, materials };
   });
@@ -130,15 +131,18 @@ export const liquidateSaida = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
     const result = await withClient(async (c) => {
       await c.query("begin");
       try {
         const op = await c.query(
           `select id, operation_type, spot, status from operations where id = $1 and deleted_at is null for update`,
-          [data.id]
+          [data.id],
         );
         if (!op.rows[0]) throw new Error("Saída não encontrada");
-        if (op.rows[0].status === "finalizada") throw new Error("Saída já finalizada");
+        if (op.rows[0].status === "finalizada")
+          throw new Error("Saída já finalizada");
 
         // Aggregate per participant from operation_materials, joining unit price from items
         const perPart = await c.query(
@@ -151,7 +155,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
              left join items i on i.id = om.item_id
             where om.operation_id = $1 and om.member_id is not null
             group by om.member_id`,
-          [data.id]
+          [data.id],
         );
 
         for (const r of perPart.rows) {
@@ -169,7 +173,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
                     net_material_delta = $5,
                     settled = true
               where operation_id = $6 and member_id = $7`,
-            [issued, returned, lost, consumed, net, data.id, r.member_id]
+            [issued, returned, lost, consumed, net, data.id, r.member_id],
           );
         }
 
@@ -177,7 +181,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
         await c.query(
           `update operation_participants set settled = true
             where operation_id = $1 and (settled is null or settled = false)`,
-          [data.id]
+          [data.id],
         );
 
         // Aggregate totals on operation
@@ -187,7 +191,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
                   coalesce(sum(lost_value),0) as lost,
                   coalesce(sum(consumed_value),0) as consumed
              from operation_participants where operation_id = $1`,
-          [data.id]
+          [data.id],
         );
         const supplied = Number(tot.rows[0].supplied);
         const returnedT = Number(tot.rows[0].returned);
@@ -210,7 +214,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
                   was_profitable = ($6 > 0),
                   updated_at = now()
             where id = $7`,
-          [supplied, returnedT, lostT, consumedT, gross, net, data.id]
+          [supplied, returnedT, lostT, consumedT, gross, net, data.id],
         );
 
         await c.query(
@@ -218,11 +222,27 @@ export const liquidateSaida = createServerFn({ method: "POST" })
            values ('liquidate', 'operation', $1::text, $2,
                    jsonb_build_object('supplied', $3, 'returned', $4, 'lost', $5, 'consumed', $6, 'net', $7),
                    now())`,
-          [data.id, `web:${context.userId}`, supplied, returnedT, lostT, consumedT, net]
+          [
+            data.id,
+            `web:${context.userId}`,
+            supplied,
+            returnedT,
+            lostT,
+            consumedT,
+            net,
+          ],
         );
 
         await c.query("commit");
-        return { supplied, returned: returnedT, lost: lostT, consumed: consumedT, gross, net, op: op.rows[0] };
+        return {
+          supplied,
+          returned: returnedT,
+          lost: lostT,
+          consumed: consumedT,
+          gross,
+          net,
+          op: op.rows[0],
+        };
       } catch (e) {
         await c.query("rollback");
         throw e;
@@ -235,9 +255,21 @@ export const liquidateSaida = createServerFn({ method: "POST" })
         description: `${result.op.operation_type ?? "Saída"} · ${result.op.spot ?? "—"}\nNet: ${result.net.toFixed(0)} €`,
         color: result.net >= 0 ? 0x10b981 : 0xef4444,
         fields: [
-          { name: "Fornecido", value: `${result.supplied.toFixed(0)} €`, inline: true },
-          { name: "Retornado", value: `${result.returned.toFixed(0)} €`, inline: true },
-          { name: "Perdido", value: `${result.lost.toFixed(0)} €`, inline: true },
+          {
+            name: "Fornecido",
+            value: `${result.supplied.toFixed(0)} €`,
+            inline: true,
+          },
+          {
+            name: "Retornado",
+            value: `${result.returned.toFixed(0)} €`,
+            inline: true,
+          },
+          {
+            name: "Perdido",
+            value: `${result.lost.toFixed(0)} €`,
+            inline: true,
+          },
         ],
       },
     }).catch(() => {});

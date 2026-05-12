@@ -21,7 +21,9 @@ export type LeaderboardPeriod = "week" | "month" | "all";
 
 export const getLeaderboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { period?: LeaderboardPeriod }) => ({ period: d?.period ?? "week" }))
+  .inputValidator((d: { period?: LeaderboardPeriod }) => ({
+    period: d?.period ?? "week",
+  }))
   .handler(async ({ data }): Promise<LeaderRow[]> => {
     const where =
       data.period === "week"
@@ -55,6 +57,6 @@ export const getLeaderboard = createServerFn({ method: "GET" })
           and m.deleted_at is null
         group by wr.member_id, m.display_name, m.nickname, m.tier
         order by score desc nulls last
-        limit 200`
+        limit 200`,
     ).catch(() => []);
   });

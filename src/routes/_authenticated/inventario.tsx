@@ -6,42 +6,124 @@ import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { fmtNum, fmtMoney, fmtDate, formatMovementType, prettyItemName } from "@/lib/domain";
+import { fmtNum, fmtDate } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
-import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/login" });
-  },
   component: Page,
 });
 
-type CatMeta = { label: string; tone: string; order: number; group: "venda" | "compra" };
+type CatMeta = { label: string; tone: string; order: number };
 
-// Espelha exatamente as subcategorias do preçário.
+// O bairro só guarda o que vende ou material p/ craftar o que vende.
 const GROUPS: Record<string, CatMeta> = {
-  // O que a firma vende
-  armas_red:        { label: "Armas Red",          tone: "destructive", order: 1,  group: "venda" },
-  armas_orange:     { label: "Armas Orange",       tone: "warning",     order: 2,  group: "venda" },
-  carregadores:     { label: "Carregadores",       tone: "primary",     order: 3,  group: "venda" },
-  acessorios:       { label: "Acessórios",         tone: "info",        order: 4,  group: "venda" },
-  coletes:          { label: "Coletes",            tone: "warning",     order: 5,  group: "venda" },
-  // Materiais (o que a firma compra / craftamos)
-  drogas:           { label: "Drogas",             tone: "success",     order: 10, group: "compra" },
-  corpos:           { label: "Corpos",             tone: "primary",     order: 11, group: "compra" },
-  prints:           { label: "Prints",             tone: "primary",     order: 12, group: "compra" },
-  minerios:         { label: "Minérios",           tone: "muted",       order: 13, group: "compra" },
-  materias_primas:  { label: "Matérias-primas",    tone: "muted",       order: 14, group: "compra" },
-  madeiras:         { label: "Madeiras",           tone: "muted",       order: 15, group: "compra" },
-  lixo:             { label: "Lixo",               tone: "muted",       order: 16, group: "compra" },
+  armas_red: { label: "Armas Red", tone: "destructive", order: 1 },
+  armas_orange: { label: "Armas Orange", tone: "warning", order: 2 },
+  carregadores: { label: "Carregadores", tone: "primary", order: 3 },
+  acessorios_armas: { label: "Acessórios de armas", tone: "info", order: 4 },
+  coletes: { label: "Coletes padrão", tone: "warning", order: 5 },
+  drogas: { label: "Drogas", tone: "success", order: 6 },
+  craft_armas: {
+    label: "Craft de armas (peças, corpos, ferro, prints)",
+    tone: "primary",
+    order: 7,
+  },
+  craft_carregadores: {
+    label: "Craft de carregadores (cobre, pólvora)",
+    tone: "muted",
+    order: 8,
+  },
 };
+
+// Devolve a chave do grupo, ou null se o item não interessa ao armazém.
+function classifyRow(r: {
+  category: string | null;
+  item_name: string;
+}): string | null {
+  const c = (r.category ?? "").toLowerCase();
+  const n = (r.item_name ?? "").toLowerCase();
+
+  // Drogas
+  if (
+    c === "drogas" ||
+    /coca|metanfetamina|meta\b|erva|maconha|haxixe|ecstasy|lsd|heroina|opio/.test(
+      n,
+    )
+  ) {
+    return "drogas";
+  }
+
+  // Coletes padrão (não kevlar nem custom)
+  if (
+    /colete\s*(padr[aã]o|standard|normal)?$/.test(n) ||
+    (c === "coletes" && !/kevlar|custom|pesado/.test(n))
+  ) {
+    return "coletes";
+  }
+
+  // Carregadores
+  if (
+    c === "municoes" ||
+    c === "municao" ||
+    /carregador|magazine|\bmag\b/.test(n)
+  ) {
+    return "carregadores";
+  }
+
+  // Acessórios de armas: silenciador, mira, lanterna, punho, etc.
+  if (
+    c === "acessorios" ||
+    /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano/.test(
+      n,
+    )
+  ) {
+    return "acessorios_armas";
+  }
+
+  // Material craft armas
+  if (
+    /\b(pe[çc]a|pe[çc]as|corpo|corpos)\b|\bferro\b|\bprint\b|\bprints\b|esquema/.test(
+      n,
+    )
+  ) {
+    return "craft_armas";
+  }
+
+  // Material craft carregadores
+  if (/\bcobre\b|\bp[oó]lvora\b/.test(n)) {
+    return "craft_carregadores";
+  }
+
+  // Armas
+  if (c === "armas" || c === "armas_fogo" || c === "armas_brancas") {
+    if (
+      c === "armas_brancas" ||
+      /faca|machete|katana|taco|cassetete|martelo|punh[aã]l|navalha/.test(n)
+    ) {
+      // Bairro não trabalha com armas brancas — esconder do armazém.
+      return null;
+    }
+    if (/compact|drako|sns|xm3/.test(n)) return "armas_orange";
+    if (
+      /red|ak\b|m4|sniper|fuzil|shotgun|caçadeira|cacadeira|g36|scar|fal/.test(
+        n,
+      )
+    )
+      return "armas_red";
+    if (
+      /pistola|glock|deagle|desert|colt|revolver|revólver|beretta|usp|uzi|mp5|mp7|smg|p90|vector/.test(
+        n,
+      )
+    )
+      return "armas_orange";
+    return "armas_red";
+  }
+
+  // Tudo o resto não interessa ao armazém
+  return null;
+}
 
 const TONE_BG: Record<string, string> = {
   warning: "bg-warning/15 border-warning/40 text-warning",
@@ -52,6 +134,19 @@ const TONE_BG: Record<string, string> = {
   muted: "bg-muted/40 border-border text-muted-foreground",
 };
 
+const MOV_LABEL: Record<string, string> = {
+  saldo_inicial: "Saldo inicial",
+  entrega_bairrista: "Entrega",
+  venda_bairrista: "Venda",
+  entrega_oficial: "Entrega oficial",
+  fornecimento_org: "Fornecimento",
+  consumo_saida: "Saída",
+  devolucao_saida: "Devolução",
+  ajuste_manual: "Ajuste",
+  perda_saida: "Perdido",
+  apreendido: "Apreendido",
+  craftado: "Crafte",
+};
 
 function Page() {
   const meFn = useServerFn(getCurrentMember);
@@ -107,28 +202,17 @@ function StockTable() {
   const fn = useServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
-  const [filter, setFilter] = useState<string>("todas");
 
-  // Agrupa pela subcategory vinda da BD (mesma fonte do preçário).
+  // group by visual category, dropping items that don't belong in the warehouse
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
-    const k = r.subcategory;
-    if (!k || !GROUPS[k]) return acc;
+    const k = classifyRow(r);
+    if (!k) return acc;
     (acc[k] ||= []).push(r);
     return acc;
   }, {});
   const total = Object.values(groups).reduce((s, arr) => s + arr.length, 0);
 
-  if (q.isLoading) {
-    return (
-      <div className="overflow-hidden rounded-sm border border-border">
-        <table className="w-full text-sm">
-          <tbody>
-            <TableRowsSkeleton rows={8} cols={3} widths={["w-40", "w-16", "w-20"]} />
-          </tbody>
-        </table>
-      </div>
-    );
-  }
+  if (q.isLoading) return <p className="text-muted-foreground">A contar…</p>;
   if (!total)
     return (
       <Card className="p-8 text-center text-muted-foreground">
@@ -136,48 +220,24 @@ function StockTable() {
       </Card>
     );
 
-  const ordered = Object.entries(groups)
-    .sort((a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50))
-    .filter(([cat]) => filter === "todas" || cat === filter);
-
-  const allCats = Object.entries(groups).sort(
-    (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50)
+  const ordered = Object.entries(groups).sort(
+    (a, b) => (GROUPS[a[0]]?.order ?? 50) - (GROUPS[b[0]]?.order ?? 50),
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-1.5">
-        <Button
-          size="sm"
-          variant={filter === "todas" ? "default" : "outline"}
-          className="h-7 px-3 text-[11px] uppercase tracking-wider"
-          onClick={() => setFilter("todas")}
-        >
-          Todas
-        </Button>
-        {allCats.map(([cat]) => {
-          const meta = GROUPS[cat];
-          const active = filter === cat;
-          return (
-            <Button
-              key={cat}
-              size="sm"
-              variant={active ? "default" : "outline"}
-              className="h-7 px-3 text-[11px] uppercase tracking-wider"
-              onClick={() => setFilter(cat)}
-            >
-              <CategoryIcon category={cat} size={12} />
-              <span className="ml-1.5">{meta?.label ?? cat}</span>
-            </Button>
-          );
-        })}
-      </div>
       {ordered.map(([cat, items]) => {
-        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99, group: "compra" as const };
+        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99 };
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
-        const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
+        const value = items.reduce(
+          (s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0),
+          0,
+        );
         return (
-          <section key={cat} className="overflow-hidden rounded-sm border border-border bg-card">
+          <section
+            key={cat}
+            className="overflow-hidden rounded-sm border border-border bg-card"
+          >
             <header
               className={
                 "flex items-center justify-between gap-3 border-b px-4 py-2.5 " +
@@ -191,48 +251,62 @@ function StockTable() {
                 </h2>
               </div>
               <span className="text-display text-[11px] tracking-wider opacity-90">
-                {items.length} refs · {fmtNum(total)} em casa · {fmtMoney(Math.round(value))}
+                {items.length} refs · {fmtNum(total)} em casa ·{" "}
+                {fmtNum(Math.round(value))} €
               </span>
             </header>
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/50 text-display text-[11px] uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-right">Em casa</th>
-                  <th className="px-3 py-2 text-right">Preço unid.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items
-                  .slice()
-                  .sort((a, b) => (b.unit_price ?? 0) - (a.unit_price ?? 0) || (b.qty ?? 0) - (a.qty ?? 0))
-                  .map((r) => {
-                    const low = r.qty <= 0;
-                    const warn = r.qty > 0 && r.qty < 5;
-                    return (
-                      <tr key={r.item_id} className="border-t border-border hover:bg-accent/30">
-                        <td className="px-3 py-2 font-medium">
-                          <span className="inline-flex items-center gap-2">
-                            <ItemIcon name={r.item_name} category={r.subcategory ?? cat} size={14} />
-                            {prettyItemName(r.item_name)}
-                          </span>
-                        </td>
-                        <td
-                          className={
-                            "px-3 py-2 text-right font-mono " +
-                            (low ? "text-destructive" : warn ? "text-warning" : "")
-                          }
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary/50 text-display text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Item</th>
+                    <th className="px-3 py-2 text-right">Em casa</th>
+                    <th className="px-3 py-2 text-right">Preço unid.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items
+                    .slice()
+                    .sort((a, b) => (b.qty ?? 0) - (a.qty ?? 0))
+                    .map((r) => {
+                      const low = r.qty <= 0;
+                      const warn = r.qty > 0 && r.qty < 5;
+                      return (
+                        <tr
+                          key={r.item_id}
+                          className="border-t border-border hover:bg-accent/30"
                         >
-                          {fmtNum(r.qty)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                          {r.unit_price != null ? fmtMoney(r.unit_price) : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+                          <td className="px-3 py-2 font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              <ItemIcon
+                                name={r.item_name}
+                                category={r.category}
+                                size={14}
+                              />
+                              {r.item_name}
+                            </span>
+                          </td>
+                          <td
+                            className={
+                              "px-3 py-2 text-right font-mono " +
+                              (low
+                                ? "text-destructive"
+                                : warn
+                                  ? "text-warning"
+                                  : "")
+                            }
+                          >
+                            {fmtNum(r.qty)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                            {r.unit_price != null ? fmtNum(r.unit_price) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
           </section>
         );
       })}
@@ -242,9 +316,12 @@ function StockTable() {
 
 function LedgerTable() {
   const fn = useServerFn(getLedger);
-  const q = useQuery({ queryKey: ["ledger"], queryFn: () => fn({ data: { limit: 150 } }) });
+  const q = useQuery({
+    queryKey: ["ledger"],
+    queryFn: () => fn({ data: { limit: 150 } }),
+  });
   return (
-    <div className="overflow-hidden rounded-sm border border-border">
+    <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
       <table className="w-full text-sm">
         <thead className="bg-secondary text-display text-xs">
           <tr>
@@ -257,23 +334,34 @@ function LedgerTable() {
         </thead>
         <tbody>
           {q.isLoading && (
-            <TableRowsSkeleton rows={8} cols={5} widths={["w-28", "w-24", "w-32", "w-24", "w-12"]} />
+            <tr>
+              <td colSpan={5} className="p-6 text-center text-muted-foreground">
+                A puxar histórico…
+              </td>
+            </tr>
           )}
           {(q.data ?? []).map((r) => (
-            <tr key={r.id} className="border-t border-border hover:bg-accent/30">
+            <tr
+              key={r.id}
+              className="border-t border-border hover:bg-accent/30"
+            >
               <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                 {fmtDate(r.created_at)}
               </td>
-              <td className="px-3 py-2">{formatMovementType(r.type)}</td>
+              <td className="px-3 py-2">{MOV_LABEL[r.type] ?? r.type}</td>
               <td className="px-3 py-2 font-medium">
                 {r.item_name ? (
                   <span className="inline-flex items-center gap-2">
                     <ItemIcon name={r.item_name} size={14} />
-                    {prettyItemName(r.item_name)}
+                    {r.item_name}
                   </span>
-                ) : "—"}
+                ) : (
+                  "—"
+                )}
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{r.member_name ?? "—"}</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {r.member_name ?? "—"}
+              </td>
               <td
                 className={
                   "px-3 py-2 text-right font-mono " +

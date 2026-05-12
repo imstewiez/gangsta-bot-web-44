@@ -22,7 +22,7 @@ async function autoCloseStaleOperations(): Promise<void> {
              updated_at = now()
        where deleted_at is null
          and status in ('planeada','em_curso','agendada','iniciada','em_liquidacao')
-         and coalesce(start_time, date::timestamp, created_at) < now() - interval '12 hours'`
+         and coalesce(start_time, date::timestamp, created_at) < now() - interval '12 hours'`,
     );
   } catch (err) {
     console.error("[autoCloseStaleOperations] failed:", err);
@@ -45,7 +45,7 @@ export const listSaidas = createServerFn({ method: "GET" })
        from operations o
        where o.deleted_at is null
        order by coalesce(o.start_time, o.date::timestamp, o.created_at) desc
-       limit 100`
+       limit 100`,
     );
   });
 
@@ -69,7 +69,7 @@ export const listKills = createServerFn({ method: "GET" })
        from kill_logs k
        left join members m on m.id = k.killer_id
        order by k.created_at desc
-       limit 100`
+       limit 100`,
     );
   });
 
@@ -96,44 +96,54 @@ export const getWeeklyTop = createServerFn({ method: "GET" })
        join members m on m.id = wr.member_id
        where wr.week_start = (select max(week_start) from weekly_rankings)
        order by score desc nulls last
-       limit 50`
+       limit 50`,
     ).catch(() => []);
   });
 
 export const addKill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    killer_id: number;
-    victim_name: string;
-    spot?: string | null;
-    notes?: string | null;
-  }) => {
-    if (!Number.isFinite(d.killer_id)) throw new Error("Killer inválido");
-    if (!d.victim_name?.trim()) throw new Error("Vítima obrigatória");
-    return d;
-  })
+  .inputValidator(
+    (d: {
+      killer_id: number;
+      victim_name: string;
+      spot?: string | null;
+      notes?: string | null;
+    }) => {
+      if (!Number.isFinite(d.killer_id)) throw new Error("Killer inválido");
+      if (!d.victim_name?.trim()) throw new Error("Vítima obrigatória");
+      return d;
+    },
+  )
   .handler(async ({ data, context }) => {
     const row = await pgOne<{ id: number }>(
       `insert into kill_logs (killer_id, victim_name, spot, notes, date, created_by, created_at)
        values ($1, $2, $3, $4, current_date, $5, now())
        returning id`,
-      [data.killer_id, data.victim_name.trim(), data.spot ?? null, data.notes ?? null, `web:${context.userId}`]
+      [
+        data.killer_id,
+        data.victim_name.trim(),
+        data.spot ?? null,
+        data.notes ?? null,
+        `web:${context.userId}`,
+      ],
     );
     return { id: row?.id ?? null };
   });
 
 export const createOperation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    operation_type: string;
-    spot?: string | null;
-    leader_id?: number | null;
-    scheduled_at?: string | null;
-    notes?: string | null;
-  }) => {
-    if (!d.operation_type?.trim()) throw new Error("Tipo obrigatório");
-    return d;
-  })
+  .inputValidator(
+    (d: {
+      operation_type: string;
+      spot?: string | null;
+      leader_id?: number | null;
+      scheduled_at?: string | null;
+      notes?: string | null;
+    }) => {
+      if (!d.operation_type?.trim()) throw new Error("Tipo obrigatório");
+      return d;
+    },
+  )
   .handler(async ({ data, context }) => {
     const sched = data.scheduled_at ? new Date(data.scheduled_at) : null;
     const row = await pgOne<{ id: number }>(
@@ -151,7 +161,7 @@ export const createOperation = createServerFn({ method: "POST" })
         sched ? sched.toISOString() : null,
         data.notes ?? null,
         `web:${context.userId}`,
-      ]
+      ],
     );
     return { id: row?.id ?? null };
   });

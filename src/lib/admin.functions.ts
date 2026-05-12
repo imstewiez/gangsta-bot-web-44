@@ -17,10 +17,13 @@ export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
-    const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("user_id, display_name, discord_id, avatar_url, created_at"),
-      supabaseAdmin.from("user_roles").select("user_id, role"),
-    ]);
+    const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("profiles")
+          .select("user_id, display_name, discord_id, avatar_url, created_at"),
+        supabaseAdmin.from("user_roles").select("user_id, role"),
+      ]);
     if (pErr) throw new Error(pErr.message);
     if (rErr) throw new Error(rErr.message);
     const rolesByUser = new Map<string, string[]>();
@@ -41,16 +44,22 @@ export const listAppUsers = createServerFn({ method: "GET" })
 
 export const setUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { user_id: string; role: "admin" | "member"; grant: boolean }) => {
-    if (!["admin", "member"].includes(d.role)) throw new Error("Role inválido");
-    return d;
-  })
+  .inputValidator(
+    (d: { user_id: string; role: "admin" | "member"; grant: boolean }) => {
+      if (!["admin", "member"].includes(d.role))
+        throw new Error("Role inválido");
+      return d;
+    },
+  )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     if (data.grant) {
       const { error } = await supabaseAdmin
         .from("user_roles")
-        .upsert({ user_id: data.user_id, role: data.role }, { onConflict: "user_id,role" });
+        .upsert(
+          { user_id: data.user_id, role: data.role },
+          { onConflict: "user_id,role" },
+        );
       if (error) throw new Error(error.message);
     } else {
       const { error } = await supabaseAdmin

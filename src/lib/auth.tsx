@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,7 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = async (uid: string) => {
     const [{ data: p }, { data: r }] = await Promise.all([
-      supabase.from("profiles").select("user_id,display_name,discord_id,avatar_url").eq("user_id", uid).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("user_id,display_name,discord_id,avatar_url")
+        .eq("user_id", uid)
+        .maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", uid),
     ]);
     setProfile(p ?? null);
@@ -38,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, s) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_evt, s) => {
       setSession(s);
       if (s?.user) {
         // defer to avoid deadlock
@@ -50,7 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      if (data.session?.user) loadProfile(data.session.user.id).finally(() => setLoading(false));
+      if (data.session?.user)
+        loadProfile(data.session.user.id).finally(() => setLoading(false));
       else setLoading(false);
     });
     return () => subscription.unsubscribe();
@@ -63,8 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     loading,
     isAdmin: roles.includes("admin"),
-    signOut: async () => { await supabase.auth.signOut(); },
-    refresh: async () => { if (session?.user) await loadProfile(session.user.id); },
+    signOut: async () => {
+      await supabase.auth.signOut();
+    },
+    refresh: async () => {
+      if (session?.user) await loadProfile(session.user.id);
+    },
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

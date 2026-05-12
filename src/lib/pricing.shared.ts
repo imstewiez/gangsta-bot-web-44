@@ -28,19 +28,30 @@ export function tierMargin(tier: string | null | undefined): number {
 }
 
 const MANAGER_TIERS = new Set(["patrao_di_zona", "kingpin", "manda_chuva"]);
-const INVENTORY_TIERS = new Set(["patrao_di_zona", "og", "kingpin", "manda_chuva"]);
+const INVENTORY_TIERS = new Set([
+  "patrao_di_zona",
+  "og",
+  "kingpin",
+  "manda_chuva",
+]);
 
-export function isManager(member: { tier: string | null; role_label?: string | null } | null): boolean {
+export function isManager(
+  member: { tier: string | null; role_label?: string | null } | null,
+): boolean {
   if (!member) return false;
   if (member.tier && MANAGER_TIERS.has(member.tier)) return true;
-  if (member.role_label === "chefia" || member.role_label === "manda_chuva") return true;
+  if (member.role_label === "chefia" || member.role_label === "manda_chuva")
+    return true;
   return false;
 }
 
-export function canSeeInventory(member: { tier: string | null; role_label?: string | null } | null): boolean {
+export function canSeeInventory(
+  member: { tier: string | null; role_label?: string | null } | null,
+): boolean {
   if (!member) return false;
   if (member.tier && INVENTORY_TIERS.has(member.tier)) return true;
-  if (member.role_label === "chefia" || member.role_label === "manda_chuva") return true;
+  if (member.role_label === "chefia" || member.role_label === "manda_chuva")
+    return true;
   return false;
 }
 

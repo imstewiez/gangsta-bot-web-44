@@ -20,8 +20,6 @@ export const getCatalog = createServerFn({ method: "GET" })
               min_sale_price::float as min_sale_price
        from items
        where side in ('compra','venda') and active = true and deleted_at is null
-       order by side, subcategory,
-                greatest(coalesce(min_sale_price,0), coalesce(purchase_price,0), coalesce(morador_purchase_price,0)) desc,
-                name`
+       order by side, subcategory, name`,
     );
   });

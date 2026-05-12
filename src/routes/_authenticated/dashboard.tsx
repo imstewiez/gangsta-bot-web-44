@@ -7,21 +7,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
 import {
-  Flame, CalendarDays, Trophy, Medal, Award,
-  UserPlus, Skull, DoorOpen, Crosshair, Home as HomeIcon, Sparkles, Users,
+  Flame,
+  CalendarDays,
+  Trophy,
+  Medal,
+  Award,
+  UserPlus,
+  Skull,
+  DoorOpen,
+  Crosshair,
+  Home as HomeIcon,
+  Sparkles,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
+export const Route = createFileRoute("/_authenticated/dashboard")({
+  component: Dashboard,
+});
 
 function Dashboard() {
   const fn = useServerFn(getHomeKpis);
   const { profile } = useAuth();
-  const { data, isLoading, error } = useQuery({ queryKey: ["home-kpis"], queryFn: () => fn() });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["home-kpis"],
+    queryFn: () => fn(),
+  });
 
   const h = new Date().getHours();
-  const saud = h < 5 ? "Ainda na rua" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
+  const saud =
+    h < 5
+      ? "Ainda na rua"
+      : h < 12
+        ? "Bom dia"
+        : h < 19
+          ? "Boa tarde"
+          : "Boa noite";
   const nome = profile?.display_name?.split(" ")[0] ?? "mano";
 
   return (
@@ -32,13 +54,39 @@ function Dashboard() {
         description="O que se passa no bairro, agora."
         icon={HomeIcon}
       />
-      {error && <p className="text-destructive text-sm">Caiu qualquer coisa: {(error as Error).message}</p>}
+      {error && (
+        <p className="text-destructive text-sm">
+          Caiu qualquer coisa: {(error as Error).message}
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={UserPlus}  label="Entradas (7d)"   value={data?.newMembersWeek}   loading={isLoading} accent />
-        <Kpi icon={DoorOpen}  label="Saídas fechadas" value={data?.totalSaidasWeek}  loading={isLoading} />
-        <Kpi icon={Crosshair} label="Saídas iniciadas" value={data?.totalOpsWeek}    loading={isLoading} />
-        <Kpi icon={Skull}     label="Kills (7d)"      value={data?.totalKillsWeek}   loading={isLoading} tone="destructive" />
+        <Kpi
+          icon={UserPlus}
+          label="Entradas (7d)"
+          value={data?.newMembersWeek}
+          loading={isLoading}
+          accent
+        />
+        <Kpi
+          icon={DoorOpen}
+          label="Saídas fechadas"
+          value={data?.totalSaidasWeek}
+          loading={isLoading}
+        />
+        <Kpi
+          icon={Crosshair}
+          label="Saídas iniciadas"
+          value={data?.totalOpsWeek}
+          loading={isLoading}
+        />
+        <Kpi
+          icon={Skull}
+          label="Kills (7d)"
+          value={data?.totalKillsWeek}
+          loading={isLoading}
+          tone="destructive"
+        />
       </div>
 
       {data?.prize?.winner_name && (
@@ -61,10 +109,15 @@ function Dashboard() {
                 )}
               </div>
               {data.prize.prize_description && (
-                <div className="text-xs text-muted-foreground italic">"{data.prize.prize_description}"</div>
+                <div className="text-xs text-muted-foreground italic">
+                  "{data.prize.prize_description}"
+                </div>
               )}
             </div>
-            <Link to="/premios" className="text-display text-[10px] tracking-[0.2em] text-primary hover:underline">
+            <Link
+              to="/premios"
+              className="text-display text-[10px] tracking-[0.2em] text-primary hover:underline"
+            >
               VER PRÉMIOS →
             </Link>
           </CardContent>
@@ -84,7 +137,8 @@ function Dashboard() {
               const rows = data?.byTier ?? [];
               const max = Math.max(1, ...rows.map((r) => Number(r.count) || 0));
               const sorted = [...rows].sort(
-                (a, b) => TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier),
+                (a, b) =>
+                  TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier),
               );
               return (
                 <ul className="space-y-3">
@@ -96,17 +150,28 @@ function Dashboard() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="flex items-center gap-2">
                             <TierIcon tier={t.tier} size="sm" />
-                            <span className="font-medium">{TIER_LABELS[t.tier] ?? t.tier}</span>
+                            <span className="font-medium">
+                              {TIER_LABELS[t.tier] ?? t.tier}
+                            </span>
                           </span>
-                          <span className="text-display tabular-nums">{fmtNum(n)}</span>
+                          <span className="text-display tabular-nums">
+                            {fmtNum(n)}
+                          </span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div className="h-full bg-primary/70" style={{ width: `${pct}%` }} />
+                          <div
+                            className="h-full bg-primary/70"
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
                       </li>
                     );
                   })}
-                  {!sorted.length && !isLoading && <li className="text-sm text-muted-foreground">Sem dados.</li>}
+                  {!sorted.length && !isLoading && (
+                    <li className="text-sm text-muted-foreground">
+                      Sem dados.
+                    </li>
+                  )}
                 </ul>
               );
             })()}
@@ -124,14 +189,20 @@ function Dashboard() {
             <TopList
               icon={<Flame className="h-3.5 w-3.5 text-destructive" />}
               title="Esta semana"
-              subtitle={data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null}
+              subtitle={
+                data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null
+              }
               rows={data?.topWeek}
               loading={isLoading}
             />
             <TopList
               icon={<CalendarDays className="h-3.5 w-3.5 text-info" />}
               title="Semana passada"
-              subtitle={data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null}
+              subtitle={
+                data?.topPrevWeekLabel
+                  ? formatWeek(data.topPrevWeekLabel)
+                  : null
+              }
               rows={data?.topPrevWeek}
               loading={isLoading}
               compact
@@ -162,15 +233,24 @@ type RankRow = {
 
 const MEDAL_ICONS = [
   { Cmp: Trophy, cls: "text-warning" },
-  { Cmp: Medal,  cls: "text-muted-foreground" },
-  { Cmp: Award,  cls: "text-orange-400" },
+  { Cmp: Medal, cls: "text-muted-foreground" },
+  { Cmp: Award, cls: "text-orange-400" },
 ] as const;
 
 function TopList({
-  title, icon, subtitle, rows, loading, compact,
+  title,
+  icon,
+  subtitle,
+  rows,
+  loading,
+  compact,
 }: {
-  title: string; icon?: React.ReactNode; subtitle?: string | null;
-  rows?: RankRow[]; loading?: boolean; compact?: boolean;
+  title: string;
+  icon?: React.ReactNode;
+  subtitle?: string | null;
+  rows?: RankRow[];
+  loading?: boolean;
+  compact?: boolean;
 }) {
   return (
     <div>
@@ -179,7 +259,11 @@ function TopList({
           {icon}
           {title}
         </span>
-        {subtitle && <span className="text-[10px] text-muted-foreground/70">{subtitle}</span>}
+        {subtitle && (
+          <span className="text-[10px] text-muted-foreground/70">
+            {subtitle}
+          </span>
+        )}
       </div>
       <ol className="space-y-1">
         {(rows ?? []).map((m, i) => {
@@ -190,19 +274,42 @@ function TopList({
           if (m.ops) bits.push(`${m.ops} saídas`);
           const medal = MEDAL_ICONS[i];
           return (
-            <li key={i} className={"flex items-center gap-3 rounded-sm px-2 " + (compact ? "py-1.5" : "py-2") + (i === 0 ? " bg-primary/5" : "")}>
+            <li
+              key={i}
+              className={
+                "flex items-center gap-3 rounded-sm px-2 " +
+                (compact ? "py-1.5" : "py-2") +
+                (i === 0 ? " bg-primary/5" : "")
+              }
+            >
               <span className="grid w-7 place-items-center">
-                {medal ? <medal.Cmp className={"h-4 w-4 " + medal.cls} /> : <span className="text-muted-foreground text-xs">#{i + 1}</span>}
+                {medal ? (
+                  <medal.Cmp className={"h-4 w-4 " + medal.cls} />
+                ) : (
+                  <span className="text-muted-foreground text-xs">
+                    #{i + 1}
+                  </span>
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{name}</div>
-                {!compact && bits.length > 0 && <div className="text-[11px] text-muted-foreground">{bits.join(" · ")}</div>}
+                {!compact && bits.length > 0 && (
+                  <div className="text-[11px] text-muted-foreground">
+                    {bits.join(" · ")}
+                  </div>
+                )}
               </div>
-              <span className="text-display tabular-nums text-sm">{fmtNum(Math.round(m.score))}</span>
+              <span className="text-display tabular-nums text-sm">
+                {fmtNum(Math.round(m.score))}
+              </span>
             </li>
           );
         })}
-        {!rows?.length && !loading && <li className="px-2 py-1.5 text-xs text-muted-foreground">Ainda sem pontos.</li>}
+        {!rows?.length && !loading && (
+          <li className="px-2 py-1.5 text-xs text-muted-foreground">
+            Ainda sem pontos.
+          </li>
+        )}
       </ol>
     </div>
   );
@@ -212,23 +319,56 @@ function formatWeek(weekStart: string): string {
   const start = new Date(weekStart);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
-  const f = (d: Date) => new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "short" }).format(d);
+  const f = (d: Date) =>
+    new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "short" }).format(
+      d,
+    );
   return `${f(start)} – ${f(end)}`;
 }
 
 function Kpi({
-  label, value, loading, accent, icon: Icon, tone,
+  label,
+  value,
+  loading,
+  accent,
+  icon: Icon,
+  tone,
 }: {
-  label: string; value?: number; loading: boolean;
-  accent?: boolean; tone?: "destructive";
+  label: string;
+  value?: number;
+  loading: boolean;
+  accent?: boolean;
+  tone?: "destructive";
   icon?: React.ComponentType<{ className?: string }>;
 }) {
-  const valueColor = accent ? "text-primary" : tone === "destructive" ? "text-destructive" : "text-foreground";
+  const valueColor = accent
+    ? "text-primary"
+    : tone === "destructive"
+      ? "text-destructive"
+      : "text-foreground";
   return (
-    <div className={"rounded-sm border bg-card p-4 transition-colors " + (accent ? "border-primary/40" : "border-border")}>
+    <div
+      className={
+        "rounded-sm border bg-card p-4 transition-colors " +
+        (accent ? "border-primary/40" : "border-border")
+      }
+    >
       <div className="flex items-center justify-between">
-        <div className="text-display text-[11px] tracking-[0.18em] text-muted-foreground uppercase">{label}</div>
-        {Icon && <Icon className={"h-4 w-4 " + (accent ? "text-primary" : tone === "destructive" ? "text-destructive" : "text-muted-foreground/60")} />}
+        <div className="text-display text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
+          {label}
+        </div>
+        {Icon && (
+          <Icon
+            className={
+              "h-4 w-4 " +
+              (accent
+                ? "text-primary"
+                : tone === "destructive"
+                  ? "text-destructive"
+                  : "text-muted-foreground/60")
+            }
+          />
+        )}
       </div>
       <div className={"mt-1 text-3xl font-bold tabular-nums " + valueColor}>
         {loading ? "…" : fmtNum(value)}

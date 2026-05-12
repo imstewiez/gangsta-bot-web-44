@@ -22,7 +22,7 @@ export function getPool(): Pool {
 
 export async function pgQuery<T = unknown>(
   text: string,
-  params: ReadonlyArray<unknown> = []
+  params: ReadonlyArray<unknown> = [],
 ): Promise<T[]> {
   const res = await getPool().query(text, params as unknown[]);
   return res.rows as T[];
@@ -30,13 +30,15 @@ export async function pgQuery<T = unknown>(
 
 export async function pgOne<T = unknown>(
   text: string,
-  params: ReadonlyArray<unknown> = []
+  params: ReadonlyArray<unknown> = [],
 ): Promise<T | null> {
   const rows = await pgQuery<T>(text, params);
   return rows[0] ?? null;
 }
 
-export async function withClient<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+export async function withClient<T>(
+  fn: (c: PoolClient) => Promise<T>,
+): Promise<T> {
   const client = await getPool().connect();
   try {
     return await fn(client);

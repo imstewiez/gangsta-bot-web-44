@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne, withClient } from "./pg.server";
 import { enqueueNotification } from "./notifier.server";
+import { resolveCurrentMember } from "./pricing.server";
 
 export type TagRequestRow = {
   id: number;
@@ -17,7 +18,9 @@ export type TagRequestRow = {
 
 export const listTagRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { status?: string | null }) => ({ status: d?.status ?? "pending" }))
+  .inputValidator((d: { status?: string | null }) => ({
+    status: d?.status ?? "pending",
+  }))
   .handler(async ({ data }): Promise<TagRequestRow[]> => {
     const params: unknown[] = [];
     let where = "";
@@ -32,7 +35,7 @@ export const listTagRequests = createServerFn({ method: "GET" })
        ${where}
        order by created_at desc
        limit 200`,
-      params
+      params,
     );
   });
 
@@ -40,12 +43,14 @@ export const approveTagRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number }) => d)
   .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
     return withClient(async (c) => {
       await c.query("begin");
       try {
         const r = await c.query(
           `select * from tag_requests where id = $1 for update`,
-          [data.id]
+          [data.id],
         );
         const tr = r.rows[0];
         if (!tr) throw new Error("Pedido não encontrado");
@@ -54,7 +59,7 @@ export const approveTagRequest = createServerFn({ method: "POST" })
         // Upsert member by discord_id
         const existing = await c.query(
           `select id from members where discord_id = $1 and deleted_at is null`,
-          [tr.discord_id]
+          [tr.discord_id],
         );
         let memberId = existing.rows[0]?.id;
         if (!memberId) {
@@ -63,7 +68,13 @@ export const approveTagRequest = createServerFn({ method: "POST" })
                                   role, status, joined_at, lifecycle_state, created_at, updated_at)
              values ($1, $2, $3, $4, $5, 'bairrista', 'active', now(), 'active', now(), now())
              returning id`,
-            [tr.discord_id, tr.username, tr.full_name ?? tr.username, tr.full_name, tr.nickname]
+            [
+              tr.discord_id,
+              tr.username,
+              tr.full_name ?? tr.username,
+              tr.full_name,
+              tr.nickname,
+            ],
           );
           memberId = ins.rows[0].id;
         }
@@ -72,7 +83,7 @@ export const approveTagRequest = createServerFn({ method: "POST" })
           `update tag_requests
              set status = 'approved', approved_by = $2, resolved_at = now(), processed_at = now()
            where id = $1`,
-          [data.id, `web:${context.userId}`]
+          [data.id, `web:${context.userId}`],
         );
         await c.query("commit");
         await enqueueNotification({
@@ -97,9 +108,11 @@ export const denyTagRequest = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
     const tr = await pgOne<{ discord_id: string | null; status: string }>(
       `select discord_id, status from tag_requests where id = $1`,
-      [data.id]
+      [data.id],
     );
     if (!tr) throw new Error("Pedido não encontrado");
     if (tr.status !== "pending") throw new Error("Pedido já resolvido");
@@ -108,12 +121,14 @@ export const denyTagRequest = createServerFn({ method: "POST" })
          set status = 'denied', denied_by = $2, deny_reason = $3, denial_reason = $3,
              resolved_at = now(), processed_at = now()
        where id = $1`,
-      [data.id, `web:${context.userId}`, data.reason.trim()]
+      [data.id, `web:${context.userId}`, data.reason.trim()],
     );
     await enqueueNotification({
       embed: {
         title: "Tag recusada",
-        description: tr.discord_id ? `<@${tr.discord_id}> · ${data.reason}` : data.reason,
+        description: tr.discord_id
+          ? `<@${tr.discord_id}> · ${data.reason}`
+          : data.reason,
         color: 0xb91c1c,
       },
     });

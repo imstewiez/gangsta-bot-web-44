@@ -52,7 +52,7 @@ export const listRecipes = createServerFn({ method: "GET" })
          left join recipe_ingredients ri on ri.recipe_id = r.id
          left join items ii on ii.id = ri.ingredient_item_id
         where i.deleted_at is null
-        order by i.name, ri.id`
+        order by i.name, ri.id`,
     );
 
     const map = new Map<number, RecipeRow>();
@@ -95,10 +95,8 @@ export const listRecipes = createServerFn({ method: "GET" })
       r.margin = isManager ? margin : 0;
       r.margin_pct = isManager ? pct : null;
     }
-    // Default: maior valor estimado primeiro (ranking financeiro), tie-break alfabético.
-    return [...map.values()].sort(
-      (a, b) => (b.estimated_value ?? 0) - (a.estimated_value ?? 0) ||
-                a.item_name.localeCompare(b.item_name, "pt")
+    return [...map.values()].sort((a, b) =>
+      a.item_name.localeCompare(b.item_name),
     );
   });
 
@@ -108,20 +106,26 @@ export type CraftFeasibility = {
   requested_qty: number;
   total_cost: number;
   feasible: boolean;
-  missing: Array<{ name: string; needed: number; in_stock: number; missing: number }>;
+  missing: Array<{
+    name: string;
+    needed: number;
+    in_stock: number;
+    missing: number;
+  }>;
 };
 
 export const computeCraftFeasibility = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { recipe_id: number; quantity: number }) => {
     if (!Number.isFinite(d.recipe_id)) throw new Error("recipe_id inválido");
-    if (!Number.isFinite(d.quantity) || d.quantity <= 0) throw new Error("quantidade inválida");
+    if (!Number.isFinite(d.quantity) || d.quantity <= 0)
+      throw new Error("quantidade inválida");
     return d;
   })
   .handler(async ({ data }): Promise<CraftFeasibility> => {
     const head = await pgOne<{ item_name: string }>(
       `select i.name as item_name from craft_recipes r join items i on i.id = r.item_id where r.id = $1`,
-      [data.recipe_id]
+      [data.recipe_id],
     );
     const ings = await pgQuery<{
       ingredient_item_id: number;
@@ -137,7 +141,7 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
          from recipe_ingredients ri
          join items ii on ii.id = ri.ingredient_item_id
         where ri.recipe_id = $1`,
-      [data.recipe_id]
+      [data.recipe_id],
     );
     let total_cost = 0;
     const missing: CraftFeasibility["missing"] = [];
@@ -146,7 +150,12 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
       const stock = Number(ing.in_stock ?? 0);
       total_cost += needed * Number(ing.unit_cost ?? 0);
       if (stock < needed) {
-        missing.push({ name: ing.name, needed, in_stock: stock, missing: needed - stock });
+        missing.push({
+          name: ing.name,
+          needed,
+          in_stock: stock,
+          missing: needed - stock,
+        });
       }
     }
     return {

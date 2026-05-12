@@ -30,27 +30,22 @@ export const listMembers = createServerFn({ method: "GET" })
          from members
          where deleted_at is null
          order by
-           -- hierarquia oficial: Manda-Chuva (8) → Young Blood (1) → resto
-           case tier
-             when 'manda_chuva' then 8
-             when 'kingpin' then 7
-             when 'patrao_di_zona' then 6
-             when 'og' then 5
+           case coalesce(role,'bairrista')
+             when 'manda_chuva' then 1
+             when 'kingpin' then 2
+             when 'og' then 3
              when 'real_gangster' then 4
-             when 'gangster_fodido' then 3
-             when 'o_gunao' then 2
-             when 'young_blood' then 1
-             else 0
-           end desc,
+             when 'patrao_di_zona' then 5
+             else 6 end,
+           case tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
            display_name nulls last
-         limit 500`
+         limit 500`,
       );
     } catch (err) {
       console.error("[listMembers] failed:", err);
       throw new Error(err instanceof Error ? err.message : "DB error");
     }
   });
-
 
 export type MemberDetail = {
   member: MemberRow | null;
@@ -72,20 +67,25 @@ export const getMember = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<MemberDetail> => {
     const member = await pgOne<MemberRow>(
       `select ${SELECT_MEMBER} from members where id = $1`,
-      [data.id]
+      [data.id],
     );
-    if (!member) return { member: null, contributions: [], recentMovements: [], kills: 0 };
+    if (!member)
+      return { member: null, contributions: [], recentMovements: [], kills: 0 };
     const [contrib, movs, kills] = await Promise.all([
       pgQuery<{ type: string; total: string }>(
         `select movement_type as type, sum(quantity)::text as total
          from inventory_movements
          where member_id = $1
          group by movement_type order by sum(quantity) desc`,
-        [data.id]
+        [data.id],
       ),
       pgQuery<{
-        id: number; type: string; item_id: number | null; item_name: string | null;
-        qty: number; created_at: string;
+        id: number;
+        type: string;
+        item_id: number | null;
+        item_name: string | null;
+        qty: number;
+        created_at: string;
       }>(
         `select im.id, im.movement_type as type, im.item_id, i.name as item_name,
                 im.quantity as qty, im.created_at
@@ -94,16 +94,19 @@ export const getMember = createServerFn({ method: "GET" })
          where im.member_id = $1
          order by im.created_at desc
          limit 25`,
-        [data.id]
+        [data.id],
       ),
       pgOne<{ count: string }>(
         "select count(*)::text as count from kill_logs where killer_id = $1",
-        [data.id]
+        [data.id],
       ).catch(() => ({ count: "0" })),
     ]);
     return {
       member,
-      contributions: contrib.map((r) => ({ type: r.type, total: Number(r.total) })),
+      contributions: contrib.map((r) => ({
+        type: r.type,
+        total: Number(r.total),
+      })),
       recentMovements: movs,
       kills: Number(kills?.count ?? 0),
     };

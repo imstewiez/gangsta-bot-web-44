@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { listOrders, createOrder, transitionOrder } from "@/lib/orders.functions";
+import {
+  listOrders,
+  createOrder,
+  transitionOrder,
+} from "@/lib/orders.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -10,15 +14,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtMoney, formatOrderStatus, prettyItemName } from "@/lib/domain";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, ShoppingBag } from "lucide-react";
-import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
-export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
+export const Route = createFileRoute("/_authenticated/encomendas")({
+  component: Page,
+});
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: "à espera",
+  approved: "aceite",
+  in_progress: "a tratar",
+  ready: "pronta",
+  fulfilled: "entregue",
+  denied: "recusada",
+  cancelled: "cancelada",
+};
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-muted text-muted-foreground border-border",
@@ -30,8 +58,10 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: "bg-muted/60 text-muted-foreground border-border line-through",
 };
 
-
-const NEXT_STATES: Record<string, { to: string; label: string; variant?: "destructive" | "default" }[]> = {
+const NEXT_STATES: Record<
+  string,
+  { to: string; label: string; variant?: "destructive" | "default" }[]
+> = {
   pending: [
     { to: "approved", label: "Aceitar" },
     { to: "denied", label: "Recusar", variant: "destructive" },
@@ -77,7 +107,13 @@ function Page() {
   );
 }
 
-function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage: boolean }) {
+function OrdersList({
+  scope,
+  canManage,
+}: {
+  scope: "mine" | "manage";
+  canManage: boolean;
+}) {
   const fn = useServerFn(listOrders);
   const transFn = useServerFn(transitionOrder);
   const qc = useQueryClient();
@@ -88,7 +124,17 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
   const m = useMutation({
     mutationFn: (v: { id: number; to: string }) =>
       transFn({
-        data: v as { id: number; to: "pending" | "approved" | "in_progress" | "ready" | "fulfilled" | "denied" | "cancelled" },
+        data: v as {
+          id: number;
+          to:
+            | "pending"
+            | "approved"
+            | "in_progress"
+            | "ready"
+            | "fulfilled"
+            | "denied"
+            | "cancelled";
+        },
       }),
     onSuccess: (res) => {
       if (res && "ok" in res && res.ok === false) {
@@ -102,13 +148,16 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (orders.isLoading) return <div className="grid gap-3"><CardGridSkeleton count={4} /></div>;
+  if (orders.isLoading)
+    return <p className="text-muted-foreground">A puxar pedidos…</p>;
   if (!orders.data?.length)
     return (
       <Card className="p-10 text-center">
         <ShoppingBag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
-          {scope === "mine" ? "Ainda não pediste nada." : "Caixa de entrada limpa."}
+          {scope === "mine"
+            ? "Ainda não pediste nada."
+            : "Caixa de entrada limpa."}
         </p>
       </Card>
     );
@@ -122,26 +171,40 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
             <div className="flex flex-wrap items-start gap-4">
               <div className="flex-1 min-w-[200px]">
                 <div className="flex items-center gap-2">
-                  <span className="text-display text-xs text-muted-foreground">#{o.id}</span>
-                  <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + (STATUS_COLOR[o.status] ?? "")}>
-                    {formatOrderStatus(o.status)}
+                  <span className="text-display text-xs text-muted-foreground">
+                    #{o.id}
                   </span>
-                  <span className="text-xs text-muted-foreground">{fmtDate(o.created_at)}</span>
+                  <span
+                    className={
+                      "rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " +
+                      (STATUS_COLOR[o.status] ?? "")
+                    }
+                  >
+                    {STATUS_LABEL[o.status] ?? o.status}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {fmtDate(o.created_at)}
+                  </span>
                 </div>
                 <div className="mt-1.5 text-base font-semibold">
-                  {o.quantity}× {prettyItemName(o.item_name)}
+                  {o.quantity}× {o.item_name ?? "—"}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Para <span className="text-foreground">{o.member_name ?? "—"}</span>
-                  {o.notes && <span className="block mt-1 italic">"{o.notes}"</span>}
+                  Para{" "}
+                  <span className="text-foreground">
+                    {o.member_name ?? "—"}
+                  </span>
+                  {o.notes && (
+                    <span className="block mt-1 italic">"{o.notes}"</span>
+                  )}
                 </div>
               </div>
               <div className="text-right">
                 <div className="font-mono text-lg font-semibold">
-                  {o.total_price != null ? fmtMoney(o.total_price) : "—"}
+                  {o.total_price != null ? fmtNum(o.total_price) : "—"}
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">
-                  {o.unit_price != null ? `${fmtMoney(o.unit_price)}/un` : ""}
+                  {o.unit_price != null ? `${fmtNum(o.unit_price)}/un` : ""}
                 </div>
               </div>
               {next && (
@@ -150,7 +213,9 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
                     <Button
                       key={s.to}
                       size="sm"
-                      variant={s.variant === "destructive" ? "outline" : "default"}
+                      variant={
+                        s.variant === "destructive" ? "outline" : "default"
+                      }
                       disabled={m.isPending}
                       onClick={() => m.mutate({ id: o.id, to: s.to })}
                     >
@@ -172,21 +237,26 @@ function NewOrder() {
   const catFn = useServerFn(getCatalog);
   const createFn = useServerFn(createOrder);
   const qc = useQueryClient();
-  const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn(), enabled: open });
-  const items = (cat.data ?? [])
-    .filter((i: CatalogItem) => i.side === "venda" && i.subcategory !== "armas_brancas")
-    .slice()
-    .sort((a, b) => {
-      const va = a.min_sale_price ?? a.purchase_price ?? a.morador_purchase_price ?? 0;
-      const vb = b.min_sale_price ?? b.purchase_price ?? b.morador_purchase_price ?? 0;
-      return vb - va;
-    });
+  const cat = useQuery({
+    queryKey: ["catalog"],
+    queryFn: () => catFn(),
+    enabled: open,
+  });
+  const items = (cat.data ?? []).filter(
+    (i: CatalogItem) => i.side === "venda" && i.subcategory !== "armas_brancas",
+  );
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("1");
   const [notes, setNotes] = useState("");
   const m = useMutation({
     mutationFn: () =>
-      createFn({ data: { item_id: Number(item), quantity: Number(qty), notes: notes || null } }),
+      createFn({
+        data: {
+          item_id: Number(item),
+          quantity: Number(qty),
+          notes: notes || null,
+        },
+      }),
     onSuccess: () => {
       toast.success("Pedido feito. A chefia já viu.");
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -201,7 +271,8 @@ function NewOrder() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <Plus className="mr-1 h-4 w-4" />Encomendar
+          <Plus className="mr-1 h-4 w-4" />
+          Encomendar
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -212,32 +283,50 @@ function NewOrder() {
           <div>
             <label className="text-xs text-muted-foreground">Item</label>
             <Select value={item} onValueChange={setItem}>
-              <SelectTrigger><SelectValue placeholder="Escolhe…" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolhe…" />
+              </SelectTrigger>
               <SelectContent>
-                {items.map((i) => {
-                  const price = i.min_sale_price ?? i.purchase_price ?? i.morador_purchase_price;
-                  return (
-                    <SelectItem key={i.id} value={String(i.id)}>
-                      {prettyItemName(i.name)}
-                      {price != null && <span className="text-muted-foreground"> · {fmtMoney(price)}</span>}
-                    </SelectItem>
-                  );
-                })}
+                {items.map((i) => (
+                  <SelectItem key={i.id} value={String(i.id)}>
+                    {i.name}{" "}
+                    <span className="text-muted-foreground">
+                      · {i.subcategory}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Quantidade</label>
-            <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+            <Input
+              type="number"
+              min={1}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+            />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Recado (opcional)</label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Para quê, para quando…" />
+            <label className="text-xs text-muted-foreground">
+              Recado (opcional)
+            </label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Para quê, para quando…"
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>Deixa lá</Button>
-          <Button disabled={!item || !qty || m.isPending} onClick={() => m.mutate()}>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Deixa lá
+          </Button>
+          <Button
+            disabled={!item || !qty || m.isPending}
+            onClick={() => m.mutate()}
+          >
             {m.isPending ? "A enviar…" : "Pedir"}
           </Button>
         </DialogFooter>

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { withClient, pgQuery } from "./pg.server";
+import { resolveCurrentMember } from "./pricing.server";
 
 export type WeekInfo = {
   week_start: string;
@@ -18,7 +19,7 @@ export const listRecentWeeks = createServerFn({ method: "GET" })
          from weekly_rankings
         group by week_start, week_end
         order by week_start desc
-        limit 8`
+        limit 8`,
     );
   });
 
@@ -34,6 +35,8 @@ export const recomputeWeek = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { week_start?: string | null }) => d)
   .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
     return withClient(async (c) => {
       await c.query("begin");
       try {
@@ -42,13 +45,15 @@ export const recomputeWeek = createServerFn({ method: "POST" })
           `select
              coalesce($1::date, date_trunc('week', now())::date) as ws,
              coalesce($1::date, date_trunc('week', now())::date) + interval '6 days' as we`,
-          [data.week_start ?? null]
+          [data.week_start ?? null],
         );
         const ws = wk.rows[0].ws as Date;
         const we = wk.rows[0].we as Date;
 
         // Clear previous rows for this week
-        await c.query(`delete from weekly_rankings where week_start = $1`, [ws]);
+        await c.query(`delete from weekly_rankings where week_start = $1`, [
+          ws,
+        ]);
 
         // Aggregate per member
         const agg = await c.query(
@@ -107,7 +112,7 @@ export const recomputeWeek = createServerFn({ method: "POST" })
               left join sales s on s.member_id = m.id
              where m.deleted_at is null
                and (coalesce(k.kills_count,0) + coalesce(o.operations_count,0) + coalesce(d.deliveries,0) + coalesce(s.sales,0) > 0)`,
-          [ws]
+          [ws],
         );
 
         // Compute scores and upsert
@@ -134,28 +139,39 @@ export const recomputeWeek = createServerFn({ method: "POST" })
                net_profit_generated, survival_rate, performance_score, hybrid_score, normalized_score, created_at)
              values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())`,
             [
-              r.member_id, ws, we,
-              r.deliveries, r.sales, r.operations_count,
+              r.member_id,
+              ws,
+              we,
+              r.deliveries,
+              r.sales,
+              r.operations_count,
               r.net_profit_generated,
               r.survival,
               pos,
-              r.kills_count, r.wins_count, r.loss_count,
-              r.net_profit_generated, r.survival,
-              r.performance, r.hybrid,
-              rows.length > 0 ? r.hybrid / Math.max(...rows.map((x) => x.hybrid || 1)) : 0,
-            ]
+              r.kills_count,
+              r.wins_count,
+              r.loss_count,
+              r.net_profit_generated,
+              r.survival,
+              r.performance,
+              r.hybrid,
+              rows.length > 0
+                ? r.hybrid / Math.max(...rows.map((x) => x.hybrid || 1))
+                : 0,
+            ],
           );
         }
 
         await c.query(
           `insert into audit_logs (action, entity_type, entity_id, actor_id, after_state, created_at)
            values ('rankings_recompute','weekly_rankings', $1::text, $2, jsonb_build_object('rows', $3::int), now())`,
-          [String(ws), `web:${context.userId}`, rows.length]
+          [String(ws), `web:${context.userId}`, rows.length],
         );
 
         await c.query("commit");
         return {
-          week_start: typeof ws === "string" ? ws : ws.toISOString().slice(0, 10),
+          week_start:
+            typeof ws === "string" ? ws : ws.toISOString().slice(0, 10),
           week_end: typeof we === "string" ? we : we.toISOString().slice(0, 10),
           rows_written: rows.length,
         };

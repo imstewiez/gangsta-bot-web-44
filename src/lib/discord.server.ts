@@ -4,11 +4,23 @@
 
 export type DiscordEvent =
   | { action: "rename"; discord_id: string; new_name: string }
-  | { action: "promote"; discord_id: string; from_tier: string | null; to_tier: string }
-  | { action: "demote"; discord_id: string; from_tier: string | null; to_tier: string }
+  | {
+      action: "promote";
+      discord_id: string;
+      from_tier: string | null;
+      to_tier: string;
+    }
+  | {
+      action: "demote";
+      discord_id: string;
+      from_tier: string | null;
+      to_tier: string;
+    }
   | { action: "kick"; discord_id: string; reason?: string };
 
-export async function notifyBot(ev: DiscordEvent): Promise<{ ok: boolean; error?: string }> {
+export async function notifyBot(
+  ev: DiscordEvent,
+): Promise<{ ok: boolean; error?: string }> {
   const url = process.env.DISCORD_BOT_URL;
   const secret = process.env.DISCORD_BOT_SECRET;
   if (!url) {
@@ -22,7 +34,11 @@ export async function notifyBot(ev: DiscordEvent): Promise<{ ok: boolean; error?
         "content-type": "application/json",
         ...(secret ? { "x-bot-secret": secret } : {}),
       },
-      body: JSON.stringify({ ...ev, guild_id: process.env.DISCORD_GUILD_ID, ts: Date.now() }),
+      body: JSON.stringify({
+        ...ev,
+        guild_id: process.env.DISCORD_GUILD_ID,
+        ts: Date.now(),
+      }),
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");

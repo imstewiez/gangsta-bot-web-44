@@ -6,6 +6,7 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     return await next();
   } catch (error) {
+    if (error instanceof Response) throw error;
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }
@@ -19,7 +20,7 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 
 const authedFetch: typeof fetch = async (input, init) => {
   const headers = new Headers(init?.headers);
-  if (typeof window !== "undefined" && !headers.has("authorization")) {
+  if (!headers.has("authorization")) {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data } = await supabase.auth.getSession();
