@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtNum } from "@/lib/domain";
+import { fmtDate, fmtMoney, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, Trash2, Check, X, PackageOpen, Package, Coins } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
@@ -118,10 +118,10 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
                     <span className="inline-flex items-center gap-2">
                       <span className="font-mono text-muted-foreground">{l.qty}×</span>
                       <ItemIcon name={l.item_name ?? ""} size={14} />
-                      {l.item_name ?? `#${l.item_id}`}
+                      {prettyItemName(l.item_name) ?? `#${l.item_id}`}
                     </span>
                     <span className="font-mono text-muted-foreground">
-                      {l.unit_value != null ? fmtNum(l.unit_value * l.qty) : "—"}
+                      {l.unit_value != null ? fmtMoney(l.unit_value * l.qty) : "—"}
                     </span>
                   </li>
                 ))}
@@ -131,7 +131,7 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
                   <span className="text-xs italic text-muted-foreground">"{d.notes}"</span>
                 ) : <span />}
                 <span className="font-mono text-base font-semibold">
-                  {fmtNum(d.total_value)}
+                  {fmtMoney(d.total_value)}
                 </span>
               </div>
             </div>
@@ -159,7 +159,10 @@ function NewDelivery() {
   const createFn = useServerFn(createDelivery);
   const qc = useQueryClient();
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn(), enabled: open });
-  const items = (cat.data ?? []).filter((i: CatalogItem) => i.side === "compra");
+  const items = (cat.data ?? [])
+    .filter((i: CatalogItem) => i.side === "compra")
+    .slice()
+    .sort((a, b) => (b.purchase_price ?? 0) - (a.purchase_price ?? 0));
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([{ item_id: "", qty: "1" }]);
   const [notes, setNotes] = useState("");
   const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
@@ -237,7 +240,8 @@ function NewDelivery() {
                 <SelectContent>
                   {items.map((i) => (
                     <SelectItem key={i.id} value={String(i.id)}>
-                      {i.name} <span className="text-muted-foreground">· {i.subcategory}</span>
+                      {prettyItemName(i.name)}
+                      {i.purchase_price != null && <span className="text-muted-foreground"> · {fmtMoney(i.purchase_price)}</span>}
                     </SelectItem>
                   ))}
                 </SelectContent>
