@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
+import { Flame, CalendarDays, Trophy, Medal, Award } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
