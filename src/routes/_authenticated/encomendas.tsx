@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { fmtDate, fmtMoney, formatOrderStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, ShoppingBag } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
 
