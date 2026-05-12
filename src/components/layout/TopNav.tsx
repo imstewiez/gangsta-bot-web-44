@@ -60,9 +60,11 @@ export function TopNav() {
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
         <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
-          <div className="grid h-8 w-8 place-items-center rounded-sm bg-primary font-display text-primary-foreground shadow-[0_0_15px_-5px_color-mix(in_oklab,var(--primary)_60%,transparent)]">
-            R
-          </div>
+          <img
+            src={redwoodLogo}
+            alt="RedWood"
+            className="h-9 w-9 rounded-sm object-contain drop-shadow-[0_0_10px_color-mix(in_oklab,var(--primary)_55%,transparent)]"
+          />
           <span className="hidden text-display text-sm tracking-[0.2em] sm:block">
             RedWood
           </span>
