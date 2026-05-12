@@ -82,7 +82,7 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (list.isLoading) return <p className="text-muted-foreground">A puxar entregas…</p>;
+  if (list.isLoading) return <div className="grid gap-3"><CardGridSkeleton count={4} /></div>;
   if (!list.data?.length)
     return (
       <Card className="p-10 text-center">
