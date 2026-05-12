@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Home, Users, Trophy, Sparkles,
-  ShoppingBag, PackageOpen, Crosshair, CalendarClock,
+  ShoppingBag, PackageOpen, Crosshair,
   Tags, Package, Hammer,
   Shield, ScrollText,
   LogOut,
@@ -59,7 +59,7 @@ const GROUPS: NavGroup[] = [
       { to: "/encomendas",      label: "Encomendas",     icon: ShoppingBag },
       { to: "/entregas",        label: "Entregas",       icon: PackageOpen },
       { to: "/operacoes",       label: "Saídas",         icon: Crosshair },
-      { to: "/disponibilidade", label: "Disponibilidade", icon: CalendarClock },
+
     ],
   },
   {
