@@ -54,7 +54,13 @@ function Page() {
           <CardHeader><CardTitle className="text-display text-sm">Votos {openId ? `(sessão #${openId})` : ""}</CardTitle></CardHeader>
           <CardContent>
             {!openId && <p className="text-sm text-muted-foreground">Escolhe uma sessão.</p>}
-            {openId && votes.isLoading && <p className="text-sm text-muted-foreground">A carregar…</p>}
+            {openId && votes.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-3/4" />
+              </div>
+            )}
             {openId && votes.data && (
               <div className="space-y-3">
                 {votes.data.slots.map((s) => {
