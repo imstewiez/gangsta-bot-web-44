@@ -208,7 +208,7 @@ function NewDelivery() {
                     : "border-border bg-card hover:bg-accent/30")
                 }
               >
-                <div className="text-display text-[11px] uppercase tracking-wider">📦 Entregar</div>
+                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider"><Package className="h-3 w-3" /> Entregar</div>
                 <div className="text-xs text-muted-foreground">Vai para o stock do bairro</div>
               </button>
               <button
