@@ -29,16 +29,24 @@ function Page() {
           </thead>
           <tbody>
             {isLoading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">A carregar…</td></tr>}
-            {(data ?? []).map((r, i) => (
+            {(data ?? []).map((r, i) => {
+              const medal = MEDAL_ICONS[i];
+              return (
               <tr key={r.member_id} className="border-t border-border hover:bg-accent/30">
-                <td className="px-3 py-2 text-display text-primary">{i + 1}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-2 text-display text-primary">
+                    {medal ? <medal.Cmp className={"h-4 w-4 " + medal.cls} /> : null}
+                    {i + 1}
+                  </span>
+                </td>
                 <td className="px-3 py-2 font-medium">{r.display_name ?? r.nick ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{r.contribution != null ? fmtNum(Math.round(r.contribution)) : "—"}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{r.performance != null ? fmtNum(Math.round(r.performance)) : "—"}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{r.reliability != null ? fmtNum(Math.round(r.reliability)) : "—"}</td>
                 <td className="px-3 py-2 text-right font-mono font-bold">{fmtNum(Math.round(r.score))}</td>
               </tr>
-            ))}
+              );
+            })}
             {!isLoading && !data?.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Sem ranking.</td></tr>}
           </tbody>
         </table>
