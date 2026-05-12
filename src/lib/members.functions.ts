@@ -30,14 +30,18 @@ export const listMembers = createServerFn({ method: "GET" })
          from members
          where deleted_at is null
          order by
-           case coalesce(role,'bairrista')
-             when 'manda_chuva' then 1
-             when 'kingpin' then 2
-             when 'og' then 3
+           -- hierarquia oficial: Manda-Chuva (8) → Young Blood (1) → resto
+           case tier
+             when 'manda_chuva' then 8
+             when 'kingpin' then 7
+             when 'patrao_di_zona' then 6
+             when 'og' then 5
              when 'real_gangster' then 4
-             when 'patrao_di_zona' then 5
-             else 6 end,
-           case tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
+             when 'gangster_fodido' then 3
+             when 'o_gunao' then 2
+             when 'young_blood' then 1
+             else 0
+           end desc,
            display_name nulls last
          limit 500`
       );
