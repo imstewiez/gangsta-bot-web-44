@@ -133,6 +133,18 @@ export function CategoryIcon({
   );
 }
 
+// Cor especial para prints — segue a cor mencionada no nome.
+function printTone(name: string): string | null {
+  const n = (name ?? "").toLowerCase();
+  if (!/print/.test(n)) return null;
+  if (/vermelh|red\b/.test(n)) return "destructive";
+  if (/laranja|orange/.test(n)) return "warning";
+  if (/amarel|dourad|yellow|gold/.test(n)) return "warning";
+  if (/azul|blue/.test(n)) return "info";
+  if (/verde|green/.test(n)) return "success";
+  return null;
+}
+
 // Ícone inline para linhas — colorido pelo tom da categoria.
 export function ItemIcon({
   name,
@@ -143,7 +155,7 @@ export function ItemIcon({
 }: { name: string; category?: string | null; size?: number; withPuck?: boolean; className?: string }) {
   const Icon = pickItemIcon(name, category);
   const cat = inferCategory(name, category ?? undefined);
-  const tone = CATEGORY_TONE[cat] ?? "muted";
+  const tone = printTone(name) ?? CATEGORY_TONE[cat] ?? "muted";
   if (withPuck) {
     const puck = TONE_PUCK[tone] ?? TONE_PUCK.muted;
     return (
