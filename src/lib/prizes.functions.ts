@@ -25,7 +25,7 @@ export const listPrizes = createServerFn({ method: "GET" })
       `select wp.id, wp.week_start, wp.week_end, wp.winner_member_id,
               m.display_name as winner_name,
               wp.hybrid_score::float as hybrid_score,
-              wp.prize_description, coalesce(wp.prize_status, 'pending') as prize_status,
+              wp.prize_description, coalesce(wp.prize_status, 'por_definir') as prize_status,
               wp.defined_by, wp.defined_at, wp.delivered_by, wp.delivered_at, wp.notes
        from weekly_prizes wp
        left join members m on m.id = wp.winner_member_id
