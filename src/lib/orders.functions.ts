@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
-import { resolveCurrentMember, tierMargin } from "./pricing.functions";
+import { resolveCurrentMember } from "./pricing.server";
+import { tierMargin } from "./pricing.shared";
 import { notifyUsers, notifyManagers } from "./notifications.server";
 
 export type OrderRow = {

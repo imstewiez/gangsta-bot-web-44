@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { getCatalog, getCurrentMember, tierMargin, TIER_LABELS, type CatalogItem } from "@/lib/pricing.functions";
+import { getCatalog, getCurrentMember, tierMargin, TIER_LABELS, type CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { fmtNum } from "@/lib/domain";
