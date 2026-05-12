@@ -67,9 +67,15 @@ function Page() {
             </ul>
             <div className="mt-3 flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Custo: {fmtNum(Math.round(r.total_cost))} €</span>
-              <span className={r.margin >= 0 ? "text-emerald-500" : "text-red-500"}>
-                Margem: {fmtNum(Math.round(r.margin))} € {r.margin_pct != null ? `(${r.margin_pct.toFixed(0)}%)` : ""}
-              </span>
+              {isManager ? (
+                <span className={r.margin >= 0 ? "text-success font-medium" : "text-destructive font-medium"}>
+                  Margem firma: {fmtNum(Math.round(r.margin))} € {r.margin_pct != null ? `(${r.margin_pct.toFixed(0)}%)` : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-muted-foreground/70">
+                  <Lock className="h-3 w-3" /> margem só para a chefia
+                </span>
+              )}
             </div>
           </div>
         ))}
