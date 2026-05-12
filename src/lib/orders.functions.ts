@@ -106,14 +106,38 @@ export const transitionOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
-    const before = await pgOne<{ status: string; member_id: number; item_name: string | null }>(
-      `select o.status, o.member_id, i.name as item_name
+    const before = await pgOne<{
+      status: string; member_id: number; item_id: number | null;
+      item_name: string | null; quantity: number;
+    }>(
+      `select o.status, o.member_id, o.item_id, o.quantity, i.name as item_name
        from orders o left join items i on i.id = o.item_id where o.id = $1`,
       [data.id]
     );
     if (!before) throw new Error("Encomenda não encontrada");
     const isFinal = data.to === "fulfilled";
     const isResolved = data.to !== "pending";
+
+    // Stock check + decrement on fulfillment
+    if (isFinal && before.status !== "fulfilled" && before.item_id) {
+      const bal = await pgOne<{ balance: number }>(
+        `select coalesce(balance, 0) as balance from inventory_balance where item_id = $1`,
+        [before.item_id]
+      );
+      const have = bal?.balance ?? 0;
+      if (have < before.quantity) {
+        throw new Error(
+          `Sem stock que chegue: ${before.item_name ?? "item"} (${have} em casa, ${before.quantity} pedidos)`
+        );
+      }
+      await pgQuery(
+        `insert into inventory_movements
+           (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
+         values ('venda_bairrista', $1, $2, $3, 'armazem', $4, $5, now())`,
+        [before.item_id, -before.quantity, before.member_id, `order:${data.id}`, `web:${context.userId}`]
+      );
+    }
+
     await pgQuery(
       `update orders set status=$2, updated_at=now(), updated_by=$3,
          delivered_at = case when $4 then now() else delivered_at end,

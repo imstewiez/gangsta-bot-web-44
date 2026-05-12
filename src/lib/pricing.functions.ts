@@ -30,10 +30,21 @@ export function tierMargin(tier: string | null | undefined): number {
   return TIER_MARGIN[tier] ?? 0;
 }
 
+// Quem pode aceitar/recusar encomendas e entregas
 const MANAGER_TIERS = new Set(["patrao_di_zona", "kingpin", "manda_chuva"]);
+// Quem pode ver/gerir o inventário (armas + carregadores)
+const INVENTORY_TIERS = new Set(["patrao_di_zona", "og", "kingpin", "manda_chuva"]);
+
 export function isManager(member: { tier: string | null; role_label?: string | null } | null): boolean {
   if (!member) return false;
   if (member.tier && MANAGER_TIERS.has(member.tier)) return true;
+  if (member.role_label === "chefia" || member.role_label === "manda_chuva") return true;
+  return false;
+}
+
+export function canSeeInventory(member: { tier: string | null; role_label?: string | null } | null): boolean {
+  if (!member) return false;
+  if (member.tier && INVENTORY_TIERS.has(member.tier)) return true;
   if (member.role_label === "chefia" || member.role_label === "manda_chuva") return true;
   return false;
 }
@@ -46,6 +57,7 @@ export type CurrentMember = {
   tier: string | null;
   role_label: string | null;
   is_manager: boolean;
+  can_see_inventory: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,7 +77,7 @@ export async function resolveCurrentMember(supabase: any, userId: string): Promi
     [profile.discord_id]
   );
   if (!m) return null;
-  return { ...m, is_manager: isManager(m) };
+  return { ...m, is_manager: isManager(m), can_see_inventory: canSeeInventory(m) };
 }
 
 export const getCurrentMember = createServerFn({ method: "GET" })

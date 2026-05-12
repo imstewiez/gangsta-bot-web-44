@@ -25,7 +25,6 @@ import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedEncomendasRouteImport } from './routes/_authenticated/encomendas'
 import { Route as AuthenticatedDisponibilidadeRouteImport } from './routes/_authenticated/disponibilidade'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCemiterioRouteImport } from './routes/_authenticated/cemiterio'
 import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros.$id'
@@ -110,11 +109,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedCemiterioRoute = AuthenticatedCemiterioRouteImport.update({
-  id: '/cemiterio',
-  path: '/cemiterio',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedAuditoriaRoute = AuthenticatedAuditoriaRouteImport.update({
   id: '/auditoria',
   path: '/auditoria',
@@ -136,7 +130,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/auditoria': typeof AuthenticatedAuditoriaRoute
-  '/cemiterio': typeof AuthenticatedCemiterioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
@@ -157,7 +150,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/auditoria': typeof AuthenticatedAuditoriaRoute
-  '/cemiterio': typeof AuthenticatedCemiterioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
@@ -180,7 +172,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
-  '/_authenticated/cemiterio': typeof AuthenticatedCemiterioRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/_authenticated/encomendas': typeof AuthenticatedEncomendasRoute
@@ -203,7 +194,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin'
     | '/auditoria'
-    | '/cemiterio'
     | '/dashboard'
     | '/disponibilidade'
     | '/encomendas'
@@ -224,7 +214,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin'
     | '/auditoria'
-    | '/cemiterio'
     | '/dashboard'
     | '/disponibilidade'
     | '/encomendas'
@@ -246,7 +235,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/auditoria'
-    | '/_authenticated/cemiterio'
     | '/_authenticated/dashboard'
     | '/_authenticated/disponibilidade'
     | '/_authenticated/encomendas'
@@ -383,13 +371,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/cemiterio': {
-      id: '/_authenticated/cemiterio'
-      path: '/cemiterio'
-      fullPath: '/cemiterio'
-      preLoaderRoute: typeof AuthenticatedCemiterioRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/auditoria': {
       id: '/_authenticated/auditoria'
       path: '/auditoria'
@@ -428,7 +409,6 @@ const AuthenticatedMembrosRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAuditoriaRoute: typeof AuthenticatedAuditoriaRoute
-  AuthenticatedCemiterioRoute: typeof AuthenticatedCemiterioRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDisponibilidadeRoute: typeof AuthenticatedDisponibilidadeRoute
   AuthenticatedEncomendasRoute: typeof AuthenticatedEncomendasRoute
@@ -447,7 +427,6 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAuditoriaRoute: AuthenticatedAuditoriaRoute,
-  AuthenticatedCemiterioRoute: AuthenticatedCemiterioRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDisponibilidadeRoute: AuthenticatedDisponibilidadeRoute,
   AuthenticatedEncomendasRoute: AuthenticatedEncomendasRoute,

@@ -8,54 +8,82 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, ShoppingBag } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({ component: Page });
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: "bg-muted text-muted-foreground",
-  approved: "bg-warning/20 text-warning",
-  in_progress: "bg-primary/20 text-primary",
-  ready: "bg-primary/30 text-primary",
-  fulfilled: "bg-success/20 text-success",
-  denied: "bg-destructive/20 text-destructive",
-  cancelled: "bg-destructive/10 text-destructive",
+const STATUS_LABEL: Record<string, string> = {
+  pending: "à espera",
+  approved: "aceite",
+  in_progress: "a tratar",
+  ready: "pronta",
+  fulfilled: "entregue",
+  denied: "recusada",
+  cancelled: "cancelada",
 };
 
-const NEXT_STATES: Record<string, { to: string; label: string }[]> = {
-  pending: [{ to: "approved", label: "Aceitar" }, { to: "denied", label: "Rejeitar" }],
-  approved: [{ to: "in_progress", label: "Em curso" }, { to: "cancelled", label: "Cancelar" }],
-  in_progress: [{ to: "ready", label: "Pronta" }],
-  ready: [{ to: "fulfilled", label: "Confirmar entrega" }],
+const STATUS_COLOR: Record<string, string> = {
+  pending: "bg-muted text-muted-foreground border-border",
+  approved: "bg-warning/15 text-warning border-warning/30",
+  in_progress: "bg-primary/15 text-primary border-primary/30",
+  ready: "bg-primary/25 text-primary border-primary/40",
+  fulfilled: "bg-success/15 text-success border-success/30",
+  denied: "bg-destructive/15 text-destructive border-destructive/30",
+  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+};
+
+const NEXT_STATES: Record<string, { to: string; label: string; variant?: "destructive" | "default" }[]> = {
+  pending: [
+    { to: "approved", label: "Aceitar" },
+    { to: "denied", label: "Recusar", variant: "destructive" },
+  ],
+  approved: [
+    { to: "in_progress", label: "Pôr a tratar" },
+    { to: "cancelled", label: "Cancelar", variant: "destructive" },
+  ],
+  in_progress: [{ to: "ready", label: "Marcar pronta" }],
+  ready: [{ to: "fulfilled", label: "Entregue" }],
 };
 
 function Page() {
   const meFn = useServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;
-  const [tab, setTab] = useState(isManager ? "manage" : "mine");
+  const [tab, setTab] = useState<string>("mine");
 
   return (
     <>
-      <PageHeader eyebrow="Bairro" title="Encomendas" description="Pedidos de armas, carregadores, coletes e acessórios." action={<NewOrder />} />
+      <PageHeader
+        eyebrow="Loja da firma"
+        title="Encomendas"
+        description="Armas, carregadores, coletes e acessórios. Pede e a chefia trata."
+        action={<NewOrder />}
+      />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="mine">Minhas</TabsTrigger>
-          {isManager && <TabsTrigger value="manage">Gestão</TabsTrigger>}
+          <TabsTrigger value="mine">As minhas</TabsTrigger>
+          {isManager && <TabsTrigger value="manage">Para tratar</TabsTrigger>}
         </TabsList>
-        <TabsContent value="mine" className="mt-4"><OrdersTable scope="mine" canManage={false} /></TabsContent>
-        {isManager && <TabsContent value="manage" className="mt-4"><OrdersTable scope="manage" canManage /></TabsContent>}
+        <TabsContent value="mine" className="mt-4">
+          <OrdersList scope="mine" canManage={false} />
+        </TabsContent>
+        {isManager && (
+          <TabsContent value="manage" className="mt-4">
+            <OrdersList scope="manage" canManage />
+          </TabsContent>
+        )}
       </Tabs>
     </>
   );
 }
 
-function OrdersTable({ scope, canManage }: { scope: "mine" | "manage"; canManage: boolean }) {
+function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage: boolean }) {
   const fn = useServerFn(listOrders);
   const transFn = useServerFn(transitionOrder);
   const qc = useQueryClient();
@@ -64,55 +92,79 @@ function OrdersTable({ scope, canManage }: { scope: "mine" | "manage"; canManage
     queryFn: () => fn({ data: { scope } }),
   });
   const m = useMutation({
-    mutationFn: (v: { id: number; to: string }) => transFn({ data: v as { id: number; to: "pending" | "approved" | "in_progress" | "ready" | "fulfilled" | "denied" | "cancelled" } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["orders"] }); toast.success("Atualizado"); },
+    mutationFn: (v: { id: number; to: string }) =>
+      transFn({
+        data: v as { id: number; to: "pending" | "approved" | "in_progress" | "ready" | "fulfilled" | "denied" | "cancelled" },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      toast.success("Feito.");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  if (orders.isLoading) return <p className="text-muted-foreground">A puxar pedidos…</p>;
+  if (!orders.data?.length)
+    return (
+      <Card className="p-10 text-center">
+        <ShoppingBag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+        <p className="text-display text-sm text-muted-foreground">
+          {scope === "mine" ? "Ainda não pediste nada." : "Caixa de entrada limpa."}
+        </p>
+      </Card>
+    );
+
   return (
-    <div className="overflow-hidden rounded-sm border border-border">
-      <table className="w-full text-sm">
-        <thead className="bg-secondary text-display text-xs">
-          <tr>
-            <th className="px-3 py-2 text-left">Data</th>
-            <th className="px-3 py-2 text-left">Membro</th>
-            <th className="px-3 py-2 text-left">Item</th>
-            <th className="px-3 py-2 text-right">Qty</th>
-            <th className="px-3 py-2 text-right">Unit.</th>
-            <th className="px-3 py-2 text-right">Total</th>
-            <th className="px-3 py-2">Estado</th>
-            <th className="px-3 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.isLoading && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">A carregar…</td></tr>}
-          {(orders.data ?? []).map((o) => (
-            <tr key={o.id} className="border-t border-border hover:bg-accent/30">
-              <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(o.created_at)}</td>
-              <td className="px-3 py-2">{o.member_name ?? "—"}</td>
-              <td className="px-3 py-2 font-medium">{o.item_name ?? "—"}</td>
-              <td className="px-3 py-2 text-right font-mono">{o.quantity}</td>
-              <td className="px-3 py-2 text-right font-mono text-muted-foreground">{o.unit_price != null ? fmtNum(o.unit_price) : "—"}</td>
-              <td className="px-3 py-2 text-right font-mono">{o.total_price != null ? fmtNum(o.total_price) : "—"}</td>
-              <td className="px-3 py-2 text-center">
-                <span className={"rounded-sm px-2 py-1 text-xs text-display " + (STATUS_COLOR[o.status] ?? "bg-muted")}>{o.status}</span>
-              </td>
-              <td className="px-3 py-2 text-right">
-                {canManage && NEXT_STATES[o.status] && (
-                  <div className="flex gap-1 justify-end">
-                    {NEXT_STATES[o.status].map((s) => (
-                      <Button key={s.to} size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate({ id: o.id, to: s.to })}>
-                        {s.label}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-          {!orders.isLoading && !orders.data?.length && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Sem encomendas.</td></tr>}
-        </tbody>
-      </table>
+    <div className="grid gap-3">
+      {orders.data.map((o) => {
+        const next = canManage ? NEXT_STATES[o.status] : null;
+        return (
+          <Card key={o.id} className="p-4">
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="flex-1 min-w-[200px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-display text-xs text-muted-foreground">#{o.id}</span>
+                  <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + (STATUS_COLOR[o.status] ?? "")}>
+                    {STATUS_LABEL[o.status] ?? o.status}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{fmtDate(o.created_at)}</span>
+                </div>
+                <div className="mt-1.5 text-base font-semibold">
+                  {o.quantity}× {o.item_name ?? "—"}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Para <span className="text-foreground">{o.member_name ?? "—"}</span>
+                  {o.notes && <span className="block mt-1 italic">"{o.notes}"</span>}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono text-lg font-semibold">
+                  {o.total_price != null ? fmtNum(o.total_price) : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  {o.unit_price != null ? `${fmtNum(o.unit_price)}/un` : ""}
+                </div>
+              </div>
+              {next && (
+                <div className="flex w-full justify-end gap-1.5 border-t border-border pt-3">
+                  {next.map((s) => (
+                    <Button
+                      key={s.to}
+                      size="sm"
+                      variant={s.variant === "destructive" ? "outline" : "default"}
+                      disabled={m.isPending}
+                      onClick={() => m.mutate({ id: o.id, to: s.to })}
+                    >
+                      {s.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -128,31 +180,57 @@ function NewOrder() {
   const [qty, setQty] = useState("1");
   const [notes, setNotes] = useState("");
   const m = useMutation({
-    mutationFn: () => createFn({ data: { item_id: Number(item), quantity: Number(qty), notes: notes || null } }),
-    onSuccess: () => { toast.success("Encomenda criada"); qc.invalidateQueries({ queryKey: ["orders"] }); setOpen(false); setItem(""); setQty("1"); setNotes(""); },
+    mutationFn: () =>
+      createFn({ data: { item_id: Number(item), quantity: Number(qty), notes: notes || null } }),
+    onSuccess: () => {
+      toast.success("Pedido feito. A chefia já viu.");
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      setOpen(false);
+      setItem("");
+      setQty("1");
+      setNotes("");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm"><Plus className="mr-1 h-4 w-4" />Nova encomenda</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="mr-1 h-4 w-4" />Encomendar
+        </Button>
+      </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Nova encomenda</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>O que precisas?</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3">
           <div>
             <label className="text-xs text-muted-foreground">Item</label>
             <Select value={item} onValueChange={setItem}>
-              <SelectTrigger><SelectValue placeholder="Item…" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Escolhe…" /></SelectTrigger>
               <SelectContent>
-                {items.map((i) => <SelectItem key={i.id} value={String(i.id)}>{i.name} · {i.subcategory}</SelectItem>)}
+                {items.map((i) => (
+                  <SelectItem key={i.id} value={String(i.id)}>
+                    {i.name} <span className="text-muted-foreground">· {i.subcategory}</span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          <div><label className="text-xs text-muted-foreground">Quantidade</label><Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-          <div><label className="text-xs text-muted-foreground">Notas</label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></div>
+          <div>
+            <label className="text-xs text-muted-foreground">Quantidade</label>
+            <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Recado (opcional)</label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Para quê, para quando…" />
+          </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button disabled={!item || !qty || m.isPending} onClick={() => m.mutate()}>{m.isPending ? "A guardar…" : "Pedir"}</Button>
+          <Button variant="ghost" onClick={() => setOpen(false)}>Deixa lá</Button>
+          <Button disabled={!item || !qty || m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? "A enviar…" : "Pedir"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
