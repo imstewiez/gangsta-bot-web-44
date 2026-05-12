@@ -6,7 +6,7 @@ import { listUnfinalizedSaidas, getSaidaDetail, liquidateSaida } from "@/lib/liq
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, fmtNum, fmtMoney, formatSaidaStatus, prettyItemName } from "@/lib/domain";
+import { fmtDate, fmtMoney, formatSaidaStatus, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { CheckCircle2, FileSearch } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
