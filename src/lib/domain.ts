@@ -25,18 +25,60 @@ export const TIER_LABELS: Record<string, string> = {
   bairrista: "Bairrista",
 };
 
-// Emoji por rank — usado para destacar a hierarquia.
+// Emoji por rank — fallback (igual ao Discord). O ideal é usar <TierIcon /> que rende SVGs.
 export const TIER_EMOJI: Record<string, string> = {
   young_blood: "🏷️",
   o_gunao: "🚬",
   gangster_fodido: "♟️",
   patrao_di_zona: "👑",
-  real_gangster: "🍁",
+  real_gangster: "🗡️",
   og: "💀",
   kingpin: "💎",
   manda_chuva: "🩸",
   bairrista: "🏠",
 };
+
+// Gradiente por tier — replicado do servidor de Discord.
+// Linear-gradient ~135deg, dois stops.
+export const TIER_GRADIENT: Record<string, string> = {
+  manda_chuva:    "linear-gradient(135deg, #e6e6e6 0%, #b8003a 100%)",
+  kingpin:        "linear-gradient(135deg, #d4d4d4 0%, #1a1a1a 100%)",
+  og:             "linear-gradient(135deg, #0d0d0d 0%, #6b6b6b 100%)",
+  real_gangster:  "linear-gradient(135deg, #5a0a0a 0%, #d40015 100%)",
+  patrao_di_zona: "linear-gradient(135deg, #0a1a3a 0%, #2563eb 100%)",
+  gangster_fodido:"linear-gradient(135deg, #2a2a2a 0%, #c95a1a 100%)",
+  o_gunao:        "linear-gradient(135deg, #14361e 0%, #5fb368 100%)",
+  young_blood:    "linear-gradient(135deg, #e91e63 0%, #ff8fbf 100%)",
+  bairrista:      "linear-gradient(135deg, #2a2a2a 0%, #b8651a 100%)",
+};
+
+// Cor "principal" do tier — para textos e bordas.
+export const TIER_ACCENT: Record<string, string> = {
+  manda_chuva:    "#ff3a6a",
+  kingpin:        "#cfd6e0",
+  og:             "#a0a0a0",
+  real_gangster:  "#ff2c3a",
+  patrao_di_zona: "#3b82f6",
+  gangster_fodido:"#e07a3a",
+  o_gunao:        "#7fce85",
+  young_blood:    "#ff7fb5",
+  bairrista:      "#d28a4a",
+};
+
+// Tag "Chefia de RedWood" — vermelho sólido da firma.
+export const REDWOOD_GRADIENT = "linear-gradient(135deg, #ff2c3a 0%, #8a000f 100%)";
+
+// Ordem hierárquica (mais baixo → mais alto).
+export const TIER_ORDER: string[] = [
+  "young_blood",
+  "o_gunao",
+  "gangster_fodido",
+  "patrao_di_zona",
+  "real_gangster",
+  "og",
+  "kingpin",
+  "manda_chuva",
+];
 
 // Tag "Chefia de RedWood" — patrões di zona e acima representam a firma.
 export const CHEFIA_TIERS = new Set<string>([
@@ -50,18 +92,6 @@ export const CHEFIA_TIERS = new Set<string>([
 export function isChefia(tier: string | null | undefined): boolean {
   return !!tier && CHEFIA_TIERS.has(tier);
 }
-
-// Ordem hierárquica (mais baixo → mais alto).
-export const TIER_ORDER: string[] = [
-  "young_blood",
-  "o_gunao",
-  "gangster_fodido",
-  "patrao_di_zona",
-  "real_gangster",
-  "og",
-  "kingpin",
-  "manda_chuva",
-];
 
 export function tierLabel(tier: string | null | undefined): string {
   if (!tier) return "—";

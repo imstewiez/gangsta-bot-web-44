@@ -1,43 +1,49 @@
 import {
   TIER_LABELS,
-  TIER_EMOJI,
-  tierColor,
+  TIER_ACCENT,
   isChefia,
-  REDWOOD_BADGE_CLASS,
-  BAIRRISTA_BADGE_CLASS,
 } from "@/lib/domain";
+import { TierIcon, RedWoodIcon } from "./TierIcon";
 
 type Size = "xs" | "sm" | "md";
 
-const SIZE: Record<Size, string> = {
-  xs: "px-1.5 py-0.5 text-[10px]",
-  sm: "px-2 py-0.5 text-xs",
-  md: "px-3 py-1 text-sm",
+const PAD: Record<Size, string> = {
+  xs: "pl-0.5 pr-2 py-0.5 text-[10px] gap-1",
+  sm: "pl-0.5 pr-2.5 py-0.5 text-xs gap-1.5",
+  md: "pl-1 pr-3 py-1 text-sm gap-2",
+};
+
+const ICON_SIZE: Record<Size, "xs" | "sm" | "md"> = {
+  xs: "xs",
+  sm: "sm",
+  md: "md",
 };
 
 export function TierBadge({
   tier,
   size = "sm",
-  withEmoji = true,
+  withIcon = true,
 }: {
   tier: string | null | undefined;
   size?: Size;
-  withEmoji?: boolean;
+  withIcon?: boolean;
 }) {
   if (!tier) return <span className="text-muted-foreground">—</span>;
   const label = TIER_LABELS[tier] ?? tier;
-  const emoji = TIER_EMOJI[tier];
+  const accent = TIER_ACCENT[tier] ?? "var(--color-foreground)";
   return (
     <span
       className={
-        "inline-flex items-center gap-1 rounded-sm border text-display whitespace-nowrap " +
-        SIZE[size] +
-        " " +
-        tierColor(tier)
+        "inline-flex items-center rounded-full border bg-card/40 backdrop-blur text-display whitespace-nowrap " +
+        PAD[size]
       }
+      style={{
+        borderColor: `color-mix(in oklab, ${accent} 55%, transparent)`,
+        color: accent,
+      }}
     >
-      {withEmoji && emoji && <span aria-hidden>{emoji}</span>}
-      <span>{label}</span>
+      {withIcon && <TierIcon tier={tier} size={ICON_SIZE[size]} />}
+      <span className="leading-none">{label}</span>
     </span>
   );
 }
@@ -50,20 +56,28 @@ export function AffiliationBadge({
   size?: Size;
 }) {
   const chefia = isChefia(tier);
-  const klass = chefia ? REDWOOD_BADGE_CLASS : BAIRRISTA_BADGE_CLASS;
-  const label = chefia ? "Chefia de RedWood" : "Bairrista";
-  const emoji = chefia ? "🟥" : "🏠";
+  if (chefia) {
+    return (
+      <span
+        className={
+          "inline-flex items-center rounded-full border border-primary/55 text-primary text-display whitespace-nowrap " +
+          PAD[size]
+        }
+      >
+        <RedWoodIcon size={ICON_SIZE[size]} />
+        <span className="leading-none">RedWood</span>
+      </span>
+    );
+  }
   return (
     <span
       className={
-        "inline-flex items-center gap-1 rounded-sm border text-display whitespace-nowrap " +
-        SIZE[size] +
-        " " +
-        klass
+        "inline-flex items-center rounded-full border border-border text-muted-foreground text-display whitespace-nowrap " +
+        PAD[size]
       }
     >
-      <span aria-hidden>{emoji}</span>
-      <span>{label}</span>
+      <TierIcon tier="bairrista" size={ICON_SIZE[size]} />
+      <span className="leading-none">Bairrista</span>
     </span>
   );
 }
@@ -76,7 +90,7 @@ export function MemberIdentity({
   size?: Size;
 }) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1.5">
       <TierBadge tier={tier} size={size} />
       <AffiliationBadge tier={tier} size={size === "md" ? "sm" : "xs"} />
     </span>
