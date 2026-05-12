@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { fmtNum } from "@/lib/domain";
+import { fmtMoney, prettyItemName } from "@/lib/domain";
 import { toast } from "sonner";
 import { Hammer, Calculator, Lock } from "lucide-react";
 
@@ -50,7 +50,7 @@ function Page() {
           <div key={r.recipe_id} className="rounded-sm border border-border bg-card p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-display text-sm">{r.item_name}</div>
+                <div className="text-display text-sm">{prettyItemName(r.item_name)}</div>
                 <div className="text-xs text-muted-foreground">{r.tier ?? r.category ?? "—"}</div>
               </div>
               <Button size="sm" variant="outline" onClick={() => { setCalcRecipe(r.recipe_id); setQty(1); setResult(null); }}>
@@ -60,17 +60,17 @@ function Page() {
             <ul className="mt-3 space-y-1 text-xs">
               {r.ingredients.map((i) => (
                 <li key={i.item_id} className="flex justify-between border-b border-border/40 py-1">
-                  <span>{i.quantity}× {i.name}</span>
-                  <span className="text-muted-foreground">{fmtNum(Math.round(i.line_cost))} €</span>
+                  <span>{i.quantity}× {prettyItemName(i.name)}</span>
+                  <span className="text-muted-foreground">{fmtMoney(Math.round(i.line_cost))}</span>
                 </li>
               ))}
               {!r.ingredients.length && <li className="text-muted-foreground">Sem ingredientes registados</li>}
             </ul>
             <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Custo: {fmtNum(Math.round(r.total_cost))} €</span>
+              <span className="text-muted-foreground">Custo: {fmtMoney(Math.round(r.total_cost))}</span>
               {isManager ? (
                 <span className={r.margin >= 0 ? "text-success font-medium" : "text-destructive font-medium"}>
-                  Margem firma: {fmtNum(Math.round(r.margin))} € {r.margin_pct != null ? `(${r.margin_pct.toFixed(0)}%)` : ""}
+                  Margem firma: {fmtMoney(Math.round(r.margin))} {r.margin_pct != null ? `(${r.margin_pct.toFixed(0)}%)` : ""}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-muted-foreground/70">
@@ -93,15 +93,15 @@ function Page() {
             </div>
             {result && (
               <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
-                <div className="font-medium">{result.item_name} × {result.requested_qty}</div>
-                <div>Custo total: <strong>{fmtNum(Math.round(result.total_cost))} €</strong></div>
-                <div className={result.feasible ? "text-emerald-500 mt-2" : "text-red-500 mt-2"}>
+                <div className="font-medium">{prettyItemName(result.item_name)} × {result.requested_qty}</div>
+                <div>Custo total: <strong>{fmtMoney(Math.round(result.total_cost))}</strong></div>
+                <div className={result.feasible ? "text-success mt-2" : "text-destructive mt-2"}>
                   {result.feasible ? "Stock suficiente ✓" : "Stock insuficiente:"}
                 </div>
                 {!result.feasible && (
                   <ul className="mt-1 space-y-0.5">
                     {result.missing.map((m) => (
-                      <li key={m.name}>· {m.name}: faltam {m.missing} (tens {m.in_stock} / precisas {m.needed})</li>
+                      <li key={m.name}>· {prettyItemName(m.name)}: faltam {m.missing} (tens {m.in_stock} / precisas {m.needed})</li>
                     ))}
                   </ul>
                 )}

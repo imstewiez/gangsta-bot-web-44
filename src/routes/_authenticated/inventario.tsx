@@ -6,7 +6,7 @@ import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { fmtNum, fmtDate } from "@/lib/domain";
+import { fmtNum, fmtMoney, fmtDate, formatMovementType, prettyItemName } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
@@ -48,19 +48,6 @@ const TONE_BG: Record<string, string> = {
   muted: "bg-muted/40 border-border text-muted-foreground",
 };
 
-const MOV_LABEL: Record<string, string> = {
-  saldo_inicial: "Saldo inicial",
-  entrega_bairrista: "Entrega",
-  venda_bairrista: "Venda",
-  entrega_oficial: "Entrega oficial",
-  fornecimento_org: "Fornecimento",
-  consumo_saida: "Saída",
-  devolucao_saida: "Devolução",
-  ajuste_manual: "Ajuste",
-  perda_saida: "Perdido",
-  apreendido: "Apreendido",
-  craftado: "Crafte",
-};
 
 function Page() {
   const meFn = useServerFn(getCurrentMember);
@@ -159,7 +146,7 @@ function StockTable() {
                 </h2>
               </div>
               <span className="text-display text-[11px] tracking-wider opacity-90">
-                {items.length} refs · {fmtNum(total)} em casa · {fmtNum(Math.round(value))} €
+                {items.length} refs · {fmtNum(total)} em casa · {fmtMoney(Math.round(value))}
               </span>
             </header>
             <table className="w-full text-sm">
@@ -182,7 +169,7 @@ function StockTable() {
                         <td className="px-3 py-2 font-medium">
                           <span className="inline-flex items-center gap-2">
                             <ItemIcon name={r.item_name} category={r.subcategory ?? cat} size={14} />
-                            {r.item_name}
+                            {prettyItemName(r.item_name)}
                           </span>
                         </td>
                         <td
@@ -194,7 +181,7 @@ function StockTable() {
                           {fmtNum(r.qty)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                          {r.unit_price != null ? fmtNum(r.unit_price) : "—"}
+                          {r.unit_price != null ? fmtMoney(r.unit_price) : "—"}
                         </td>
                       </tr>
                     );
@@ -236,12 +223,12 @@ function LedgerTable() {
               <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                 {fmtDate(r.created_at)}
               </td>
-              <td className="px-3 py-2">{MOV_LABEL[r.type] ?? r.type}</td>
+              <td className="px-3 py-2">{formatMovementType(r.type)}</td>
               <td className="px-3 py-2 font-medium">
                 {r.item_name ? (
                   <span className="inline-flex items-center gap-2">
                     <ItemIcon name={r.item_name} size={14} />
-                    {r.item_name}
+                    {prettyItemName(r.item_name)}
                   </span>
                 ) : "—"}
               </td>
