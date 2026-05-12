@@ -70,7 +70,7 @@ function Page() {
             Preços que pagamos pelo material que entregares. Larga em <span className="text-foreground">Entregas</span>.
           </p>
           {COMPRA_GROUPS.map((g) => (
-            <BuyTable key={g.key} title={g.label} items={grouped[g.key] ?? []} />
+            <BuyTable key={g.key} catKey={g.key} title={g.label} items={grouped[g.key] ?? []} />
           ))}
         </TabsContent>
 
@@ -79,7 +79,7 @@ function Page() {
             Só vendemos a gente da casa. Encomendas em <span className="text-foreground">Encomendas</span>.
           </p>
           {VENDA_GROUPS.map((g) => (
-            <SellTable key={g.key} title={g.label} items={grouped[g.key] ?? []} myMargin={myMargin} />
+            <SellTable key={g.key} catKey={g.key} title={g.label} items={grouped[g.key] ?? []} myMargin={myMargin} />
           ))}
         </TabsContent>
       </Tabs>
