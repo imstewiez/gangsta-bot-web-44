@@ -92,15 +92,21 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
 
   return (
     <div className="grid gap-3">
-      {list.data.map((d) => (
+      {list.data.map((d) => {
+        const tipoMeta = TIPO_META[d.tipo] ?? TIPO_META.entrega;
+        const st = statusMeta(d.tipo, d.status);
+        return (
         <Card key={d.id} className="p-4">
           <div className="flex items-start gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={"rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + tipoMeta.tone}>
+                  {tipoMeta.emoji} {tipoMeta.label}
+                </span>
                 <span className="font-semibold">{d.requester_name ?? "—"}</span>
                 <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
-                <span className={"ml-auto rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + (STATUS_COLOR[d.status] ?? "")}>
-                  {STATUS_LABEL[d.status] ?? d.status}
+                <span className={"ml-auto rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " + st.color}>
+                  {st.label}
                 </span>
               </div>
               <ul className="mt-3 divide-y divide-border/50 text-sm">
