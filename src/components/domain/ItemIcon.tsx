@@ -1,9 +1,12 @@
 import {
-  Crosshair, Swords, Knife, Package, Wrench, Shield, Pill, Hammer, FlaskConical,
-  Crown, Target, Flashlight, Scope, Cog, Cylinder, Box, Layers, Zap, Flame, Pickaxe,
+  Crosshair, Swords, Sword, Package, Wrench, Shield, Pill, Hammer, FlaskConical,
+  Crown, Target, Flashlight, Telescope, Cog, Cylinder, Box, Layers, Zap, Flame, Pickaxe,
   Trees, Recycle, Gem, Leaf, Cigarette, Syringe, Cookie, Skull, Bomb, Anchor, Drill,
   type LucideIcon,
 } from "lucide-react";
+
+const Knife = Sword;
+const Scope = Telescope;
 
 // Per-category icon (for headers).
 export const CATEGORY_ICON: Record<string, LucideIcon> = {
