@@ -18,38 +18,66 @@ export const Route = createFileRoute("/_authenticated/inventario")({
   component: Page,
 });
 
-type CatMeta = { label: string; emoji: string; tone: string; order: number; matchSub?: (s: string | null) => boolean };
+type CatMeta = { label: string; emoji: string; tone: string; order: number };
 
-// Cor de cada grupo (usa tokens do design system)
+// O bairro só guarda o que vende ou material p/ craftar o que vende.
+// Tudo o resto é descartado da vista (sucata, consumíveis aleatórios, etc).
 const GROUPS: Record<string, CatMeta> = {
-  armas_orange: { label: "Armas Orange", emoji: "🟧", tone: "warning", order: 1 },
-  armas_red:    { label: "Armas Red",    emoji: "🟥", tone: "destructive", order: 2 },
-  armas_brancas:{ label: "Armas Brancas",emoji: "🔪", tone: "info", order: 3 },
-  municoes:     { label: "Carregadores & Munições", emoji: "🎯", tone: "primary", order: 4 },
-  drogas:       { label: "Drogas",       emoji: "💊", tone: "success", order: 5 },
-  materias_primas: { label: "Matérias-primas", emoji: "⛏️", tone: "primary", order: 6 },
-  componentes:  { label: "Componentes",  emoji: "⚙️", tone: "muted", order: 7 },
-  consumiveis:  { label: "Consumíveis",  emoji: "🥤", tone: "muted", order: 8 },
-  lixo:         { label: "Lixo & Sucata",emoji: "🗑️", tone: "muted", order: 9 },
-  outros:       { label: "Outros",       emoji: "📦", tone: "muted", order: 99 },
+  armas_red:        { label: "Armas Red",          emoji: "🟥", tone: "destructive", order: 1 },
+  armas_orange:     { label: "Armas Orange",       emoji: "🟧", tone: "warning",     order: 2 },
+  armas_brancas:    { label: "Armas Brancas",      emoji: "🔪", tone: "info",        order: 3 },
+  carregadores:     { label: "Carregadores",       emoji: "🧰", tone: "primary",     order: 4 },
+  acessorios_armas: { label: "Acessórios de armas",emoji: "🔧", tone: "info",        order: 5 },
+  coletes:          { label: "Coletes padrão",     emoji: "🦺", tone: "warning",     order: 6 },
+  drogas:           { label: "Drogas",             emoji: "💊", tone: "success",     order: 7 },
+  craft_armas:      { label: "Craft de armas (peças, corpos, ferro, prints)", emoji: "⚒️", tone: "primary", order: 8 },
+  craft_carregadores: { label: "Craft de carregadores (cobre, pólvora)", emoji: "🧪", tone: "muted", order: 9 },
 };
 
-function classifyRow(r: { category: string | null; item_name: string }): string {
+// Devolve a chave do grupo, ou null se o item não interessa ao armazém.
+function classifyRow(r: { category: string | null; item_name: string }): string | null {
   const c = (r.category ?? "").toLowerCase();
   const n = (r.item_name ?? "").toLowerCase();
-  if (c === "armas_brancas") return "armas_brancas";
-  if (c === "municoes" || c === "municao" || /carregador|municao|munição|bala/.test(n)) return "municoes";
-  if (c === "drogas") return "drogas";
-  if (c === "lixo") return "lixo";
-  if (c === "componentes" || c === "acessorios") return "componentes";
-  if (c === "consumiveis" || c === "consumivel") return "consumiveis";
-  if (c === "materias_primas" || c === "materiais") return "materias_primas";
-  if (c === "armas" || c === "armas_fogo") {
-    // tenta separar por nome
-    if (/red|ak|m4|sniper|fuzil|shotgun|caçadeira/.test(n)) return "armas_red";
+
+  // Drogas
+  if (c === "drogas" || /coca|metanfetamina|meta\b|erva|maconha|haxixe|ecstasy|lsd|heroina|opio/.test(n)) {
+    return "drogas";
+  }
+
+  // Coletes padrão (não kevlar nem custom)
+  if (/colete\s*(padr[aã]o|standard|normal)?$/.test(n) || (c === "coletes" && !/kevlar|custom|pesado/.test(n))) {
+    return "coletes";
+  }
+
+  // Carregadores
+  if (c === "municoes" || c === "municao" || /carregador|magazine|\bmag\b/.test(n)) {
+    return "carregadores";
+  }
+
+  // Acessórios de armas: silenciador, mira, lanterna, punho, etc.
+  if (c === "acessorios" || /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano/.test(n)) {
+    return "acessorios_armas";
+  }
+
+  // Material craft armas
+  if (/\b(pe[çc]a|pe[çc]as|corpo|corpos)\b|\bferro\b|\bprint\b|\bprints\b|esquema/.test(n)) {
+    return "craft_armas";
+  }
+
+  // Material craft carregadores
+  if (/\bcobre\b|\bp[oó]lvora\b/.test(n)) {
+    return "craft_carregadores";
+  }
+
+  // Armas
+  if (c === "armas" || c === "armas_fogo" || c === "armas_brancas") {
+    if (c === "armas_brancas" || /faca|machete|katana|taco|cassetete|martelo/.test(n)) return "armas_brancas";
+    if (/red|ak|m4|sniper|fuzil|shotgun|caçadeira|cacadeira|g36|scar|fal/.test(n)) return "armas_red";
     return "armas_orange";
   }
-  return "outros";
+
+  // Tudo o resto não interessa ao armazém
+  return null;
 }
 
 const TONE_BG: Record<string, string> = {
