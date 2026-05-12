@@ -30,9 +30,9 @@ function statusMeta(tipo: string, status: string): { label: string; color: strin
   return { label: status, color: "bg-muted text-muted-foreground border-border" };
 }
 
-const TIPO_META: Record<string, { label: string; emoji: string; tone: string }> = {
-  entrega: { label: "Entrega ao bairro", emoji: "📦", tone: "bg-info/15 text-info border-info/30" },
-  venda:   { label: "Venda ao bairro",   emoji: "💰", tone: "bg-warning/15 text-warning border-warning/30" },
+const TIPO_META: Record<string, { label: string; Icon: LucideIcon; tone: string }> = {
+  entrega: { label: "Entrega ao bairro", Icon: Package, tone: "bg-info/15 text-info border-info/30" },
+  venda:   { label: "Venda ao bairro",   Icon: Coins,   tone: "bg-warning/15 text-warning border-warning/30" },
 };
 
 function Page() {
