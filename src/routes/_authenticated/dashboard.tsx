@@ -78,20 +78,23 @@ function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-5">
             <TopList
-              title="🔥 Esta semana"
+              icon={<Flame className="h-3.5 w-3.5 text-destructive" />}
+              title="Esta semana"
               subtitle={data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null}
               rows={data?.topWeek}
               loading={isLoading}
             />
             <TopList
-              title="📅 Semana passada"
+              icon={<CalendarDays className="h-3.5 w-3.5 text-info" />}
+              title="Semana passada"
               subtitle={data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null}
               rows={data?.topPrevWeek}
               loading={isLoading}
               compact
             />
             <TopList
-              title="🏆 Mês"
+              icon={<Trophy className="h-3.5 w-3.5 text-warning" />}
+              title="Mês"
               subtitle={data?.topMonthLabel ?? null}
               rows={data?.topMonth}
               loading={isLoading}
