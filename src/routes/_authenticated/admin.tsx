@@ -4,7 +4,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { listAppUsers, setUserRole } from "@/lib/admin.functions";
 import { PageHeader } from "@/components/layout/AppShell";
-import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
