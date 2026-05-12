@@ -7,6 +7,7 @@ import { tierMargin, TIER_LABELS, type CatalogItem } from "@/lib/pricing.shared"
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { fmtNum } from "@/lib/domain";
+import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 
 export const Route = createFileRoute("/_authenticated/precario")({ component: Page });
 
@@ -69,7 +70,7 @@ function Page() {
             Preços que pagamos pelo material que entregares. Larga em <span className="text-foreground">Entregas</span>.
           </p>
           {COMPRA_GROUPS.map((g) => (
-            <BuyTable key={g.key} title={g.label} items={grouped[g.key] ?? []} />
+            <BuyTable key={g.key} catKey={g.key} title={g.label} items={grouped[g.key] ?? []} />
           ))}
         </TabsContent>
 
@@ -78,7 +79,7 @@ function Page() {
             Só vendemos a gente da casa. Encomendas em <span className="text-foreground">Encomendas</span>.
           </p>
           {VENDA_GROUPS.map((g) => (
-            <SellTable key={g.key} title={g.label} items={grouped[g.key] ?? []} myMargin={myMargin} />
+            <SellTable key={g.key} catKey={g.key} title={g.label} items={grouped[g.key] ?? []} myMargin={myMargin} />
           ))}
         </TabsContent>
       </Tabs>
@@ -86,12 +87,15 @@ function Page() {
   );
 }
 
-function BuyTable({ title, items }: { title: string; items: CatalogItem[] }) {
+function BuyTable({ title, items, catKey }: { title: string; items: CatalogItem[]; catKey: string }) {
   if (!items.length) return null;
   const isDrogas = items[0]?.subcategory === "drogas";
   return (
     <section>
-      <h2 className="text-display text-sm uppercase tracking-widest text-muted-foreground mb-2">{title}</h2>
+      <h2 className="mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest text-muted-foreground">
+        <CategoryIcon category={catKey} size={16} />
+        {title}
+      </h2>
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs">
@@ -110,7 +114,12 @@ function BuyTable({ title, items }: { title: string; items: CatalogItem[] }) {
           <tbody>
             {items.map((it) => (
               <tr key={it.id} className="border-t border-border">
-                <td className="px-3 py-2 font-medium">{it.name}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-2 font-medium">
+                    <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
+                    {it.name}
+                  </span>
+                </td>
                 {isDrogas ? (
                   <>
                     <td className="px-3 py-2 text-right font-mono text-success">{fmtNum(it.morador_purchase_price ?? 0)}</td>
@@ -128,11 +137,14 @@ function BuyTable({ title, items }: { title: string; items: CatalogItem[] }) {
   );
 }
 
-function SellTable({ title, items, myMargin }: { title: string; items: CatalogItem[]; myMargin: number }) {
+function SellTable({ title, items, myMargin, catKey }: { title: string; items: CatalogItem[]; myMargin: number; catKey: string }) {
   if (!items.length) return null;
   return (
     <section>
-      <h2 className="text-display text-sm uppercase tracking-widest text-muted-foreground mb-2">{title}</h2>
+      <h2 className="mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest text-muted-foreground">
+        <CategoryIcon category={catKey} size={16} />
+        {title}
+      </h2>
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs">
@@ -150,7 +162,12 @@ function SellTable({ title, items, myMargin }: { title: string; items: CatalogIt
               const base = it.min_sale_price ?? 0;
               return (
                 <tr key={it.id} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium">{it.name}</td>
+                  <td className="px-3 py-2">
+                    <span className="inline-flex items-center gap-2 font-medium">
+                      <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
+                      {it.name}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 text-right font-mono">{fmtNum(base)}</td>
                   <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtNum(Math.round(base * 1.015))}</td>
                   <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtNum(Math.round(base * 1.01))}</td>
