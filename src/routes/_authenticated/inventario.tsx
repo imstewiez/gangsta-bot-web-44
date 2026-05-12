@@ -230,7 +230,7 @@ function StockTable() {
               <tbody>
                 {items
                   .slice()
-                  .sort((a, b) => (b.qty ?? 0) - (a.qty ?? 0))
+                  .sort((a, b) => (b.unit_price ?? 0) - (a.unit_price ?? 0) || (b.qty ?? 0) - (a.qty ?? 0))
                   .map((r) => {
                     const low = r.qty <= 0;
                     const warn = r.qty > 0 && r.qty < 5;
