@@ -79,7 +79,8 @@ export function TopNav() {
         <nav className="hidden flex-1 items-center gap-0.5 lg:flex">
           {visible.map((n) => (
             <Link key={n.to} to={n.to} className={linkClass(n.to)}>
-              {n.label}
+              <n.icon className="h-3.5 w-3.5" />
+              <span>{n.label}</span>
             </Link>
           ))}
           {isAdmin && (
@@ -87,7 +88,8 @@ export function TopNav() {
               <span className="mx-1.5 h-4 w-px bg-border" />
               {ADMIN_NAV.map((n) => (
                 <Link key={n.to} to={n.to} className={linkClass(n.to)}>
-                  {n.label}
+                  <n.icon className="h-3.5 w-3.5" />
+                  <span>{n.label}</span>
                 </Link>
               ))}
             </>
