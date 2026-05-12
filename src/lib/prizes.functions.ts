@@ -38,7 +38,7 @@ export const setPrize = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number; description?: string | null; status?: string | null; notes?: string | null }) => d)
   .handler(async ({ data, context }) => {
-    const isDelivered = data.status === "delivered";
+    const isDelivered = data.status === "entregue";
     await pgQuery(
       `update weekly_prizes set
          prize_description = coalesce($2, prize_description),
@@ -76,7 +76,7 @@ export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
     const row = await pgOne<{ id: number }>(
       `insert into weekly_prizes
          (week_start, week_end, winner_member_id, hybrid_score, prize_status, defined_by, defined_at, created_at, updated_at)
-       values ($1, $2, $3, $4, 'pending', $5, now(), now(), now())
+       values ($1, $2, $3, $4, 'por_definir', $5, now(), now(), now())
        returning id`,
       [top.week_start, top.week_end, top.member_id, top.score, `web:${context.userId}`]
     );
