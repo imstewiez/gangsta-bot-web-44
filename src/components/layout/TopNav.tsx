@@ -55,7 +55,7 @@ export function TopNav() {
   const linkClass = (to: string) => {
     const active = loc.pathname === to || loc.pathname.startsWith(to + "/");
     return (
-      "relative text-display text-[11px] tracking-[0.16em] px-3 py-1.5 rounded-sm transition-all " +
+      "relative inline-flex items-center gap-1.5 text-display text-[11px] tracking-[0.16em] px-2.5 py-1.5 rounded-sm transition-all " +
       (active
         ? "text-primary-foreground bg-primary shadow-[0_0_18px_-6px_var(--primary)]"
         : "text-muted-foreground hover:text-foreground hover:bg-accent/40")
