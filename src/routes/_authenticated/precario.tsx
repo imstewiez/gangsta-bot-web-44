@@ -6,6 +6,7 @@ import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { tierMargin, TIER_LABELS, type CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { fmtMoney, prettyItemName } from "@/lib/domain";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 import { Tags } from "lucide-react";
@@ -36,6 +37,8 @@ function Page() {
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn() });
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const [tab, setTab] = useState("compra");
+  const [compraCat, setCompraCat] = useState<string>("todas");
+  const [vendaCat, setVendaCat] = useState<string>("todas");
 
   const grouped = useMemo(() => {
     const out: Record<string, CatalogItem[]> = {};
@@ -70,7 +73,13 @@ function Page() {
           <p className="text-xs text-muted-foreground">
             Preços que pagamos pelo material que entregares. Larga em <span className="text-foreground">Entregas</span>.
           </p>
-          {COMPRA_GROUPS.map((g) => (
+          <CategoryChips
+            groups={COMPRA_GROUPS}
+            grouped={grouped}
+            value={compraCat}
+            onChange={setCompraCat}
+          />
+          {COMPRA_GROUPS.filter((g) => compraCat === "todas" || g.key === compraCat).map((g) => (
             <BuyTable key={g.key} catKey={g.key} title={g.label} items={grouped[g.key] ?? []} />
           ))}
         </TabsContent>
@@ -79,7 +88,13 @@ function Page() {
           <p className="text-xs text-muted-foreground">
             Só vendemos a gente da casa. Encomendas em <span className="text-foreground">Encomendas</span>.
           </p>
-          {VENDA_GROUPS.map((g) => (
+          <CategoryChips
+            groups={VENDA_GROUPS}
+            grouped={grouped}
+            value={vendaCat}
+            onChange={setVendaCat}
+          />
+          {VENDA_GROUPS.filter((g) => vendaCat === "todas" || g.key === vendaCat).map((g) => (
             <SellTable key={g.key} catKey={g.key} title={g.label} items={grouped[g.key] ?? []} myMargin={myMargin} />
           ))}
         </TabsContent>
