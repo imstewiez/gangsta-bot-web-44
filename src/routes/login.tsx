@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import redwoodLogo from "@/assets/redwood-logo.png";
+import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
