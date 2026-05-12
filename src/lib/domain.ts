@@ -88,11 +88,9 @@ export function tierLabel(tier: string | null | undefined): string {
   return TIER_LABELS[tier] ?? tier;
 }
 
+/** @deprecated usar <TierIcon /> + tierLabel(). Mantido só para retro-compat. */
 export function tierLabelWithEmoji(tier: string | null | undefined): string {
-  if (!tier) return "—";
-  const emoji = TIER_EMOJI[tier] ?? "•";
-  const label = TIER_LABELS[tier] ?? tier;
-  return `${emoji} ${label}`;
+  return tierLabel(tier);
 }
 
 export const ROLE_LABELS = TIER_LABELS;
