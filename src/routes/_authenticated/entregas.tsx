@@ -158,6 +158,7 @@ function NewDelivery() {
   const items = (cat.data ?? []).filter((i: CatalogItem) => i.side === "compra");
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([{ item_id: "", qty: "1" }]);
   const [notes, setNotes] = useState("");
+  const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
   const m = useMutation({
     mutationFn: () =>
       createFn({
@@ -166,14 +167,16 @@ function NewDelivery() {
             .filter((l) => l.item_id && l.qty)
             .map((l) => ({ item_id: Number(l.item_id), qty: Number(l.qty) })),
           notes: notes || null,
+          tipo,
         },
       }),
     onSuccess: () => {
-      toast.success("Entrega submetida. A chefia confirma.");
+      toast.success(tipo === "venda" ? "Pedido de compra enviado." : "Entrega submetida. A chefia confirma.");
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       setOpen(false);
       setLines([{ item_id: "", qty: "1" }]);
       setNotes("");
+      setTipo("entrega");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -189,6 +192,37 @@ function NewDelivery() {
           <DialogTitle>O que vens largar?</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">É para…</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTipo("entrega")}
+                className={
+                  "rounded-sm border px-3 py-2 text-left text-sm transition-colors " +
+                  (tipo === "entrega"
+                    ? "border-info bg-info/15 text-info"
+                    : "border-border bg-card hover:bg-accent/30")
+                }
+              >
+                <div className="text-display text-[11px] uppercase tracking-wider">📦 Entregar</div>
+                <div className="text-xs text-muted-foreground">Vai para o stock do bairro</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipo("venda")}
+                className={
+                  "rounded-sm border px-3 py-2 text-left text-sm transition-colors " +
+                  (tipo === "venda"
+                    ? "border-warning bg-warning/15 text-warning"
+                    : "border-border bg-card hover:bg-accent/30")
+                }
+              >
+                <div className="text-display text-[11px] uppercase tracking-wider">💰 Vender</div>
+                <div className="text-xs text-muted-foreground">A chefia paga ao morador</div>
+              </button>
+            </div>
+          </div>
           {lines.map((l, idx) => (
             <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
               <Select
