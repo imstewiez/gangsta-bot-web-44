@@ -26,7 +26,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<DeliveryRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const params: unknown[] = [];
-    let where = "where r.tipo = 'entrega'";
+    let where = "where r.tipo in ('entrega','venda')";
     if (data.scope === "mine") {
       if (!me) return [];
       params.push(me.id);
@@ -36,7 +36,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
     }
     return pgQuery<DeliveryRow>(
       `select r.id, r.requester_member_id, m.display_name as requester_name,
-              r.status, r.lines, r.notes,
+              r.status, coalesce(r.tipo, 'entrega') as tipo, r.lines, r.notes,
               r.total_qty, r.total_value::float as total_value,
               r.created_at, r.decided_at, r.decision_reason
        from inventory_delivery_requests r
