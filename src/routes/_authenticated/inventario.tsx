@@ -141,7 +141,7 @@ function StockTable() {
   return (
     <div className="space-y-6">
       {ordered.map(([cat, items]) => {
-        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99 };
+        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99, group: "compra" as const };
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
         const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
         return (
