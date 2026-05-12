@@ -49,27 +49,33 @@ function Page() {
   return (
     <>
       <PageHeader
-        eyebrow="Bairro"
+        eyebrow="Tabela da firma"
         title="Preçário"
         description={
           me.data
-            ? `Vês preços de venda com margem do teu escalão: ${TIER_LABELS[me.data.tier ?? ""] ?? "—"} (+${(myMargin * 100).toFixed(1)}%)`
-            : "Catálogo de compra e venda da firma."
+            ? `Vês os preços ajustados ao teu escalão — ${TIER_LABELS[me.data.tier ?? ""] ?? "—"}${myMargin > 0 ? ` (margem +${(myMargin * 100).toFixed(1)}%)` : ""}.`
+            : "Tabela de compra e venda da firma."
         }
       />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="compra">Compramos</TabsTrigger>
-          <TabsTrigger value="venda">Vendemos</TabsTrigger>
+          <TabsTrigger value="compra">A firma compra</TabsTrigger>
+          <TabsTrigger value="venda">A firma vende</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="compra" className="mt-4 space-y-6">
+        <TabsContent value="compra" className="mt-4 space-y-8">
+          <p className="text-xs text-muted-foreground">
+            Preços que pagamos pelo material que entregares. Larga em <span className="text-foreground">Entregas</span>.
+          </p>
           {COMPRA_GROUPS.map((g) => (
             <BuyTable key={g.key} title={g.label} items={grouped[g.key] ?? []} />
           ))}
         </TabsContent>
 
-        <TabsContent value="venda" className="mt-4 space-y-6">
+        <TabsContent value="venda" className="mt-4 space-y-8">
+          <p className="text-xs text-muted-foreground">
+            Só vendemos a gente da casa. Encomendas em <span className="text-foreground">Encomendas</span>.
+          </p>
           {VENDA_GROUPS.map((g) => (
             <SellTable key={g.key} title={g.label} items={grouped[g.key] ?? []} myMargin={myMargin} />
           ))}
