@@ -6,7 +6,7 @@ import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { fmtNum, fmtDate } from "@/lib/domain";
+import { fmtNum, fmtMoney, fmtDate, formatMovementType, prettyItemName } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 import { Crosshair, Package, History } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
@@ -48,19 +48,6 @@ const TONE_BG: Record<string, string> = {
   muted: "bg-muted/40 border-border text-muted-foreground",
 };
 
-const MOV_LABEL: Record<string, string> = {
-  saldo_inicial: "Saldo inicial",
-  entrega_bairrista: "Entrega",
-  venda_bairrista: "Venda",
-  entrega_oficial: "Entrega oficial",
-  fornecimento_org: "Fornecimento",
-  consumo_saida: "Saída",
-  devolucao_saida: "Devolução",
-  ajuste_manual: "Ajuste",
-  perda_saida: "Perdido",
-  apreendido: "Apreendido",
-  craftado: "Crafte",
-};
 
 function Page() {
   const meFn = useServerFn(getCurrentMember);

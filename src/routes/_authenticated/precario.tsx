@@ -6,7 +6,7 @@ import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { tierMargin, TIER_LABELS, type CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { fmtNum } from "@/lib/domain";
+import { fmtMoney, prettyItemName } from "@/lib/domain";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 import { Tags } from "lucide-react";
 
@@ -118,16 +118,16 @@ function BuyTable({ title, items, catKey }: { title: string; items: CatalogItem[
                 <td className="px-3 py-2">
                   <span className="inline-flex items-center gap-2 font-medium">
                     <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
-                    {it.name}
+                    {prettyItemName(it.name)}
                   </span>
                 </td>
                 {isDrogas ? (
                   <>
-                    <td className="px-3 py-2 text-right font-mono text-success">{fmtNum(it.morador_purchase_price ?? 0)}</td>
-                    <td className="px-3 py-2 text-right font-mono">{fmtNum(it.purchase_price ?? 0)}</td>
+                    <td className="px-3 py-2 text-right font-mono text-success">{fmtMoney(it.morador_purchase_price ?? 0)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{fmtMoney(it.purchase_price ?? 0)}</td>
                   </>
                 ) : (
-                  <td className="px-3 py-2 text-right font-mono">{fmtNum(it.purchase_price ?? 0)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtMoney(it.purchase_price ?? 0)}</td>
                 )}
               </tr>
             ))}
@@ -166,14 +166,14 @@ function SellTable({ title, items, myMargin, catKey }: { title: string; items: C
                   <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-2 font-medium">
                       <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
-                      {it.name}
+                      {prettyItemName(it.name)}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtNum(base)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtNum(Math.round(base * 1.015))}</td>
-                  <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtNum(Math.round(base * 1.01))}</td>
-                  <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtNum(Math.round(base * 1.005))}</td>
-                  <td className="px-3 py-2 text-right font-mono text-primary font-semibold">{fmtNum(Math.round(base * (1 + myMargin)))}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtMoney(base)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtMoney(Math.round(base * 1.015))}</td>
+                  <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtMoney(Math.round(base * 1.01))}</td>
+                  <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtMoney(Math.round(base * 1.005))}</td>
+                  <td className="px-3 py-2 text-right font-mono text-primary font-semibold">{fmtMoney(Math.round(base * (1 + myMargin)))}</td>
                 </tr>
               );
             })}
