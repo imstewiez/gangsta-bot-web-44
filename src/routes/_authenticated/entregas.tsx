@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Check, X, PackageOpen, Package, Coins } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/entregas")({ component: Page });
 
