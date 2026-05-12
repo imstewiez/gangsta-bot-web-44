@@ -134,16 +134,17 @@ function DelList({ scope, canDecide }: { scope: "mine" | "manage"; canDecide: bo
             {canDecide && d.status === "pending" && (
               <div className="flex flex-col gap-1.5">
                 <Button size="sm" onClick={() => m.mutate({ id: d.id, approve: true })} disabled={m.isPending}>
-                  <Check className="mr-1 h-3 w-3" />Pagar
+                  <Check className="mr-1 h-3 w-3" />{d.tipo === "venda" ? "Comprar" : "Receber"}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => m.mutate({ id: d.id, approve: false })} disabled={m.isPending}>
-                  <X className="mr-1 h-3 w-3" />Não interessa
+                  <X className="mr-1 h-3 w-3" />Recusar
                 </Button>
               </div>
             )}
           </div>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
