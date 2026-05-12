@@ -14,7 +14,7 @@ import {
   adminAdjustStats,
   TIER_LIST,
 } from "@/lib/member-admin.functions";
-import { TIER_LABELS, TIER_EMOJI } from "@/lib/domain";
+import { TIER_LABELS } from "@/lib/domain";
 import { Pencil, Crown, UserMinus, Activity } from "lucide-react";
 
 type Member = {
