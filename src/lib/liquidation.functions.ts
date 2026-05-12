@@ -229,15 +229,17 @@ export const liquidateSaida = createServerFn({ method: "POST" })
       }
     });
 
-    await enqueueNotification("operation_liquidated", {
-      title: `Saída #${data.id} liquidada`,
-      description: `${result.op.operation_type ?? "Saída"} · ${result.op.spot ?? "—"}\nNet: ${result.net.toFixed(0)} €`,
-      color: result.net >= 0 ? 0x10b981 : 0xef4444,
-      fields: [
-        { name: "Fornecido", value: `${result.supplied.toFixed(0)} €`, inline: true },
-        { name: "Retornado", value: `${result.returned.toFixed(0)} €`, inline: true },
-        { name: "Perdido", value: `${result.lost.toFixed(0)} €`, inline: true },
-      ],
+    await enqueueNotification({
+      embed: {
+        title: `Saída #${data.id} liquidada`,
+        description: `${result.op.operation_type ?? "Saída"} · ${result.op.spot ?? "—"}\nNet: ${result.net.toFixed(0)} €`,
+        color: result.net >= 0 ? 0x10b981 : 0xef4444,
+        fields: [
+          { name: "Fornecido", value: `${result.supplied.toFixed(0)} €`, inline: true },
+          { name: "Retornado", value: `${result.returned.toFixed(0)} €`, inline: true },
+          { name: "Perdido", value: `${result.lost.toFixed(0)} €`, inline: true },
+        ],
+      },
     }).catch(() => {});
 
     return result;
