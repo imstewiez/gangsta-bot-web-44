@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
-import { resolveCurrentMember } from "./pricing.functions";
+import { resolveCurrentMember } from "./pricing.server";
 
 // Apenas armas e carregadores entram no inventário
 const INV_CATEGORIES = [

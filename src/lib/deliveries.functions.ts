@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
-import { resolveCurrentMember } from "./pricing.functions";
+import { resolveCurrentMember } from "./pricing.server";
 import { notifyUsers, notifyManagers } from "./notifications.server";
 
 export type DeliveryLine = { item_id: number; item_name?: string; qty: number; unit_value?: number };
