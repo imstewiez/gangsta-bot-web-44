@@ -7,6 +7,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/membros", label: "Membros" },
   { to: "/inventario", label: "Inventário" },
+  { to: "/receitas", label: "Receitas" },
   { to: "/encomendas", label: "Encomendas" },
   { to: "/operacoes", label: "Operações" },
   { to: "/cemiterio", label: "Cemitério" },
@@ -18,6 +19,8 @@ const NAV = [
 const ADMIN_NAV = [
   { to: "/admin", label: "Chefia" },
   { to: "/onboarding", label: "Onboarding" },
+  { to: "/liquidacao", label: "Liquidação" },
+  { to: "/sync", label: "Sync" },
   { to: "/auditoria", label: "Auditoria" },
 ] as const;
 
