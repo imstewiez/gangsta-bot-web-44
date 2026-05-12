@@ -56,7 +56,7 @@ function Page() {
               <tr key={m.id} className="border-t border-border hover:bg-accent/30">
                 <td className="px-3 py-2">
                   <Link to="/membros/$id" params={{ id: String(m.id) }} className="font-medium hover:text-primary inline-flex items-center gap-2">
-                    <span aria-hidden className="text-base leading-none">{TIER_EMOJI[m.tier ?? "bairrista"] ?? "🏠"}</span>
+                    <TierIcon tier={m.tier} size="sm" />
                     {m.display_name ?? "—"}
                   </Link>
                 </td>
