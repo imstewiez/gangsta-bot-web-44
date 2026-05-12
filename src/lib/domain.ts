@@ -81,22 +81,40 @@ export const ROLE_LABELS = TIER_LABELS;
 export function tierColor(tier: string | null | undefined): string {
   switch (tier) {
     case "manda_chuva":
+      // rosa-sangue, topo da hierarquia
+      return "bg-[oklch(0.55_0.22_0)/0.22] text-[oklch(0.85_0.15_0)] border-[oklch(0.55_0.22_0)/0.55]";
     case "kingpin":
-      return "bg-primary/25 text-primary border-primary/50";
+      // diamante / ciano gelado
+      return "bg-[oklch(0.55_0.15_200)/0.22] text-[oklch(0.85_0.12_200)] border-[oklch(0.55_0.15_200)/0.55]";
     case "og":
+      // chumbo / preto-violeta
+      return "bg-[oklch(0.30_0.04_300)/0.45] text-[oklch(0.88_0.03_300)] border-[oklch(0.50_0.05_300)/0.55]";
     case "real_gangster":
-      return "bg-accent/20 text-accent-foreground border-accent/40";
+      // vermelho RedWood clássico
+      return "bg-primary/22 text-primary border-primary/55";
     case "patrao_di_zona":
-      return "bg-warning/25 text-warning border-warning/50";
+      // azul chefia
+      return "bg-info/22 text-info border-info/55";
     case "gangster_fodido":
-      return "bg-primary/15 text-primary border-primary/30";
+      // verde-musgo
+      return "bg-[oklch(0.45_0.10_150)/0.30] text-[oklch(0.85_0.12_150)] border-[oklch(0.55_0.12_150)/0.55]";
     case "o_gunao":
-      return "bg-warning/15 text-warning border-warning/30";
+      // âmbar tabaco
+      return "bg-warning/22 text-warning border-warning/55";
     case "young_blood":
+      // rosa fresco
+      return "bg-[oklch(0.60_0.18_350)/0.22] text-[oklch(0.85_0.14_350)] border-[oklch(0.60_0.18_350)/0.55]";
+    case "bairrista":
     default:
       return "bg-muted text-muted-foreground border-border";
   }
 }
+
+// Cor da tag "Chefia de RedWood" — sempre vermelho RedWood.
+export const REDWOOD_BADGE_CLASS =
+  "bg-primary/15 text-primary border-primary/45";
+export const BAIRRISTA_BADGE_CLASS =
+  "bg-muted text-muted-foreground border-border";
 
 
 export function fmtNum(n: number | string | null | undefined): string {
