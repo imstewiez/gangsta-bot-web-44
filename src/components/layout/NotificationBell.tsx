@@ -115,7 +115,7 @@ export function NotificationBell() {
                 }
               >
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 text-base leading-none">{meta.icon}</span>
+                  <meta.Icon className={"mt-0.5 h-4 w-4 shrink-0 " + meta.color} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold">{n.title}</div>
                     {n.body && <div className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{n.body}</div>}
