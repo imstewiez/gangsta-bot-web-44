@@ -70,8 +70,8 @@ export const getLedger = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const params: unknown[] = [data.limit, INV_CATEGORIES];
-    let where = "where i.category = any($2::text[])";
+    const params: unknown[] = [data.limit, INV_SUBCATEGORIES];
+    let where = "where i.subcategory = any($2::text[])";
     if (data.type) {
       params.push(data.type);
       where += ` and im.movement_type = $${params.length}`;
