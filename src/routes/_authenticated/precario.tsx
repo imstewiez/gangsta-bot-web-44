@@ -87,12 +87,15 @@ function Page() {
   );
 }
 
-function BuyTable({ title, items }: { title: string; items: CatalogItem[] }) {
+function BuyTable({ title, items, catKey }: { title: string; items: CatalogItem[]; catKey: string }) {
   if (!items.length) return null;
   const isDrogas = items[0]?.subcategory === "drogas";
   return (
     <section>
-      <h2 className="text-display text-sm uppercase tracking-widest text-muted-foreground mb-2">{title}</h2>
+      <h2 className="mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest text-muted-foreground">
+        <CategoryIcon category={catKey} size={16} />
+        {title}
+      </h2>
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs">
@@ -111,7 +114,12 @@ function BuyTable({ title, items }: { title: string; items: CatalogItem[] }) {
           <tbody>
             {items.map((it) => (
               <tr key={it.id} className="border-t border-border">
-                <td className="px-3 py-2 font-medium">{it.name}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-2 font-medium">
+                    <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
+                    {it.name}
+                  </span>
+                </td>
                 {isDrogas ? (
                   <>
                     <td className="px-3 py-2 text-right font-mono text-success">{fmtNum(it.morador_purchase_price ?? 0)}</td>
