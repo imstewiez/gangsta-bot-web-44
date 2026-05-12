@@ -39,6 +39,10 @@ export function TopNav() {
   const meFn = useServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn(), staleTime: 60_000 });
   const canSeeInv = me.data?.can_see_inventory ?? false;
+  const myTier = me.data?.tier ?? null;
+  const myTierLabel = myTier ? TIER_LABELS[myTier] ?? myTier : null;
+  const myEmoji = myTier ? TIER_EMOJI[myTier] : null;
+  const myDisplay = me.data?.display_name ?? profile?.display_name ?? "—";
 
   const visible = NAV.filter((n) => !n.need || (n.need === "inventory" && canSeeInv));
 
