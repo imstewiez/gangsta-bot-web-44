@@ -18,12 +18,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 export function PageHeader({
-  eyebrow, title, description, action,
+  eyebrow, title, description, action, icon: Icon,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   action?: ReactNode;
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <div className="relative mb-10 animate-rise">
@@ -38,8 +39,13 @@ export function PageHeader({
               <span className="text-display text-[11px] tracking-[0.35em] text-primary">{eyebrow}</span>
             </div>
           )}
-          <h1 className="text-display text-4xl md:text-5xl font-bold tracking-tight leading-[0.95] text-glow">
-            {title}
+          <h1 className="text-display text-4xl md:text-5xl font-bold tracking-tight leading-[0.95] text-glow flex items-center gap-3">
+            {Icon && (
+              <span className="grid place-items-center h-11 w-11 rounded-md bg-primary/15 ring-1 ring-inset ring-primary/40 text-primary">
+                <Icon className="h-6 w-6" />
+              </span>
+            )}
+            <span>{title}</span>
           </h1>
           {description && (
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
