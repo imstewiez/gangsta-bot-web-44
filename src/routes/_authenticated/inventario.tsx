@@ -181,7 +181,7 @@ function StockTable() {
   return (
     <div className="space-y-6">
       {ordered.map(([cat, items]) => {
-        const meta = GROUPS[cat] ?? { label: cat, emoji: "📦", tone: "muted", order: 99 };
+        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99 };
         const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
         const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
         return (
@@ -193,7 +193,7 @@ function StockTable() {
               }
             >
               <div className="flex items-center gap-2">
-                <span className="text-lg leading-none">{meta.emoji}</span>
+                <CategoryIcon category={cat} tone={meta.tone} size={18} />
                 <h2 className="text-display text-sm uppercase tracking-widest">
                   {meta.label}
                 </h2>
