@@ -39,24 +39,26 @@ function classifyRow(r: {
   const c = (r.category ?? "").toLowerCase();
   const n = (r.item_name ?? "").toLowerCase();
 
-  // === EXPLICITAMENTE NÃO GUARDAMOS ===
-  // Lixo, madeiras, borracha, tecido, papel, couro, kevlar, ferro, carvão, armas brancas
-  const lixo = /r[áa]dio|telem[oó]vel|sucata|lixo|pl[áa]stico|pe[çc]as estragadas/;
-  const madeiras = /serradura|t[áa]bua|taninos/;
-  const outras_primas = /borracha|tecido|papel|couro|kevlar/;
-  const min_nao_craft = /\bferro\b|\bcarv[aã]o\b/;
-  const armas_brancas =
-    /adaga|taco|garrafa|crowbar|clube|machado|chave de tubo|bast[aã]o|canivete|machete|faca|soqueira/;
+  // === EXCLUIR SEMPRE ===
+  // Items estragados, lixo, madeiras, primas que não são craft
+  if (/estragad/.test(n)) return null;
+  if (c === "lixo" || c === "madeiras" || c === "coletes" || c === "armas_brancas") return null;
+  if (/r[áa]dio|telem[oó]vel|sucata|lixo eletr[oô]nico|pl[áa]stico|pe[çc]as estragadas/.test(n)) return null;
+  if (/serradura|t[áa]bua|taninos/.test(n)) return null;
+  if (/borracha|tecido|papel|couro|kevlar/.test(n)) return null;
+  if (/\bferro\b|\bcarv[aã]o\b/.test(n)) return null;
 
-  if (lixo.test(n) || madeiras.test(n) || outras_primas.test(n) || min_nao_craft.test(n))
+  // Armas brancas — nomes reais da BD
+  if (
+    /\bpistola\b(?!\s*\.50|\s*xm3|\s*heavy|\s*ap\s*pistol|\s*gadget)|cacete|punhal|soco\s*ingl[eê]s|adaga|taco|garrafa|crowbar|clube\s*de\s*golfe|machado|chave\s*de\s*tubo|bast[aã]o|canivete|machete|\bfaca\b|soqueira|martelo/.test(n)
+  ) {
     return null;
-  if (c === "armas_brancas" || armas_brancas.test(n)) return null;
-  if (c === "lixo" || c === "madeiras" || c === "coletes") return null;
+  }
 
   // === DROGAS ===
   if (
     c === "drogas" ||
-    /cabe[çc]os|haxixe|erva|meth|meta\b|metanfetamina|maconha|coca[ií]na|op[ií]o/.test(n)
+    /cabe[çc]os|haxixe|erva|meth|metanfetamina|maconha|coca[ií]na|op[ií]o/.test(n)
   ) {
     return "drogas";
   }
@@ -73,7 +75,7 @@ function classifyRow(r: {
   // === ACESSÓRIOS ===
   if (
     c === "acessorios" ||
-    /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano|grip|muzzle|barrel|extensivo|mag expandido/.test(n)
+    /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano|grip|muzzle|barrel|extensivo|mag\s*expandido/.test(n)
   ) {
     return "acessorios_armas";
   }
@@ -88,22 +90,22 @@ function classifyRow(r: {
     return "materiais_craft";
   }
 
-  // === ARMAS ===
+  // === ARMAS — só inclui se reconhecer explicitamente ===
   if (c === "armas" || c === "armas_fogo") {
     // Orange tier
     if (
-      /sns|xm3|mini smg|micro smg|machine pistol|tec pistol|ap pistol|assault shotgun|heavy shotgun|compact rifle|gusenberg/.test(n)
+      /sns\s*pistol|pistol\s*xm3|mini\s*smg|micro\s*smg|machine\s*pistol|tec\s*pistol|ap\s*pistol|assault\s*shotgun|heavy\s*shotgun|compact\s*rifle|gusenberg/.test(n)
     ) {
       return "armas_orange";
     }
     // Red tier
     if (
-      /heavy pistol|\.50\b|p90|pdw|bullpup|carabina|revolver|gadget|assault rifle|sniper|fuzil/.test(n)
+      /heavy\s*pistol|pistola?\s*\.50|p90|pdw|bullpup|carabina|revolver|gadget\s*pistol|assault\s*rifle|sniper|fuzil/.test(n)
     ) {
       return "armas_red";
     }
-    // Default para armas não reconhecidas
-    return "armas_orange";
+    // Armas não reconhecidas = não entram no stock
+    return null;
   }
 
   // Tudo o resto não interessa ao armazém
