@@ -11,18 +11,29 @@ export type RankRow = {
   ops: number;
 };
 
-type KPI = {
-  totalMembers: number;
+export type PrizeHighlight = {
+  winner_name: string | null;
+  winner_tier: string | null;
+  score: number | null;
+  prize_description: string | null;
+  prize_status: string | null;
+  week_start: string | null;
+};
+
+export type HomeKpis = {
+  // public-safe stats — visible to every member
+  newMembersWeek: number;
+  totalSaidasWeek: number;     // operações fechadas/finalizadas na semana
+  totalKillsWeek: number;
+  totalOpsWeek: number;        // saídas iniciadas na semana (qualquer estado)
   byTier: { tier: string; count: number }[];
-  openSaidas: number;
-  pendingTagRequests: number;
-  totalStock: number;
   topWeek: RankRow[];
   topWeekLabel: string | null;
   topPrevWeek: RankRow[];
   topPrevWeekLabel: string | null;
   topMonth: RankRow[];
   topMonthLabel: string | null;
+  prize: PrizeHighlight | null;
 };
 
 const SCORE_EXPR = `
@@ -52,34 +63,37 @@ async function topForWeek(weekStart: string | null): Promise<RankRow[]> {
   ).catch(() => []);
 }
 
-export const getDashboardKpis = createServerFn({ method: "GET" })
+export const getHomeKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<KPI> => {
-    const [members, byTier, saidas, tags, stock, weeks, monthRows] = await Promise.all([
-      pgOne<{ count: string }>(
-        `select count(*)::text as count from members
-         where deleted_at is null
-           and (lifecycle_state is null or lifecycle_state::text = 'active')`
-      ),
+  .handler(async (): Promise<HomeKpis> => {
+    const [byTier, newMembers, saidasWeek, opsWeek, killsWeek, weeks, monthRows, prize] = await Promise.all([
       pgQuery<{ tier: string; count: string }>(
         `select coalesce(tier, 'unknown') as tier, count(*)::text as count
          from members
          where deleted_at is null
            and (lifecycle_state is null or lifecycle_state::text = 'active')
          group by 1 order by 2 desc`
-      ),
+      ).catch(() => []),
+      pgOne<{ count: string }>(
+        `select count(*)::text as count from members
+         where deleted_at is null
+           and joined_at >= now() - interval '7 days'`
+      ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
         `select count(*)::text as count from operations
-         where status in ('planeada','em_curso','em_liquidacao','agendada','iniciada')
-           and deleted_at is null`
+         where deleted_at is null
+           and status in ('finalizada','fechada','fechada_auto','encerrada')
+           and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
-        "select count(*)::text as count from tag_requests where status = 'pending'"
+        `select count(*)::text as count from operations
+         where deleted_at is null
+           and coalesce(start_time, date::timestamp, created_at) >= now() - interval '7 days'`
       ).catch(() => ({ count: "0" })),
-      pgOne<{ total: string }>(
-        "select coalesce(sum(balance),0)::text as total from inventory_balance"
-      ).catch(() => ({ total: "0" })),
-      // Pick the two most recent weeks that actually have activity.
+      pgOne<{ count: string }>(
+        `select count(*)::text as count from kill_logs
+         where coalesce(date::timestamp, created_at) >= now() - interval '7 days'`
+      ).catch(() => ({ count: "0" })),
       pgQuery<{ week_start: string }>(
         `select to_char(week_start,'YYYY-MM-DD') as week_start
          from weekly_rankings
@@ -89,7 +103,6 @@ export const getDashboardKpis = createServerFn({ method: "GET" })
          order by week_start desc
          limit 2`
       ).catch(() => []),
-      // Aggregate current calendar month.
       pgQuery<RankRow>(
         `select m.display_name, m.nickname as nick,
                 sum(${SCORE_EXPR})::float as score,
@@ -105,6 +118,16 @@ export const getDashboardKpis = createServerFn({ method: "GET" })
          order by score desc nulls last
          limit 5`
       ).catch(() => []),
+      pgOne<PrizeHighlight>(
+        `select m.display_name as winner_name, m.tier as winner_tier,
+                wp.hybrid_score::float as score,
+                wp.prize_description, wp.prize_status,
+                to_char(wp.week_start,'YYYY-MM-DD') as week_start
+         from weekly_prizes wp
+         left join members m on m.id = wp.winner_member_id
+         order by wp.week_start desc
+         limit 1`
+      ).catch(() => null),
     ]);
 
     const [latestWeek, prevWeek] = [weeks[0]?.week_start ?? null, weeks[1]?.week_start ?? null];
@@ -117,16 +140,54 @@ export const getDashboardKpis = createServerFn({ method: "GET" })
       .format(new Date());
 
     return {
-      totalMembers: Number(members?.count ?? 0),
+      newMembersWeek: Number(newMembers?.count ?? 0),
+      totalSaidasWeek: Number(saidasWeek?.count ?? 0),
+      totalKillsWeek: Number(killsWeek?.count ?? 0),
+      totalOpsWeek: Number(opsWeek?.count ?? 0),
       byTier: byTier.map((r) => ({ tier: r.tier, count: Number(r.count) })),
-      openSaidas: Number(saidas?.count ?? 0),
-      pendingTagRequests: Number(tags?.count ?? 0),
-      totalStock: Number(stock?.total ?? 0),
       topWeek,
       topWeekLabel: latestWeek,
       topPrevWeek,
       topPrevWeekLabel: prevWeek,
       topMonth: monthRows,
       topMonthLabel: monthLabel,
+      prize,
+    };
+  });
+
+// Kept for /admin (chefia-only) — full sensitive KPIs
+export type AdminKpis = {
+  totalMembers: number;
+  openSaidas: number;
+  pendingTagRequests: number;
+  totalStock: number;
+};
+
+export const getAdminKpis = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<AdminKpis> => {
+    const [members, saidas, tags, stock] = await Promise.all([
+      pgOne<{ count: string }>(
+        `select count(*)::text as count from members
+         where deleted_at is null
+           and (lifecycle_state is null or lifecycle_state::text = 'active')`
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        `select count(*)::text as count from operations
+         where status in ('planeada','em_curso','em_liquidacao','agendada','iniciada')
+           and deleted_at is null`
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        "select count(*)::text as count from tag_requests where status = 'pending'"
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ total: string }>(
+        "select coalesce(sum(balance),0)::text as total from inventory_balance"
+      ).catch(() => ({ total: "0" })),
+    ]);
+    return {
+      totalMembers: Number(members?.count ?? 0),
+      openSaidas: Number(saidas?.count ?? 0),
+      pendingTagRequests: Number(tags?.count ?? 0),
+      totalStock: Number(stock?.total ?? 0),
     };
   });
