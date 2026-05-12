@@ -67,7 +67,7 @@ function Page() {
             <div><label className="text-xs text-muted-foreground">Descrição</label><Input value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
             <div><label className="text-xs text-muted-foreground">Status</label>
               <Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{["pending", "defined", "delivered", "cancelled"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                <SelectContent>{["por_definir", "definido", "entregue", "cancelado", "alterado"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
             <div><label className="text-xs text-muted-foreground">Notas</label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></div>
           </div>
           <DialogFooter>

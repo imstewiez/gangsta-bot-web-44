@@ -25,7 +25,7 @@ export const listPrizes = createServerFn({ method: "GET" })
       `select wp.id, wp.week_start, wp.week_end, wp.winner_member_id,
               m.display_name as winner_name,
               wp.hybrid_score::float as hybrid_score,
-              wp.prize_description, coalesce(wp.prize_status, 'pending') as prize_status,
+              wp.prize_description, coalesce(wp.prize_status, 'por_definir') as prize_status,
               wp.defined_by, wp.defined_at, wp.delivered_by, wp.delivered_at, wp.notes
        from weekly_prizes wp
        left join members m on m.id = wp.winner_member_id
@@ -38,7 +38,7 @@ export const setPrize = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number; description?: string | null; status?: string | null; notes?: string | null }) => d)
   .handler(async ({ data, context }) => {
-    const isDelivered = data.status === "delivered";
+    const isDelivered = data.status === "entregue";
     await pgQuery(
       `update weekly_prizes set
          prize_description = coalesce($2, prize_description),
@@ -76,7 +76,7 @@ export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
     const row = await pgOne<{ id: number }>(
       `insert into weekly_prizes
          (week_start, week_end, winner_member_id, hybrid_score, prize_status, defined_by, defined_at, created_at, updated_at)
-       values ($1, $2, $3, $4, 'pending', $5, now(), now(), now())
+       values ($1, $2, $3, $4, 'por_definir', $5, now(), now(), now())
        returning id`,
       [top.week_start, top.week_end, top.member_id, top.score, `web:${context.userId}`]
     );
