@@ -18,12 +18,47 @@ export const Route = createFileRoute("/_authenticated/inventario")({
   component: Page,
 });
 
-const CAT_LABEL: Record<string, string> = {
-  armas: "Armas",
-  armas_fogo: "Armas de fogo",
-  armas_brancas: "Armas brancas",
-  municoes: "Carregadores",
-  acessorios: "Acessórios",
+type CatMeta = { label: string; emoji: string; tone: string; order: number; matchSub?: (s: string | null) => boolean };
+
+// Cor de cada grupo (usa tokens do design system)
+const GROUPS: Record<string, CatMeta> = {
+  armas_orange: { label: "Armas Orange", emoji: "🟧", tone: "warning", order: 1 },
+  armas_red:    { label: "Armas Red",    emoji: "🟥", tone: "destructive", order: 2 },
+  armas_brancas:{ label: "Armas Brancas",emoji: "🔪", tone: "info", order: 3 },
+  municoes:     { label: "Carregadores & Munições", emoji: "🎯", tone: "primary", order: 4 },
+  drogas:       { label: "Drogas",       emoji: "💊", tone: "success", order: 5 },
+  materias_primas: { label: "Matérias-primas", emoji: "⛏️", tone: "primary", order: 6 },
+  componentes:  { label: "Componentes",  emoji: "⚙️", tone: "muted", order: 7 },
+  consumiveis:  { label: "Consumíveis",  emoji: "🥤", tone: "muted", order: 8 },
+  lixo:         { label: "Lixo & Sucata",emoji: "🗑️", tone: "muted", order: 9 },
+  outros:       { label: "Outros",       emoji: "📦", tone: "muted", order: 99 },
+};
+
+function classifyRow(r: { category: string | null; item_name: string }): string {
+  const c = (r.category ?? "").toLowerCase();
+  const n = (r.item_name ?? "").toLowerCase();
+  if (c === "armas_brancas") return "armas_brancas";
+  if (c === "municoes" || c === "municao" || /carregador|municao|munição|bala/.test(n)) return "municoes";
+  if (c === "drogas") return "drogas";
+  if (c === "lixo") return "lixo";
+  if (c === "componentes" || c === "acessorios") return "componentes";
+  if (c === "consumiveis" || c === "consumivel") return "consumiveis";
+  if (c === "materias_primas" || c === "materiais") return "materias_primas";
+  if (c === "armas" || c === "armas_fogo") {
+    // tenta separar por nome
+    if (/red|ak|m4|sniper|fuzil|shotgun|caçadeira/.test(n)) return "armas_red";
+    return "armas_orange";
+  }
+  return "outros";
+}
+
+const TONE_BG: Record<string, string> = {
+  warning: "bg-warning/15 border-warning/40 text-warning",
+  destructive: "bg-destructive/15 border-destructive/40 text-destructive",
+  info: "bg-info/15 border-info/40 text-info",
+  primary: "bg-primary/15 border-primary/40 text-primary",
+  success: "bg-success/15 border-success/40 text-success",
+  muted: "bg-muted/40 border-border text-muted-foreground",
 };
 
 const MOV_LABEL: Record<string, string> = {
