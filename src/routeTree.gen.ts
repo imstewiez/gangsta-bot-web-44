@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/tops'
 import { Route as AuthenticatedReceitasRouteImport } from './routes/_authenticated/receitas'
 import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticated/premios'
+import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
@@ -55,6 +56,11 @@ const AuthenticatedReceitasRoute = AuthenticatedReceitasRouteImport.update({
 const AuthenticatedPremiosRoute = AuthenticatedPremiosRouteImport.update({
   id: '/premios',
   path: '/premios',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPrecarioRoute = AuthenticatedPrecarioRouteImport.update({
+  id: '/precario',
+  path: '/precario',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOperacoesRoute = AuthenticatedOperacoesRouteImport.update({
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
+  '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRoute
+  '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
+  '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/membros'
     | '/onboarding'
     | '/operacoes'
+    | '/precario'
     | '/premios'
     | '/receitas'
     | '/tops'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/membros'
     | '/onboarding'
     | '/operacoes'
+    | '/precario'
     | '/premios'
     | '/receitas'
     | '/tops'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/_authenticated/membros'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
+    | '/_authenticated/precario'
     | '/_authenticated/premios'
     | '/_authenticated/receitas'
     | '/_authenticated/tops'
@@ -287,6 +299,13 @@ declare module '@tanstack/react-router' {
       path: '/premios'
       fullPath: '/premios'
       preLoaderRoute: typeof AuthenticatedPremiosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/precario': {
+      id: '/_authenticated/precario'
+      path: '/precario'
+      fullPath: '/precario'
+      preLoaderRoute: typeof AuthenticatedPrecarioRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/operacoes': {
@@ -399,6 +418,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
+  AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
   AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
@@ -416,6 +436,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
+  AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,
   AuthenticatedTopsRoute: AuthenticatedTopsRoute,
