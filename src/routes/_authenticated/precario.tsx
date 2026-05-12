@@ -142,8 +142,8 @@ function CategoryChips({
   );
 }
 
+function BuyTable({ title, items, catKey }: { title: string; items: CatalogItem[]; catKey: string }) {
   if (!items.length) return null;
-  const isDrogas = items[0]?.subcategory === "drogas";
   return (
     <section>
       <h2 className="mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest text-muted-foreground">
