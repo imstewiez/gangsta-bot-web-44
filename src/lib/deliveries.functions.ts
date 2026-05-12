@@ -117,11 +117,12 @@ export const decideDelivery = createServerFn({ method: "POST" })
       [data.id, status, `web:${context.userId}`, data.reason ?? "", me.discord_id]
     );
     if (data.approve) {
-      // post inventory movements: entrada
+      // post inventory movements: incoming (positive) using allowed type
       for (const l of before.lines) {
         await pgQuery(
-          `insert into inventory_movements (movement_type, item_id, quantity, member_id, notes, created_by, created_at)
-           values ('entrada', $1, $2, $3, $4, $5, now())`,
+          `insert into inventory_movements
+             (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
+           values ('entrega_bairrista', $1, $2, $3, 'armazem', $4, $5, now())`,
           [l.item_id, l.qty, null, `delivery:${data.id}`, `web:${context.userId}`]
         );
       }
