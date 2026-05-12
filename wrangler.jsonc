@@ -10,4 +10,13 @@
   "observability": {
     "enabled": true,
   },
+  "vars": {
+    "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
+    "SUPABASE_ANON_KEY": "PREENCHER-ANON-KEY-AQUI",
+  },
+  "secrets": [
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "DATABASE_URL",
+    "DISCORD_BOT_URL"
+  ],
 }
