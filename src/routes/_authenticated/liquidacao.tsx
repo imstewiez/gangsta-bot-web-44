@@ -51,7 +51,7 @@ function Page() {
         icon={CheckCircle2}
         description="Encerra a saída, calcula valores por participante a partir dos materiais e atualiza o net." />
       <div className="space-y-2">
-        {list.isLoading && <p className="text-muted-foreground">A carregar…</p>}
+        {list.isLoading && <CardGridSkeleton count={3} />}
         {(list.data ?? []).map((s) => (
           <div key={s.id} className="flex items-center gap-4 rounded-sm border border-border bg-card p-4">
             <div className="grid h-10 w-10 place-items-center rounded-sm bg-muted text-display text-xs">#{s.id}</div>
