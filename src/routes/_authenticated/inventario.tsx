@@ -117,10 +117,10 @@ function StockTable() {
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
 
-  // group by visual category, dropping items that don't belong in the warehouse
+  // Agrupa pela subcategory vinda da BD (mesma fonte do preçário).
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
-    const k = classifyRow(r);
-    if (!k) return acc;
+    const k = r.subcategory;
+    if (!k || !GROUPS[k]) return acc;
     (acc[k] ||= []).push(r);
     return acc;
   }, {});
