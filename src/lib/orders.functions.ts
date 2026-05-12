@@ -176,5 +176,5 @@ export const transitionOrder = createServerFn({ method: "POST" })
         link: "/encomendas",
       });
     }
-    return { ok: true };
+    return { ok: true as const };
   });
