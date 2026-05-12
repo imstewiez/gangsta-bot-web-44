@@ -50,18 +50,17 @@ export const listDeliveries = createServerFn({ method: "GET" })
 
 export const createDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { lines: { item_id: number; qty: number }[]; notes?: string | null }) => {
+  .inputValidator((d: { lines: { item_id: number; qty: number }[]; notes?: string | null; tipo?: "entrega" | "venda" }) => {
     if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Sem linhas");
     for (const l of d.lines) {
       if (!Number.isFinite(l.item_id) || !Number.isFinite(l.qty) || l.qty <= 0) throw new Error("Linha inválida");
     }
-    return d;
+    return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
     if (!me.discord_id) throw new Error("Membro sem Discord ID");
-    // Compute lines with prices (morador price for member submissions when available)
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
       id: number; name: string; purchase_price: number | null; morador_purchase_price: number | null;
@@ -84,14 +83,15 @@ export const createDelivery = createServerFn({ method: "POST" })
     const row = await pgOne<{ id: string }>(
       `insert into inventory_delivery_requests
          (id, requester_member_id, requester_discord_id, status, lines, notes, total_qty, total_value, created_by, tipo)
-       values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, 'entrega')
+       values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, $8)
        returning id`,
-      [me.id, me.discord_id, JSON.stringify(enriched), data.notes ?? "", totalQty, totalValue, `web:${context.userId}`]
+      [me.id, me.discord_id, JSON.stringify(enriched), data.notes ?? "", totalQty, totalValue, `web:${context.userId}`, data.tipo]
     );
+    const verb = data.tipo === "venda" ? "quer vender" : "vai entregar";
     await notifyManagers(context.supabase, {
       type: "delivery_new",
-      title: "Nova entrega de material",
-      body: `${me.display_name ?? "Membro"} entregou ${totalQty} itens (€${Math.round(totalValue)})`,
+      title: data.tipo === "venda" ? "Pedido de compra" : "Nova entrega de material",
+      body: `${me.display_name ?? "Membro"} ${verb} ${totalQty} itens (€${Math.round(totalValue)})`,
       link: "/entregas",
     });
     return { id: row?.id };
