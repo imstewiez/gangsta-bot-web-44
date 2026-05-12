@@ -101,7 +101,7 @@ function OrdersList({ scope, canManage }: { scope: "mine" | "manage"; canManage:
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (orders.isLoading) return <p className="text-muted-foreground">A puxar pedidos…</p>;
+  if (orders.isLoading) return <div className="grid gap-3"><CardGridSkeleton count={4} /></div>;
   if (!orders.data?.length)
     return (
       <Card className="p-10 text-center">
