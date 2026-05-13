@@ -30,74 +30,6 @@ const GROUPS: Record<string, CatMeta> = {
   },
 };
 
-// Whitelist: só estes nomes (normalizados) entram no armazém.
-const ALLOWED: Record<string, string[]> = {
-  armas_orange: [
-    "sns pistol",
-    "pistol xm3",
-    "mini smg",
-    "micro smg",
-    "machine pistol",
-    "tec pistol",
-    "ap pistol",
-    "assault shotgun",
-    "heavy shotgun",
-    "compact rifle",
-    "gusenberg",
-  ],
-  armas_red: [
-    "heavy pistol",
-    ".50",
-    "p90",
-    "pdw",
-    "bullpup",
-    "carabina especial",
-    "revolver",
-    "gadget pistol",
-    "assault rifle",
-    "sniper",
-    "fuzil",
-  ],
-  carregadores: [
-    "carregador orange",
-    "carregador red",
-    "carregador especial",
-  ],
-  acessorios_armas: [
-    "silenciador",
-    "mira",
-    "grip",
-    "lanterna",
-    "muzzle",
-    "barrel",
-    "extensivo",
-    "mag expandido",
-  ],
-  drogas: [
-    "cabeços",
-    "haxixe",
-    "folhas erva",
-    "erva",
-    "meth",
-    "ópio",
-  ],
-  materiais_craft: [
-    "aço",
-    "peças",
-    "corpo pistol xm3",
-    "corpo uzi",
-    "corpo tec-9",
-    "corpo tec pistol",
-    "corpo ap pistol",
-    "print laranja",
-    "print azul",
-    "print vermelha",
-    "print amarela",
-    "cobre",
-    "pólvora",
-  ],
-};
-
 function normalizeName(n: string): string {
   return n
     .toLowerCase()
@@ -109,20 +41,49 @@ function classifyRow(r: { category: string | null; item_name: string }): string 
   const c = (r.category ?? "").toLowerCase();
   const n = normalizeName(r.item_name);
 
-  // Excluir armas brancas por categoria
+  // === EXCLUIR ===
   if (c === "armas_brancas") return null;
-
-  // Excluir items estragados
   if (n.includes("estragad")) return null;
-
-  // Excluir coletes
   if (c === "coletes" || n.includes("colete")) return null;
+  // Gusenberg Sweeper é falso
+  if (n.includes("gusenberg") && n.includes("sweeper")) return null;
 
-  // Verificar whitelist
-  for (const [group, names] of Object.entries(ALLOWED)) {
-    if (names.some((allowed) => n.includes(allowed))) {
-      return group;
-    }
+  // === ARMAS ORANGE ===
+  if (
+    /\bsns\b|\bxm3\b|\bmini\s*smg\b|\bmicro\s*smg\b|\bmachine\s*pistol\b|\btec\s*pistol\b|\bap\s*pistol\b|\bassault\s*shotgun\b|\bheavy\s*shotgun\b|\bcompact\s*rifle\b|\bgusenberg\b(?!\s*sweeper)/.test(n)
+  ) {
+    return "armas_orange";
+  }
+
+  // === ARMAS RED ===
+  if (
+    /\bheavy\s*pistol\b|\b\.50\b|\bp90\b|\bpdw\b|\bbullpup\b|\bcarabina\b|\brevolver\b|\bgadget\b|\bassault\s*rifle\b|\bsniper\b|\bfuzil\b/.test(n)
+  ) {
+    return "armas_red";
+  }
+
+  // === CARREGADORES ===
+  if (/\bcarregador\b/.test(n)) {
+    return "carregadores";
+  }
+
+  // === ACESSÓRIOS ===
+  if (
+    /\bsilenciador\b|\bmira\b|\bgrip\b|\blanterna\b|\bmuzzle\b|\bbarrel\b|\bextensivo\b|\bmag\s*expandido\b/.test(n)
+  ) {
+    return "acessorios_armas";
+  }
+
+  // === DROGAS ===
+  if (
+    /\bcabe[çc]os\b|\bhaxixe\b|\berva\b|\bmeth\b|\bmeta\b|\bmetanfetamina\b|\bmaconha\b|\bcoca[ií]na\b|\bop[ií]o\b/.test(n)
+  ) {
+    return "drogas";
+  }
+
+  // === MATERIAIS DE CRAFT ===
+  if (/\ba[çc]o\b|\bpe[çc]as\b|\bcorpo\b|\bcorpos\b|\bprint\b|\bprints\b|\bcobre\b|\bp[oó]lvora\b/.test(n)) {
+    return "materiais_craft";
   }
 
   return null;
