@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
-// Tudo o que é stock controlado pelo armazém
+// Categorias que interessam ao armazém
 const INV_CATEGORIES = [
   "armas",
   "armas_fogo",
@@ -13,9 +13,10 @@ const INV_CATEGORIES = [
   "drogas",
   "materiais",
   "materias_primas",
-  "lixo",
   "componentes",
-  "consumiveis",
+  "minerios",
+  "corpos",
+  "prints",
 ];
 
 async function gateInventory(supabase: unknown, userId: string) {

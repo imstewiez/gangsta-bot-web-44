@@ -17,12 +17,11 @@ export const Route = createFileRoute("/_authenticated/inventario")({
 
 type CatMeta = { label: string; tone: string; order: number };
 
-// O bairro só guarda o que vende ou material p/ craftar o que vende.
 const GROUPS: Record<string, CatMeta> = {
   armas_red: { label: "Armas Red", tone: "destructive", order: 1 },
   armas_orange: { label: "Armas Orange", tone: "warning", order: 2 },
   carregadores: { label: "Carregadores", tone: "primary", order: 3 },
-  acessorios_armas: { label: "Acessórios de armas", tone: "info", order: 4 },
+  acessorios_armas: { label: "Acessórios", tone: "info", order: 4 },
   drogas: { label: "Drogas", tone: "success", order: 5 },
   materiais_craft: {
     label: "Materiais de Craft",
@@ -31,84 +30,101 @@ const GROUPS: Record<string, CatMeta> = {
   },
 };
 
-// Devolve a chave do grupo, ou null se o item não interessa ao armazém.
-function classifyRow(r: {
-  category: string | null;
-  item_name: string;
-}): string | null {
+// Whitelist: só estes nomes (normalizados) entram no armazém.
+const ALLOWED: Record<string, string[]> = {
+  armas_orange: [
+    "sns pistol",
+    "pistol xm3",
+    "mini smg",
+    "micro smg",
+    "machine pistol",
+    "tec pistol",
+    "ap pistol",
+    "assault shotgun",
+    "heavy shotgun",
+    "compact rifle",
+    "gusenberg",
+  ],
+  armas_red: [
+    "heavy pistol",
+    ".50",
+    "p90",
+    "pdw",
+    "bullpup",
+    "carabina especial",
+    "revolver",
+    "gadget pistol",
+    "assault rifle",
+    "sniper",
+    "fuzil",
+  ],
+  carregadores: [
+    "carregador orange",
+    "carregador red",
+    "carregador especial",
+  ],
+  acessorios_armas: [
+    "silenciador",
+    "mira",
+    "grip",
+    "lanterna",
+    "muzzle",
+    "barrel",
+    "extensivo",
+    "mag expandido",
+  ],
+  drogas: [
+    "cabeços",
+    "haxixe",
+    "folhas erva",
+    "erva",
+    "meth",
+    "ópio",
+  ],
+  materiais_craft: [
+    "aço",
+    "peças",
+    "corpo pistol xm3",
+    "corpo uzi",
+    "corpo tec-9",
+    "corpo tec pistol",
+    "corpo ap pistol",
+    "print laranja",
+    "print azul",
+    "print vermelha",
+    "print amarela",
+    "cobre",
+    "pólvora",
+  ],
+};
+
+function normalizeName(n: string): string {
+  return n
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function classifyRow(r: { category: string | null; item_name: string }): string | null {
   const c = (r.category ?? "").toLowerCase();
-  const n = (r.item_name ?? "").toLowerCase();
+  const n = normalizeName(r.item_name);
 
-  // === EXCLUIR SEMPRE ===
-  // Items estragados, lixo, madeiras, primas que não são craft
-  if (/estragad/.test(n)) return null;
-  if (c === "lixo" || c === "madeiras" || c === "coletes" || c === "armas_brancas") return null;
-  if (/r[áa]dio|telem[oó]vel|sucata|lixo eletr[oô]nico|pl[áa]stico|pe[çc]as estragadas/.test(n)) return null;
-  if (/serradura|t[áa]bua|taninos/.test(n)) return null;
-  if (/borracha|tecido|papel|couro|kevlar/.test(n)) return null;
-  if (/\bferro\b|\bcarv[aã]o\b/.test(n)) return null;
+  // Excluir armas brancas por categoria
+  if (c === "armas_brancas") return null;
 
-  // Armas brancas — nomes reais da BD
-  if (
-    /\bpistola\b(?!\s*\.50|\s*xm3|\s*heavy|\s*ap\s*pistol|\s*gadget)|cacete|punhal|soco\s*ingl[eê]s|adaga|taco|garrafa|crowbar|clube\s*de\s*golfe|machado|chave\s*de\s*tubo|bast[aã]o|canivete|machete|\bfaca\b|soqueira|martelo/.test(n)
-  ) {
-    return null;
-  }
+  // Excluir items estragados
+  if (n.includes("estragad")) return null;
 
-  // === DROGAS ===
-  if (
-    c === "drogas" ||
-    /cabe[çc]os|haxixe|erva|meth|metanfetamina|maconha|coca[ií]na|op[ií]o/.test(n)
-  ) {
-    return "drogas";
-  }
+  // Excluir coletes
+  if (c === "coletes" || n.includes("colete")) return null;
 
-  // === CARREGADORES ===
-  if (
-    c === "municoes" ||
-    c === "municao" ||
-    /carregador|magazine|\bmag\b/.test(n)
-  ) {
-    return "carregadores";
-  }
-
-  // === ACESSÓRIOS ===
-  if (
-    c === "acessorios" ||
-    /silenciador|supressor|mira|red\s*dot|holo|lanterna|punho|coronha|cano|grip|muzzle|barrel|extensivo|mag\s*expandido/.test(n)
-  ) {
-    return "acessorios_armas";
-  }
-
-  // === MATERIAIS DE CRAFT ===
-  if (
-    /\b(pe[çc]a|pe[çc]as)\b|\ba[çc]o\b|\bcorpo\b|\bcorpos\b|\bprint\b|\bprints\b/.test(n)
-  ) {
-    return "materiais_craft";
-  }
-  if (/\bcobre\b|\bp[oó]lvora\b/.test(n)) {
-    return "materiais_craft";
-  }
-
-  // === ARMAS — só inclui se reconhecer explicitamente ===
-  if (c === "armas" || c === "armas_fogo") {
-    // Orange tier
-    if (
-      /sns\s*pistol|pistol\s*xm3|mini\s*smg|micro\s*smg|machine\s*pistol|tec\s*pistol|ap\s*pistol|assault\s*shotgun|heavy\s*shotgun|compact\s*rifle|gusenberg/.test(n)
-    ) {
-      return "armas_orange";
+  // Verificar whitelist
+  for (const [group, names] of Object.entries(ALLOWED)) {
+    if (names.some((allowed) => n.includes(allowed))) {
+      return group;
     }
-    // Red tier
-    if (
-      /heavy\s*pistol|pistola?\s*\.50|p90|pdw|bullpup|carabina|revolver|gadget\s*pistol|assault\s*rifle|sniper|fuzil/.test(n)
-    ) {
-      return "armas_red";
-    }
-    // Armas não reconhecidas = não entram no stock
-    return null;
   }
 
-  // Tudo o resto não interessa ao armazém
   return null;
 }
 
@@ -190,7 +206,6 @@ function StockTable() {
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
 
-  // group by visual category, dropping items that don't belong in the warehouse
   const groups = rows.reduce<Record<string, typeof rows>>((acc, r) => {
     const k = classifyRow(r);
     if (!k) return acc;
@@ -218,7 +233,7 @@ function StockTable() {
     <div className="space-y-6">
       {ordered.map(([cat, items]) => {
         const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99 };
-        const total = items.reduce((s, r) => s + (r.qty ?? 0), 0);
+        const totalQty = items.reduce((s, r) => s + (r.qty ?? 0), 0);
         const value = items.reduce(
           (s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0),
           0,
@@ -241,7 +256,7 @@ function StockTable() {
                 </h2>
               </div>
               <span className="text-display text-[11px] tracking-wider opacity-90">
-                {items.length} refs · {fmtNum(total)} em casa ·{" "}
+                {items.length} refs · {fmtNum(totalQty)} em casa ·{" "}
                 {fmtNum(Math.round(value))} €
               </span>
             </header>
@@ -308,68 +323,59 @@ function LedgerTable() {
   const fn = useServerFn(getLedger);
   const q = useQuery({
     queryKey: ["ledger"],
-    queryFn: () => fn({ data: { limit: 150 } }),
+    queryFn: () => fn({ page: 1, limit: 50 }),
   });
+  const rows = q.data?.rows ?? [];
+
+  if (q.isLoading) return <p className="text-muted-foreground">A carregar…</p>;
+  if (!rows.length)
+    return (
+      <Card className="p-8 text-center text-muted-foreground">
+        Sem movimentos registados.
+      </Card>
+    );
+
   return (
-    <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-secondary text-display text-xs">
+        <thead className="bg-secondary/50 text-display text-[11px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 text-left">Quando</th>
+            <th className="px-3 py-2 text-left">Data</th>
             <th className="px-3 py-2 text-left">Tipo</th>
             <th className="px-3 py-2 text-left">Item</th>
-            <th className="px-3 py-2 text-left">Quem</th>
-            <th className="px-3 py-2 text-right">Qty</th>
+            <th className="px-3 py-2 text-right">Qtd</th>
+            <th className="px-3 py-2 text-left">Membro</th>
           </tr>
         </thead>
         <tbody>
-          {q.isLoading && (
-            <tr>
-              <td colSpan={5} className="p-6 text-center text-muted-foreground">
-                A puxar histórico…
-              </td>
-            </tr>
-          )}
-          {(q.data ?? []).map((r) => (
+          {rows.map((r) => (
             <tr
               key={r.id}
               className="border-t border-border hover:bg-accent/30"
             >
-              <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                {fmtDate(r.created_at)}
-              </td>
-              <td className="px-3 py-2">{MOV_LABEL[r.type] ?? r.type}</td>
-              <td className="px-3 py-2 font-medium">
-                {r.item_name ? (
-                  <span className="inline-flex items-center gap-2">
-                    <ItemIcon name={r.item_name} size={14} />
-                    {r.item_name}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </td>
               <td className="px-3 py-2 text-muted-foreground">
-                {r.member_name ?? "—"}
+                {fmtDate(r.created_at).split(",")[0]}
+              </td>
+              <td className="px-3 py-2">
+                {MOV_LABEL[r.type] ?? r.type}
+              </td>
+              <td className="px-3 py-2 font-medium">
+                {r.item_name ?? "—"}
               </td>
               <td
                 className={
                   "px-3 py-2 text-right font-mono " +
-                  (r.qty < 0 ? "text-destructive" : "text-success")
+                  (r.qty > 0 ? "text-success" : r.qty < 0 ? "text-destructive" : "")
                 }
               >
                 {r.qty > 0 ? "+" : ""}
                 {fmtNum(r.qty)}
               </td>
-            </tr>
-          ))}
-          {!q.isLoading && !q.data?.length && (
-            <tr>
-              <td colSpan={5} className="p-6 text-center text-muted-foreground">
-                Sem movimentos.
+              <td className="px-3 py-2 text-muted-foreground">
+                {r.member_name ?? "—"}
               </td>
             </tr>
-          )}
+          ))}
         </tbody>
       </table>
     </div>
