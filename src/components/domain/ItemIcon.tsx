@@ -156,6 +156,16 @@ export function pickItemIcon(
   return CATEGORY_ICON[cat];
 }
 
+// Cores específicas para prints
+function pickPrintTone(name: string): string | null {
+  const n = name.toLowerCase();
+  if (n.includes("amarela")) return "warning";
+  if (n.includes("azul")) return "info";
+  if (n.includes("vermelha")) return "destructive";
+  if (n.includes("laranja")) return "primary";
+  return null;
+}
+
 // Classes Tailwind por tom — texto + bg + border do "puck" do ícone.
 const TONE_TEXT: Record<string, string> = {
   warning: "text-warning",
@@ -219,7 +229,9 @@ export function ItemIcon({
 }) {
   const Icon = pickItemIcon(name, category);
   const cat = inferCategory(name, category ?? undefined);
-  const tone = CATEGORY_TONE[cat] ?? "muted";
+  let tone = CATEGORY_TONE[cat] ?? "muted";
+  const printTone = pickPrintTone(name);
+  if (printTone) tone = printTone;
   if (withPuck) {
     const puck = TONE_PUCK[tone] ?? TONE_PUCK.muted;
     return (

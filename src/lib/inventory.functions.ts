@@ -29,6 +29,7 @@ export type StockRow = {
   item_id: number;
   item_name: string;
   category: string | null;
+  subcategory: string | null;
   qty: number;
   unit_price: number | null;
 };
@@ -38,7 +39,7 @@ export const getStock = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<StockRow[]> => {
     await gateInventory(context.supabase, context.userId);
     return pgQuery<StockRow>(
-      `select i.id as item_id, i.name as item_name, i.category,
+      `select i.id as item_id, i.name as item_name, i.category, i.subcategory,
               coalesce(ib.balance, 0)::float as qty,
               coalesce(i.min_sale_price, i.estimated_value)::float as unit_price
        from items i
@@ -46,7 +47,7 @@ export const getStock = createServerFn({ method: "GET" })
        where i.active is not false
          and coalesce(i.deleted_at, 'epoch'::timestamptz) = 'epoch'::timestamptz
          and i.category = any($1::text[])
-       order by i.category nulls last, i.name`,
+       order by unit_price desc nulls last`,
       [INV_CATEGORIES],
     );
   });
