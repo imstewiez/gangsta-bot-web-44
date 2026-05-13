@@ -285,7 +285,7 @@ function StockTable() {
                             <span className="inline-flex items-center gap-2">
                               <ItemIcon
                                 name={r.item_name}
-                                category={r.category}
+                                category={cat}
                                 size={14}
                               />
                               {r.item_name}

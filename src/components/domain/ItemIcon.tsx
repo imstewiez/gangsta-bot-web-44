@@ -36,6 +36,7 @@ export type CatKey =
   | "drogas"
   | "craft_armas"
   | "craft_carregadores"
+  | "materiais_craft"
   | "lixo"
   | "madeiras"
   | "materias_primas"
@@ -55,6 +56,7 @@ export const CATEGORY_ICON: Record<CatKey, LucideIcon> = {
   drogas: Pill,
   craft_armas: Hammer,
   craft_carregadores: FlaskConical,
+  materiais_craft: Cog,
   lixo: Recycle,
   madeiras: Trees,
   materias_primas: Cog,
@@ -76,6 +78,7 @@ export const CATEGORY_TONE: Record<CatKey, string> = {
   drogas: "success",
   craft_armas: "primary",
   craft_carregadores: "muted",
+  materiais_craft: "muted",
   lixo: "muted",
   madeiras: "success",
   materias_primas: "primary",
