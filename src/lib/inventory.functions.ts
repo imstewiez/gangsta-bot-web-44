@@ -41,7 +41,7 @@ export const getStock = createServerFn({ method: "GET" })
     return pgQuery<StockRow>(
       `select i.id as item_id, i.name as item_name, i.category, i.subcategory,
               coalesce(ib.balance, 0)::float as qty,
-              coalesce(i.min_sale_price, i.estimated_value)::float as unit_price
+              coalesce(i.purchase_price, i.min_sale_price, i.estimated_value)::float as unit_price
        from items i
        left join inventory_balance ib on ib.item_id = i.id
        where i.active is not false

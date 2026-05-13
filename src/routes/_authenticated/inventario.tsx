@@ -59,7 +59,7 @@ function classifyRow(r: { category: string | null; item_name: string }): string 
 
   // === 4. ACESSÓRIOS ===
   if (
-    /\bsilenciador\b|\bmira\b|\bgrip\b|\blanterna\b|\bmuzzle\b|\bbarrel\b|\bextensivo\b|\bmag\s*expandido\b/.test(n)
+    /\bsilenciador\b|\bmira\b|\bgrip\b|\blanterna\b|\bmuzzle\b|\bbarrel\b|\bextensivo\b|\bmag\b/.test(n)
   ) {
     return "acessorios_armas";
   }
@@ -80,7 +80,7 @@ function classifyRow(r: { category: string | null; item_name: string }): string 
 
   // === 7. ARMAS RED ===
   if (
-    /\bheavy\s*pistol\b|\b\.50\b|\bp90\b|\bpdw\b|\bbullpup\b|\bcarabina\b|\brevolver\b|\bgadget\b|\bassault\s*rifle\b|\bsniper\b|\bfuzil\b/.test(n)
+    /\bheavy\s*pistol\b|\bp90\b|\bcombat\s*pdw\b|\bbullpup\s*rifle\b|\bbullpup\b|\bcarabina\b|\brevolver\b|\bgadget\s*pistol\b|\bpdw\b/.test(n)
   ) {
     return "armas_red";
   }
