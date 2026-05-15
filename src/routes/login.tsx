@@ -51,7 +51,7 @@ function LoginPage() {
             className="h-11 w-11 rounded-sm object-contain drop-shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_70%,transparent)]"
           />
           <span className="text-display text-sm tracking-[0.25em]">
-            RedWood
+            Ballas Gang
           </span>
         </Link>
 

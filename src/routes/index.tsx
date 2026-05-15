@@ -34,7 +34,7 @@ function Landing() {
             />
             <div className="leading-tight">
               <div className="text-display text-sm tracking-[0.28em]">
-                RedWood
+                Ballas Gang
               </div>
               <div className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">
                 Acesso reservado
