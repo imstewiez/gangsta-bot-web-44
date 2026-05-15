@@ -69,8 +69,7 @@ function Landing() {
           </h1>
 
           <p className="mt-8 max-w-lg text-base leading-relaxed text-muted-foreground/90">
-            Casa fechada. Quem é de cá, sabe a porta. Se chegaste aqui por
-            engano, faz o teu caminho — não há nada para ver.
+            Acesso restrito. Membros apenas. Se não és da firma, não há nada para ti aqui.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -78,7 +77,7 @@ function Landing() {
               to="/login"
               className="btn-shine group inline-flex items-center gap-2 rounded-sm bg-primary px-7 py-3.5 text-display text-sm font-bold tracking-wider text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_40px_-6px_var(--primary)]"
             >
-              Bater à porta
+              Entrar
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.28em] text-muted-foreground/70">

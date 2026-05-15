@@ -12,4 +12,16 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
+  vite: {
+    resolve: {
+      alias: {
+        'perf_hooks': '/src/lib/node-polyfills.ts',
+      },
+    },
+    build: {
+      rollupOptions: {
+        external: [],
+      },
+    },
+  },
 });

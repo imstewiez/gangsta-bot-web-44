@@ -5,9 +5,20 @@ import { getMember } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fmtNum, fmtDate, ROLE_LABELS } from "@/lib/domain";
+import { fmtNum, fmtDate, ROLE_LABELS, POSITION_LABELS, TIER_ORDER } from "@/lib/domain";
 import { MemberIdentity } from "@/components/domain/RoleBadge";
 import { MemberAdminPanel } from "@/components/domain/MemberAdminPanel";
+import {
+  Skull,
+  Crosshair,
+  Truck,
+  Coins,
+  ShoppingBag,
+  Package,
+  Sword,
+  ArrowDownUp,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({
   component: Page,
@@ -38,44 +49,49 @@ function Page() {
     );
   const m = data.member;
   const isChefia = me.data?.is_manager ?? false;
+  const myTier = me.data?.tier ?? null;
+
+  function tierRank(t: string | null) {
+    if (!t) return -1;
+    return TIER_ORDER.indexOf(t);
+  }
+  const canManage = isChefia && tierRank(myTier) > tierRank(m.tier);
+
   return (
     <>
       <PageHeader
-        eyebrow={ROLE_LABELS[m.role_label ?? "bairrista"]}
+        eyebrow={POSITION_LABELS[m.tier ?? "bairrista"]}
         title={m.display_name ?? "—"}
         description={m.nick ? `"${m.nick}"` : undefined}
         action={<MemberIdentity tier={m.tier} size="md" />}
       />
-      <div className="grid gap-4 md:grid-cols-3">
+
+      {/* Stats grid */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={Sword} label="Kills" value={data.kills} tone="primary" />
+        <StatCard icon={Skull} label="Mortes" value={data.deaths} tone="destructive" />
+        <StatCard icon={Crosshair} label="Saídas" value={data.saidas} tone="info" />
+        <StatCard icon={Truck} label="Entregas" value={data.deliveries} tone="success" />
+        <StatCard icon={Coins} label="Vendas" value={data.vendas} tone="warning" />
+        <StatCard icon={ShoppingBag} label="Encomendas" value={data.orders} tone="accent" />
         <Card>
-          <CardHeader>
-            <CardTitle className="text-display text-sm">Entrou</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Entrou</CardTitle>
           </CardHeader>
-          <CardContent>{fmtDate(m.joined_at)}</CardContent>
+          <CardContent className="text-sm">{fmtDate(m.joined_at)}</CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-display text-sm">Discord ID</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Discord ID</CardTitle>
           </CardHeader>
-          <CardContent className="font-mono text-xs">
-            {m.discord_id ?? "—"}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-display text-sm">Kills</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-bold text-primary">
-            {fmtNum(data.kills)}
-          </CardContent>
+          <CardContent className="font-mono text-xs">{m.discord_id ?? "—"}</CardContent>
         </Card>
       </div>
+
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-display text-sm">
-              Contribuições
-            </CardTitle>
+            <CardTitle className="text-display text-sm">Contribuições</CardTitle>
           </CardHeader>
           <CardContent>
             {(data.contributions?.length ?? 0) === 0 ? (
@@ -87,7 +103,7 @@ function Page() {
                     key={c.type}
                     className="flex justify-between border-b border-border/50 py-1.5 text-sm last:border-0"
                   >
-                    <span className="text-muted-foreground">{c.type}</span>
+                    <MovementTypeBadge type={c.type} />
                     <span className="font-mono">{fmtNum(c.total)}</span>
                   </li>
                 ))}
@@ -97,9 +113,7 @@ function Page() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-display text-sm">
-              Movimentos recentes
-            </CardTitle>
+            <CardTitle className="text-display text-sm">Movimentos recentes</CardTitle>
           </CardHeader>
           <CardContent>
             {(data.recentMovements?.length ?? 0) === 0 ? (
@@ -114,10 +128,8 @@ function Page() {
                     <span className="text-muted-foreground">
                       {fmtDate(mv.created_at).split(",")[0]}
                     </span>
-                    <span>{mv.type}</span>
-                    <span className="text-muted-foreground">
-                      {mv.item_name ?? "—"}
-                    </span>
+                    <MovementTypeBadge type={mv.type} />
+                    <span className="text-muted-foreground">{mv.item_name ?? "—"}</span>
                     <span className="ml-auto font-mono">{fmtNum(mv.qty)}</span>
                   </li>
                 ))}
@@ -126,6 +138,7 @@ function Page() {
           </CardContent>
         </Card>
       </div>
+
       {isChefia && (
         <div className="mt-6">
           <MemberAdminPanel
@@ -135,9 +148,65 @@ function Page() {
               nick: m.nick,
               tier: m.tier,
             }}
+            myTier={myTier}
+            canManage={canManage}
           />
         </div>
       )}
     </>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  tone: string;
+}) {
+  const toneMap: Record<string, string> = {
+    primary: "text-primary",
+    destructive: "text-destructive",
+    info: "text-info",
+    success: "text-success",
+    warning: "text-warning",
+    accent: "text-accent-foreground",
+  };
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={`rounded-sm border border-border/60 bg-secondary/30 p-2 ${toneMap[tone] ?? "text-foreground"}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <div className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+          <div className="text-2xl font-bold">{fmtNum(value)}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const MOVEMENT_TYPE_META: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
+  entrega_bairrista: { label: "Entrega", icon: Truck, tone: "text-info" },
+  venda_bairrista: { label: "Venda", icon: Coins, tone: "text-warning" },
+  aquisicao: { label: "Aquisição", icon: ShoppingBag, tone: "text-success" },
+  saida: { label: "Saída", icon: Crosshair, tone: "text-destructive" },
+  craft: { label: "Craft", icon: Package, tone: "text-primary" },
+  transferencia: { label: "Transferência", icon: ArrowDownUp, tone: "text-accent-foreground" },
+};
+
+function MovementTypeBadge({ type }: { type: string }) {
+  const meta = MOVEMENT_TYPE_META[type] ?? { label: type, icon: Package, tone: "text-muted-foreground" };
+  const Icon = meta.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs ${meta.tone}`}>
+      <Icon className="h-3 w-3" />
+      <span className="text-foreground">{meta.label}</span>
+    </span>
   );
 }

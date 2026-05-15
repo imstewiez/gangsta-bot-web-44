@@ -5,7 +5,7 @@ import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { ROLE_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
+import { ROLE_LABELS, POSITION_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
 import { Users } from "lucide-react";
@@ -66,7 +66,7 @@ function Page() {
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{m.nick ?? "—"}</td>
-                <td className="px-3 py-2 text-muted-foreground">{ROLE_LABELS[m.role_label ?? "bairrista"] ?? m.role_label}</td>
+                <td className="px-3 py-2 text-muted-foreground">{POSITION_LABELS[m.tier ?? "bairrista"] ?? m.tier}</td>
                 <td className="px-3 py-2"><TierBadge tier={m.tier} /></td>
                 <td className="px-3 py-2"><AffiliationBadge tier={m.tier} /></td>
                 <td className="px-3 py-2 text-xs text-muted-foreground">{fmtDate(m.joined_at)}</td>

@@ -6,8 +6,13 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { useState } from "react";
+import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { Loader2 } from "lucide-react";
+import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 
 export const Route = createFileRoute("/_authenticated/disponibilidade")({
+  errorComponent: PageErrorBoundary,
   component: Page,
 });
 
@@ -27,7 +32,7 @@ function Page() {
   return (
     <>
       <PageHeader
-        eyebrow="Bairro"
+        eyebrow="Estrutura"
         title="Disponibilidade"
         description="Sessões diárias e votos."
       />
@@ -38,7 +43,7 @@ function Page() {
           </CardHeader>
           <CardContent className="space-y-1">
             {sessions.isLoading && (
-              <p className="text-muted-foreground text-sm">A carregar…</p>
+              <PageSkeleton rows={6} />
             )}
             {(sessions.data ?? []).map((s) => (
               <button
@@ -68,7 +73,7 @@ function Page() {
               </button>
             ))}
             {!sessions.isLoading && !sessions.data?.length && (
-              <p className="text-sm text-muted-foreground">Sem sessões.</p>
+              <EmptyState title="Sem sessões" description="Nenhumas sessões encontradas." />
             )}
           </CardContent>
         </Card>
@@ -85,7 +90,7 @@ function Page() {
               </p>
             )}
             {openId && votes.isLoading && (
-              <p className="text-sm text-muted-foreground">A carregar…</p>
+              <PageSkeleton rows={6} />
             )}
             {openId && votes.data && (
               <div className="space-y-3">
@@ -124,7 +129,7 @@ function Page() {
                   );
                 })}
                 {!votes.data.slots.length && (
-                  <p className="text-sm text-muted-foreground">Sem slots.</p>
+                  <EmptyState title="Sem slots" description="Nenhuns slots encontrados." />
                 )}
               </div>
             )}

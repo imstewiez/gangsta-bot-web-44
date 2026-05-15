@@ -270,3 +270,19 @@
 .delay-400 {
   animation-delay: 0.4s;
 }
+
+/* Sidebar scrollbar — thin & subtle */
+[data-sidebar="content"]::-webkit-scrollbar {
+  width: 4px;
+}
+[data-sidebar="content"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-sidebar="content"]::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--border) 40%, transparent);
+  border-radius: 2px;
+}
+[data-sidebar="content"] {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--border) 40%, transparent) transparent;
+}

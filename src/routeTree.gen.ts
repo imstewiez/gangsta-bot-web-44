@@ -9,11 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LogsRouteImport } from './routes/logs'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/tops'
+import { Route as AuthenticatedTestDbRouteImport } from './routes/_authenticated/test-db'
 import { Route as AuthenticatedReceitasRouteImport } from './routes/_authenticated/receitas'
 import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticated/premios'
 import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
@@ -31,6 +33,11 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedMembrosIndexRouteImport } from './routes/_authenticated/membros.index'
 import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros.$id'
 
+const LogsRoute = LogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -53,6 +60,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AuthenticatedTopsRoute = AuthenticatedTopsRouteImport.update({
   id: '/tops',
   path: '/tops',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTestDbRoute = AuthenticatedTestDbRouteImport.update({
+  id: '/test-db',
+  path: '/test-db',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedReceitasRoute = AuthenticatedReceitasRouteImport.update({
@@ -141,6 +153,7 @@ const AuthenticatedMembrosIdRoute = AuthenticatedMembrosIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/logs': typeof LogsRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -155,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
+  '/test-db': typeof AuthenticatedTestDbRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
@@ -163,6 +177,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/logs': typeof LogsRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -176,6 +191,7 @@ export interface FileRoutesByTo {
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
+  '/test-db': typeof AuthenticatedTestDbRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
@@ -186,6 +202,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/logs': typeof LogsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -200,6 +217,7 @@ export interface FileRoutesById {
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
+  '/_authenticated/test-db': typeof AuthenticatedTestDbRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
@@ -210,6 +228,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/logs'
     | '/admin'
     | '/auditoria'
     | '/dashboard'
@@ -224,6 +243,7 @@ export interface FileRouteTypes {
     | '/precario'
     | '/premios'
     | '/receitas'
+    | '/test-db'
     | '/tops'
     | '/auth/callback'
     | '/membros/$id'
@@ -232,6 +252,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/logs'
     | '/admin'
     | '/auditoria'
     | '/dashboard'
@@ -245,6 +266,7 @@ export interface FileRouteTypes {
     | '/precario'
     | '/premios'
     | '/receitas'
+    | '/test-db'
     | '/tops'
     | '/auth/callback'
     | '/membros/$id'
@@ -254,6 +276,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/logs'
     | '/_authenticated/admin'
     | '/_authenticated/auditoria'
     | '/_authenticated/dashboard'
@@ -268,6 +291,7 @@ export interface FileRouteTypes {
     | '/_authenticated/precario'
     | '/_authenticated/premios'
     | '/_authenticated/receitas'
+    | '/_authenticated/test-db'
     | '/_authenticated/tops'
     | '/auth/callback'
     | '/_authenticated/membros/$id'
@@ -278,11 +302,19 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  LogsRoute: typeof LogsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/logs': {
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -316,6 +348,13 @@ declare module '@tanstack/react-router' {
       path: '/tops'
       fullPath: '/tops'
       preLoaderRoute: typeof AuthenticatedTopsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/test-db': {
+      id: '/_authenticated/test-db'
+      path: '/test-db'
+      fullPath: '/test-db'
+      preLoaderRoute: typeof AuthenticatedTestDbRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/receitas': {
@@ -461,6 +500,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
+  AuthenticatedTestDbRoute: typeof AuthenticatedTestDbRoute
   AuthenticatedTopsRoute: typeof AuthenticatedTopsRoute
 }
 
@@ -479,6 +519,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,
+  AuthenticatedTestDbRoute: AuthenticatedTestDbRoute,
   AuthenticatedTopsRoute: AuthenticatedTopsRoute,
 }
 
@@ -490,6 +531,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  LogsRoute: LogsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport

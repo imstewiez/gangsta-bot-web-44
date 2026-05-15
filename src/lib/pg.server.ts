@@ -1,31 +1,46 @@
-// Server-only PostgreSQL pool for the existing Railway database (Bot di Zona).
+// Server-only PostgreSQL client using Supabase RPC (Edge-compatible).
+// Uses Supabase REST API instead of TCP sockets — works reliably on Cloudflare Workers.
 // NEVER import this file from client code.
-import { Pool, type PoolClient } from "pg";
+import { createClient } from "@supabase/supabase-js";
 
-let pool: Pool | null = null;
+let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
-export function getPool(): Pool {
-  if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error("DATABASE_URL is not configured");
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_ANON_KEY must be set");
     }
-    pool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      max: 5,
-      idleTimeoutMillis: 30_000,
+    supabaseInstance = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
   }
-  return pool;
+  return supabaseInstance;
 }
 
 export async function pgQuery<T = unknown>(
   text: string,
   params: ReadonlyArray<unknown> = [],
 ): Promise<T[]> {
-  const res = await getPool().query(text, params as unknown[]);
-  return res.rows as T[];
+  try {
+    // Replace $1, $2, ... with actual values for the RPC call
+    let query = text;
+    params.forEach((param, i) => {
+      const val = param === null ? 'NULL' : typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : String(param);
+      query = query.replace(new RegExp(`\\$${i + 1}\\b`, 'g'), val);
+    });
+
+    const { data, error } = await getSupabase().rpc('exec_sql', { sql_query: query });
+    if (error) throw error;
+    const rows = (data as any[] | null) ?? [];
+    console.log("[pgQuery] OK", { text: text.slice(0, 60), rows: rows.length });
+    return rows as T[];
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    console.error("[pgQuery] ERROR", { text: text.slice(0, 60), error: err });
+    throw e;
+  }
 }
 
 export async function pgOne<T = unknown>(
@@ -36,13 +51,29 @@ export async function pgOne<T = unknown>(
   return rows[0] ?? null;
 }
 
+type PgClientLike = {
+  query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
+};
+
 export async function withClient<T>(
-  fn: (c: PoolClient) => Promise<T>,
+  fn: (c: PgClientLike) => Promise<T>,
 ): Promise<T> {
-  const client = await getPool().connect();
-  try {
-    return await fn(client);
-  } finally {
-    client.release();
-  }
+  const client: PgClientLike = {
+    query: async (text: string, params?: unknown[]) => {
+      const upper = text.trim().toLowerCase();
+      if (
+        upper === "begin" ||
+        upper.startsWith("begin ") ||
+        upper === "commit" ||
+        upper.startsWith("commit ") ||
+        upper === "rollback" ||
+        upper.startsWith("rollback ")
+      ) {
+        return { rows: [] };
+      }
+      const rows = await pgQuery(text, params ?? []);
+      return { rows: rows as unknown[] };
+    },
+  };
+  return await fn(client);
 }

@@ -24,7 +24,15 @@ type Member = {
   tier: string | null;
 };
 
-export function MemberAdminPanel({ member }: { member: Member }) {
+export function MemberAdminPanel({
+  member,
+  myTier,
+  canManage,
+}: {
+  member: Member;
+  myTier: string | null;
+  canManage: boolean;
+}) {
   const qc = useQueryClient();
   const nav = useNavigate();
 
@@ -60,6 +68,9 @@ export function MemberAdminPanel({ member }: { member: Member }) {
       <CardHeader>
         <CardTitle className="text-display text-sm flex items-center gap-2">
           <Crown className="h-4 w-4 text-primary" /> Painel de Chefia
+          {!canManage && (
+            <span className="ml-auto text-[10px] text-muted-foreground">Só leitura — mesmo cargo ou superior</span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -110,6 +121,7 @@ export function MemberAdminPanel({ member }: { member: Member }) {
               value={tier}
               onChange={(e) => setTier(e.target.value)}
               className="h-9 rounded-sm border border-border bg-input px-2 text-sm"
+              disabled={!canManage}
             >
               {TIER_LIST.map((t) => (
                 <option key={t} value={t}>
@@ -120,7 +132,7 @@ export function MemberAdminPanel({ member }: { member: Member }) {
             <Button
               size="sm"
               variant="secondary"
-              disabled={busy !== null || tier === member.tier}
+              disabled={!canManage || busy !== null || tier === member.tier}
               onClick={() =>
                 run(
                   "tier",
@@ -138,6 +150,11 @@ export function MemberAdminPanel({ member }: { member: Member }) {
               Aplicar
             </Button>
           </div>
+          {!canManage && (
+            <p className="text-[11px] text-muted-foreground">
+              Não podes alterar o tier de alguém do mesmo cargo ou superior ao teu.
+            </p>
+          )}
         </section>
 
         {/* Ajustar stats */}
@@ -186,8 +203,8 @@ export function MemberAdminPanel({ member }: { member: Member }) {
                   adjustFn({
                     data: {
                       id: member.id,
-                      kills_delta: killsDelta || undefined,
-                      deaths_delta: deathsDelta || undefined,
+                      kills_delta: killsStr || undefined,
+                      deaths_delta: deathsStr || undefined,
                       reason: reason || undefined,
                     },
                   }),
@@ -215,7 +232,7 @@ export function MemberAdminPanel({ member }: { member: Member }) {
           <Button
             size="sm"
             variant="destructive"
-            disabled={busy !== null}
+            disabled={!canManage || busy !== null}
             onClick={() => {
               if (!confirm(`Confirmar expulsão de ${member.display_name}?`))
                 return;
@@ -231,6 +248,11 @@ export function MemberAdminPanel({ member }: { member: Member }) {
           >
             Expulsar
           </Button>
+          {!canManage && (
+            <p className="text-[11px] text-muted-foreground">
+              Não podes expulsar alguém do mesmo cargo ou superior ao teu.
+            </p>
+          )}
         </section>
       </CardContent>
     </Card>

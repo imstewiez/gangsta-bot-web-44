@@ -24,7 +24,7 @@ async function assertManager(
   userId: string,
 ) {
   const me = await resolveCurrentMember(supabase, userId);
-  if (!me?.is_manager) throw new Error("Só a chefia pode fazer isto.");
+  if (!me?.is_manager) throw new Error("Acesso restrito à direção.");
   return me;
 }
 
@@ -132,7 +132,7 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.supabase, context.userId);
-    const reason = data.reason || "ajuste manual chefia";
+    const reason = data.reason || "ajuste manual direção";
 
     if (data.kills_delta && data.kills_delta !== 0) {
       const n = Math.abs(data.kills_delta);

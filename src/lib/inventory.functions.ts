@@ -41,7 +41,7 @@ export const getStock = createServerFn({ method: "GET" })
     return pgQuery<StockRow>(
       `select i.id as item_id, i.name as item_name, i.category, i.subcategory,
               coalesce(ib.balance, 0)::float as qty,
-              coalesce(i.purchase_price, i.min_sale_price, i.estimated_value)::float as unit_price
+              coalesce(i.purchase_price, 0)::float as unit_price
        from items i
        left join inventory_balance ib on ib.item_id = i.id
        where i.active is not false
@@ -63,6 +63,37 @@ export type LedgerRow = {
   created_at: string;
   notes: string | null;
 };
+
+export const adjustStock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { item_id: number; new_qty: number }) => {
+    if (!d?.item_id || typeof d.new_qty !== "number") throw new Error("Dados inválidos.");
+    return { item_id: d.item_id, new_qty: d.new_qty };
+  })
+  .handler(async ({ data, context }) => {
+    await gateInventory(context.supabase, context.userId);
+    // buscar qty atual
+    const current = await pgOne<{ balance: number }>(
+      `select coalesce(balance, 0)::float as balance from inventory_balance where item_id = $1`,
+      [data.item_id],
+    );
+    const currentQty = current?.balance ?? 0;
+    const delta = data.new_qty - currentQty;
+    if (delta === 0) return { ok: true };
+    await pgQuery(
+      `insert into inventory_movements
+         (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
+       values ('ajuste_manual', $1, $2, $3, 'armazem', $4, $5, now())`,
+      [
+        data.item_id,
+        delta,
+        null,
+        `ajuste: ${currentQty} → ${data.new_qty}`,
+        `web:${context.userId}`,
+      ],
+    );
+    return { ok: true };
+  });
 
 export const getLedger = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

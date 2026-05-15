@@ -59,6 +59,11 @@ export type MemberDetail = {
     created_at: string;
   }[];
   kills: number;
+  deaths: number;
+  saidas: number;
+  deliveries: number;
+  vendas: number;
+  orders: number;
 };
 
 export const getMember = createServerFn({ method: "GET" })
@@ -70,8 +75,8 @@ export const getMember = createServerFn({ method: "GET" })
       [data.id],
     );
     if (!member)
-      return { member: null, contributions: [], recentMovements: [], kills: 0 };
-    const [contrib, movs, kills] = await Promise.all([
+      return { member: null, contributions: [], recentMovements: [], kills: 0, deaths: 0, saidas: 0, deliveries: 0, vendas: 0, orders: 0 };
+    const [contrib, movs, kills, deaths, saidas, deliveries, vendas, orders] = await Promise.all([
       pgQuery<{ type: string; total: string }>(
         `select movement_type as type, sum(quantity)::text as total
          from inventory_movements
@@ -100,6 +105,26 @@ export const getMember = createServerFn({ method: "GET" })
         "select count(*)::text as count from kill_logs where killer_id = $1",
         [data.id],
       ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        "select count(*)::text as count from kill_logs where victim_id = $1",
+        [data.id],
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        "select count(*)::text as count from operation_participants where member_id = $1",
+        [data.id],
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        "select count(*)::text as count from deliveries where requester_member_id = $1 and status = 'approved' and tipo = 'entrega'",
+        [data.id],
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        "select count(*)::text as count from deliveries where requester_member_id = $1 and status = 'approved' and tipo = 'venda'",
+        [data.id],
+      ).catch(() => ({ count: "0" })),
+      pgOne<{ count: string }>(
+        "select count(*)::text as count from orders where member_id = $1",
+        [data.id],
+      ).catch(() => ({ count: "0" })),
     ]);
     return {
       member,
@@ -109,5 +134,10 @@ export const getMember = createServerFn({ method: "GET" })
       })),
       recentMovements: movs,
       kills: Number(kills?.count ?? 0),
+      deaths: Number(deaths?.count ?? 0),
+      saidas: Number(saidas?.count ?? 0),
+      deliveries: Number(deliveries?.count ?? 0),
+      vendas: Number(vendas?.count ?? 0),
+      orders: Number(orders?.count ?? 0),
     };
   });

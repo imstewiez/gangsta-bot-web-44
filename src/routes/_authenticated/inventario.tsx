@@ -283,9 +283,9 @@ function LedgerTable() {
   const fn = useServerFn(getLedger);
   const q = useQuery({
     queryKey: ["ledger"],
-    queryFn: () => fn({ page: 1, limit: 50 }),
+    queryFn: () => fn({ data: { limit: 50 } }),
   });
-  const rows = q.data?.rows ?? [];
+  const rows = q.data ?? [];
 
   if (q.isLoading) return <p className="text-muted-foreground">A carregar…</p>;
   if (!rows.length)

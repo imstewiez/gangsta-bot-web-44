@@ -47,7 +47,7 @@ const ACTION_META: Record<
     tone: "text-destructive",
   },
   member_joined: {
-    label: "Entrada no bairro",
+    label: "Nova admissão",
     icon: UserPlus,
     tone: "text-success",
   },
@@ -172,7 +172,8 @@ export const Route = createFileRoute("/_authenticated/auditoria")({
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id);
-    if (!(roles ?? []).some((r: { role: string }) => r.role === "admin"))
+    const MANAGER_ROLES = new Set(["patrao_di_zona", "real_gangster", "og", "kingpin", "manda_chuva", "admin"]);
+    if (!(roles ?? []).some((r: { role: string }) => MANAGER_ROLES.has(r.role)))
       throw redirect({ to: "/dashboard" });
   },
   component: Page,
@@ -187,12 +188,12 @@ function Page() {
   return (
     <>
       <PageHeader
-        eyebrow="Chefia"
+        eyebrow="Direção"
         title="Auditoria"
-        description="Tudo o que se mexe no bairro fica aqui."
+        description="Registo operacional de todas as movimentações."
         icon={ScrollText}
       />
-      <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
+      <div className="overflow-x-auto overflow-hidden rounded-sm border border-border" style={{ maxHeight: "70vh", overflowY: "auto" }}>
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-[11px] uppercase tracking-widest text-muted-foreground">
             <tr>

@@ -8,6 +8,7 @@ export type RecipeRow = {
   item_id: number;
   item_name: string;
   category: string | null;
+  subcategory: string | null;
   tier: string | null;
   unit: string | null;
   ingredients: Array<{
@@ -16,6 +17,8 @@ export type RecipeRow = {
     quantity: number;
     unit_cost: number;
     line_cost: number;
+    category: string | null;
+    subcategory: string | null;
   }>;
   total_cost: number;
   estimated_value: number;
@@ -33,18 +36,23 @@ export const listRecipes = createServerFn({ method: "GET" })
       item_id: number;
       item_name: string;
       category: string | null;
+      subcategory: string | null;
       tier: string | null;
       unit: string | null;
       estimated_value: string | null;
       ing_item_id: number | null;
       ing_name: string | null;
+      ing_category: string | null;
+      ing_subcategory: string | null;
       quantity: number | null;
       unit_cost: string | null;
     }>(
-      `select r.id as recipe_id, r.item_id, i.name as item_name, r.category, r.tier, i.unit,
+      `select r.id as recipe_id, r.item_id, i.name as item_name, i.category, i.subcategory, r.tier, i.unit,
               i.estimated_value,
               ri.ingredient_item_id as ing_item_id,
               ii.name as ing_name,
+              ii.category as ing_category,
+              ii.subcategory as ing_subcategory,
               ri.quantity,
               coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost
          from craft_recipes r
@@ -64,6 +72,7 @@ export const listRecipes = createServerFn({ method: "GET" })
           item_id: r.item_id,
           item_name: r.item_name,
           category: r.category,
+          subcategory: r.subcategory,
           tier: r.tier,
           unit: r.unit,
           ingredients: [],
@@ -84,6 +93,8 @@ export const listRecipes = createServerFn({ method: "GET" })
           quantity: qty,
           unit_cost: uc,
           line_cost: line,
+          category: r.ing_category,
+          subcategory: r.ing_subcategory,
         });
         recipe.total_cost += line;
       }
@@ -95,8 +106,8 @@ export const listRecipes = createServerFn({ method: "GET" })
       r.margin = isManager ? margin : 0;
       r.margin_pct = isManager ? pct : null;
     }
-    return [...map.values()].sort((a, b) =>
-      a.item_name.localeCompare(b.item_name),
+    return [...map.values()].sort(
+      (a, b) => b.estimated_value - a.estimated_value,
     );
   });
 

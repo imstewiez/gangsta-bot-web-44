@@ -2,6 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 
+export type ParticipantStat = {
+  member_id: number;
+  member_name: string | null;
+  kills: number;
+  deaths_count: number;
+  role_in_op: string | null;
+  net_material_delta: number;
+};
+
 export type SaidaRow = {
   id: number;
   tipo: string | null;
@@ -10,6 +19,16 @@ export type SaidaRow = {
   scheduled_at: string | null;
   finalized_at: string | null;
   participant_count: number;
+  // stats quando fechada
+  enemy_name: string | null;
+  enemy_faction: string | null;
+  enemy_count: number | null;
+  our_kills: number | null;
+  deaths: number | null;
+  survivors: number | null;
+  had_fight: boolean | null;
+  result_notes: string | null;
+  participants_json: ParticipantStat[];
 };
 
 // Auto-close any saída older than 12h (opportunistic — runs on every list).
@@ -33,7 +52,7 @@ export const listSaidas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<SaidaRow[]> => {
     await autoCloseStaleOperations();
-    return pgQuery<SaidaRow>(
+    const rows = await pgQuery<Omit<SaidaRow, 'participants_json'> & { participants_json: string }>(
       `select o.id,
               o.operation_type as tipo,
               o.spot,
@@ -41,12 +60,37 @@ export const listSaidas = createServerFn({ method: "GET" })
               coalesce(o.start_time,
                        (o.date::timestamp + coalesce(o.scheduled_time, '00:00'::time))) as scheduled_at,
               o.end_time as finalized_at,
-              (select count(*)::int from operation_participants op where op.operation_id = o.id) as participant_count
+              (select count(*)::int from operation_participants op where op.operation_id = o.id) as participant_count,
+              o.enemy_name,
+              o.enemy_faction,
+              o.enemy_count,
+              o.our_kills,
+              o.deaths,
+              o.survivors,
+              o.had_fight,
+              o.result_notes,
+              coalesce((
+                select jsonb_agg(jsonb_build_object(
+                  'member_id', p.member_id,
+                  'member_name', m.display_name,
+                  'kills', coalesce(p.kills, 0),
+                  'deaths_count', coalesce(p.deaths_count, 0),
+                  'role_in_op', p.role_in_op,
+                  'net_material_delta', coalesce(p.net_material_delta, 0)::float
+                ) order by coalesce(p.kills,0) desc, m.display_name)
+                from operation_participants p
+                left join members m on m.id = p.member_id
+                where p.operation_id = o.id
+              ), '[]'::jsonb)::text as participants_json
        from operations o
        where o.deleted_at is null
        order by coalesce(o.start_time, o.date::timestamp, o.created_at) desc
        limit 100`,
     );
+    return rows.map((r) => ({
+      ...r,
+      participants_json: JSON.parse(r.participants_json) as ParticipantStat[],
+    }));
   });
 
 export type KillRow = {

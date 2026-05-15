@@ -11,6 +11,7 @@ import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
+import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -30,22 +31,29 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { fmtDate, fmtNum } from "@/lib/domain";
+import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
 import { toast } from "sonner";
 import { Plus, ShoppingBag } from "lucide-react";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { Loader2 } from "lucide-react";
+import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
+import { FadeIn } from "@/components/layout/FadeIn";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({
+  errorComponent: PageErrorBoundary,
   component: Page,
 });
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: "à espera",
-  approved: "aceite",
-  in_progress: "a tratar",
-  ready: "pronta",
-  fulfilled: "entregue",
-  denied: "recusada",
-  cancelled: "cancelada",
+  pending: "Pendente",
+  approved: "Aprovada",
+  in_progress: "Em processamento",
+  ready: "Pronta",
+  fulfilled: "Entregue",
+  denied: "Recusada",
+  cancelled: "Cancelada",
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -83,13 +91,14 @@ function Page() {
   return (
     <>
       <PageHeader
-        eyebrow="Loja da firma"
+        eyebrow="Supply"
         title="Encomendas"
-        description="Armas, carregadores, coletes e acessórios. Pede e a chefia trata."
+        description="Catálogo operacional. As encomendas são processadas pela direção."
         icon={ShoppingBag}
         action={<NewOrder />}
       />
-      <Tabs value={tab} onValueChange={setTab}>
+      <FadeIn>
+        <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="mine">As minhas</TabsTrigger>
           {isManager && <TabsTrigger value="manage">Para tratar</TabsTrigger>}
@@ -103,6 +112,7 @@ function Page() {
           </TabsContent>
         )}
       </Tabs>
+      </FadeIn>
     </>
   );
 }
@@ -136,6 +146,20 @@ function OrdersList({
             | "cancelled";
         },
       }),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ["orders"] });
+      const prev = qc.getQueryData(["orders", scope]);
+      qc.setQueryData(["orders", scope], (old: any) =>
+        old?.map((o: any) =>
+          o.id === vars.id ? { ...o, status: vars.to } : o
+        )
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["orders", scope], ctx.prev);
+      toast.error(_e.message);
+    },
     onSuccess: (res) => {
       if (res && "ok" in res && res.ok === false) {
         toast.error(res.error);
@@ -145,7 +169,6 @@ function OrdersList({
       qc.invalidateQueries({ queryKey: ["stock"] });
       toast.success("Feito.");
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   if (orders.isLoading)
@@ -201,26 +224,26 @@ function OrdersList({
               </div>
               <div className="text-right">
                 <div className="font-mono text-lg font-semibold">
-                  {o.total_price != null ? fmtNum(o.total_price) : "—"}
+                  {o.total_price != null ? fmtPrice(o.total_price) : "—"}
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">
-                  {o.unit_price != null ? `${fmtNum(o.unit_price)}/un` : ""}
+                  {o.unit_price != null ? `${fmtPrice(o.unit_price)}/un` : ""}
                 </div>
               </div>
               {next && (
                 <div className="flex w-full justify-end gap-1.5 border-t border-border pt-3">
                   {next.map((s) => (
-                    <Button
+                    <ButtonLoading
                       key={s.to}
                       size="sm"
                       variant={
                         s.variant === "destructive" ? "outline" : "default"
                       }
-                      disabled={m.isPending}
+                      loading={m.isPending}
                       onClick={() => m.mutate({ id: o.id, to: s.to })}
                     >
                       {s.label}
-                    </Button>
+                    </ButtonLoading>
                   ))}
                 </div>
               )}
@@ -258,14 +281,13 @@ function NewOrder() {
         },
       }),
     onSuccess: () => {
-      toast.success("Pedido feito. A chefia já viu.");
+      toast.success("Encomenda registada com sucesso.");
       qc.invalidateQueries({ queryKey: ["orders"] });
       setOpen(false);
       setItem("");
       setQty("1");
       setNotes("");
     },
-    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -291,7 +313,7 @@ function NewOrder() {
                   <SelectItem key={i.id} value={String(i.id)}>
                     {i.name}{" "}
                     <span className="text-muted-foreground">
-                      · {i.subcategory}
+                      · {fmtCategoryLabel(i.subcategory)}
                     </span>
                   </SelectItem>
                 ))}

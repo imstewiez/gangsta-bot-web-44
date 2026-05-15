@@ -81,7 +81,7 @@ export const CATEGORY_TONE: Record<CatKey, string> = {
   materiais_craft: "muted",
   lixo: "muted",
   madeiras: "success",
-  materias_primas: "primary",
+  materias_primas: "muted",
   minerios: "info",
   corpos: "warning",
   prints: "primary",
@@ -140,8 +140,9 @@ export function inferCategory(name: string, raw?: string | null): CatKey {
   if (/min[ée]rio|pedra|cristal|cobre|ferro|a[çc]o|metal|ouro|prata/.test(n))
     return "minerios";
   if (/lixo|sucata|trash|chatarra/.test(n)) return "lixo";
-  if (/pe[çc]a/.test(n)) return "craft_armas";
-  if (/p[oó]lvora|gunpowder/.test(n)) return "craft_carregadores";
+  if (/\bpe[çc]as\b/.test(n)) return "materiais_craft";
+  if (/\bpe[çc]a\b/.test(n)) return "craft_armas";
+  if (/\bp[oó]lvora\b/.test(n)) return "materiais_craft";
 
   return "outros";
 }

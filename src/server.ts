@@ -81,7 +81,15 @@ async function normalizeCatastrophicSsrResponse(
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const url = new URL(request.url);
+    if (url.hostname === "redwood.pt") {
+      url.hostname = "www.redwood.pt";
+      url.protocol = "https:";
+      return Response.redirect(url.toString(), 301);
+    }
+
     try {
+      (globalThis as any).__cloudflareEnv = env;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

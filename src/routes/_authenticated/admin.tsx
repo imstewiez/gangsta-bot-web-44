@@ -5,13 +5,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { listAppUsers, setUserRole } from "@/lib/admin.functions";
 import { PageHeader } from "@/components/layout/AppShell";
-import { Button } from "@/components/ui/button";
+import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
 import { Shield, ShieldOff } from "lucide-react";
+import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { Loader2 } from "lucide-react";
+import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 
 export const Route = createFileRoute("/_authenticated/admin")({
+  errorComponent: PageErrorBoundary,
   beforeLoad: async () => {
     if (isServer()) return;
     const {
@@ -22,7 +27,8 @@ export const Route = createFileRoute("/_authenticated/admin")({
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id);
-    if (!(roles ?? []).some((r: { role: string }) => r.role === "admin")) {
+    const MANAGER_ROLES = new Set(["patrao_di_zona", "real_gangster", "og", "kingpin", "manda_chuva", "admin"]);
+    if (!(roles ?? []).some((r: { role: string }) => MANAGER_ROLES.has(r.role))) {
       throw redirect({ to: "/dashboard" });
     }
   },
@@ -40,18 +46,33 @@ function AdminPage() {
       role: "admin" | "member";
       grant: boolean;
     }) => setFn({ data: v }),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ["appUsers"] });
+      const prev = qc.getQueryData(["appUsers"]);
+      qc.setQueryData(["appUsers"], (old: any) =>
+        old?.map((u: any) =>
+          u.user_id === vars.user_id
+            ? { ...u, app_role: vars.grant ? vars.role : null }
+            : u
+        )
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["appUsers"], ctx.prev);
+      toast.error(_e.message);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["appUsers"] });
       toast.success("Atualizado");
     },
-    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <>
       <PageHeader
-        eyebrow="Chefia"
+        eyebrow="Direção"
         title="Admin"
-        description="Gerir acessos da app."
+        description="Gestão de acessos e permissões."
       />
       <Card>
         <CardHeader>
@@ -61,7 +82,7 @@ function AdminPage() {
         </CardHeader>
         <CardContent>
           {users.isLoading && (
-            <p className="text-muted-foreground text-sm">A carregar…</p>
+            <PageSkeleton rows={6} />
           )}
           {users.error && (
             <p className="text-destructive text-sm">
@@ -102,8 +123,9 @@ function AdminPage() {
                       </span>
                     ))}
                   </div>
-                  <Button
+                  <ButtonLoading
                     size="sm"
+                    loading={m.isPending}
                     variant={isAdmin ? "outline" : "default"}
                     disabled={m.isPending}
                     onClick={() =>
@@ -125,12 +147,12 @@ function AdminPage() {
                         Tornar admin
                       </>
                     )}
-                  </Button>
+                  </ButtonLoading>
                 </div>
               );
             })}
             {!users.isLoading && !users.data?.length && (
-              <p className="text-sm text-muted-foreground">Sem utilizadores.</p>
+              <EmptyState title="Sem utilizadores" description="Nenhuns utilizadores encontrados." />
             )}
           </div>
         </CardContent>

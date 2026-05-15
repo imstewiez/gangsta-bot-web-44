@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { fmtDate, fmtNum } from "@/lib/domain";
+import { fmtDate, fmtNum , fmtPrice} from "@/lib/domain";
 import { toast } from "sonner";
 import { CheckCircle2, FileSearch } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +45,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["liq:list"] });
       qc.invalidateQueries({ queryKey: ["liq:detail"] });
       qc.invalidateQueries({ queryKey: ["saidas"] });
-      toast.success(`Liquidada · Net ${fmtNum(Math.round(r.net))} €`);
+      toast.success(`Liquidada · Net ${fmtPrice(r.net)}`);
       setOpenId(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -111,15 +111,15 @@ function Page() {
                 </div>
                 <div>
                   Fornecido:{" "}
-                  {fmtNum(Math.round(detail.data.operation.supplied_value))} €
+                  {fmtPrice(detail.data.operation.supplied_value)}
                 </div>
                 <div>
                   Retornado:{" "}
-                  {fmtNum(Math.round(detail.data.operation.returned_value))} €
+                  {fmtPrice(detail.data.operation.returned_value)}
                 </div>
                 <div>
                   Net atual:{" "}
-                  {fmtNum(Math.round(detail.data.operation.net_value))} €
+                  {fmtPrice(detail.data.operation.net_value)}
                 </div>
               </div>
               <div>
@@ -153,7 +153,7 @@ function Page() {
                                 : "text-red-500")
                             }
                           >
-                            {fmtNum(Math.round(p.net_material_delta))} €
+                            {fmtPrice(p.net_material_delta)}
                           </td>
                           <td className="px-2 py-1 text-center">
                             {p.settled ? "✓" : "—"}

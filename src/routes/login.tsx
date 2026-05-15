@@ -57,13 +57,13 @@ function LoginPage() {
 
         <div className="card-frame rounded-xl p-7 animate-rise delay-100">
           <div className="text-display text-[11px] tracking-[0.3em] text-primary mb-2">
-            Porta da firma
+            Entrada
           </div>
           <h1 className="mb-1 text-display text-3xl font-bold text-glow">
             Diz quem és.
           </h1>
           <p className="mb-6 text-sm text-muted-foreground">
-            Acesso só para quem já tem nome no bairro.
+            Acesso reservado a membros da firma.
           </p>
 
           <Button

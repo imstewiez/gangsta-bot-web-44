@@ -82,7 +82,7 @@ const GROUPS: NavGroup[] = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const loc = useLocation();
 
   const meFn = useServerFn(getCurrentMember);
@@ -99,7 +99,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/60">
-      <SidebarHeader className="border-b border-border/60">
+      <SidebarHeader>
         <Link to="/dashboard" className="flex items-center gap-2.5 px-2 py-2 group">
           <img
             src={redwoodLogo}
@@ -120,7 +120,7 @@ export function AppSidebar() {
       <SidebarContent>
         {GROUPS.map((g) => {
           const items = g.items.filter((it) => {
-            if (it.admin && !isAdmin) return false;
+            if (it.admin && !(me.data?.is_manager ?? false)) return false;
             if (it.need === "inventory" && !canSeeInv) return false;
             return true;
           });
@@ -156,7 +156,7 @@ export function AppSidebar() {
         })}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border/60">
+      <SidebarFooter>
         {!collapsed ? (
           <div className="flex items-center gap-2 px-1.5 py-1">
             <span

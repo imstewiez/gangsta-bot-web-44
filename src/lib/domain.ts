@@ -95,6 +95,20 @@ export function tierLabelWithEmoji(tier: string | null | undefined): string {
 
 export const ROLE_LABELS = TIER_LABELS;
 
+// Posições hierárquicas — o que aparece na coluna "Posição" e no perfil.
+export const POSITION_LABELS: Record<string, string> = {
+  young_blood: "Bairrista-1",
+  o_gunao: "Bairrista-2",
+  gangster_fodido: "Bairrista-3",
+  patrao_di_zona: "Chefe Moradores",
+  real_gangster: "Oficial-1",
+  og: "Oficial-2",
+  kingpin: "Sub-Chefe",
+  manda_chuva: "Chefe",
+  bairrista: "Bairrista",
+  chefia: "Chefia",
+};
+
 export function tierColor(tier: string | null | undefined): string {
   switch (tier) {
     case "manda_chuva":
@@ -150,4 +164,30 @@ export function fmtDate(d: string | Date | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+export function fmtPrice(n: number | string | null | undefined): string {
+  return fmtNum(n) + " €";
+}
+
+export function fmtCategoryLabel(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const map: Record<string, string> = {
+    armas_red: "Arma Red",
+    armas_orange: "Arma Orange",
+    carregadores: "Carregador",
+    acessorios_armas: "Acessório",
+    drogas: "Substâncias",
+    materiais_craft: "Material",
+    coletes: "Colete",
+    lixo: "Sucata",
+    madeiras: "Madeira",
+    materias_primas: "Matéria-prima",
+    minerios: "Minério",
+    corpos: "Corpo",
+    prints: "Print",
+    entrega_bairrista: "Entrega",
+    venda_bairrista: "Venda",
+  };
+  return map[raw] ?? raw;
 }

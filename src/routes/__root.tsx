@@ -8,6 +8,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { PageTransition } from "@/components/layout/PageTransition";
 import { AuthProvider } from "@/lib/auth";
 
 import appCss from "../styles.css?url";
@@ -19,7 +21,7 @@ function NotFoundComponent() {
         <h1 className="text-display text-7xl font-bold text-primary">404</h1>
         <h2 className="mt-4 text-xl font-semibold">Página não encontrada</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          O bairro não conhece este sítio.
+          Território desconhecido. Redireciona para a base.
         </p>
         <div className="mt-6">
           <Link
@@ -70,14 +72,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
-        { title: "Firma RedWood — Bairro" },
+        { title: "Firma RedWood — Unidade · Força · Propósito" },
         {
           name: "description",
           content:
-            "Painel de gestão da Firma RedWood — onboarding, hierarquia, inventário, saídas, tops.",
+            "Painel operacional da Firma RedWood — gestão interna, recursos e estrutura hierárquica.",
         },
-        { property: "og:title", content: "Firma RedWood — Bairro" },
-        { name: "twitter:title", content: "Firma RedWood — Bairro" },
+        { property: "og:title", content: "Firma RedWood — Unidade · Força · Propósito" },
+        { name: "twitter:title", content: "Firma RedWood — Unidade · Força · Propósito" },
         { name: "description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
         { property: "og:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
         { name: "twitter:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
@@ -87,6 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { property: "og:type", content: "website" },
       ],
       links: [
+        { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
         { rel: "stylesheet", href: appCss },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         {
@@ -126,7 +129,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        <PageTransition><Outlet /></PageTransition>
+        <GlobalSearch />
         <Toaster richColors position="top-right" />
       </AuthProvider>
     </QueryClientProvider>

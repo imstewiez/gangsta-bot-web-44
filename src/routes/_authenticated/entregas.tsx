@@ -11,6 +11,7 @@ import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
+import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -30,7 +31,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { fmtDate, fmtNum } from "@/lib/domain";
+import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
 import { toast } from "sonner";
 import {
   Plus,
@@ -43,6 +44,7 @@ import {
 } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
+import { FadeIn } from "@/components/layout/FadeIn";
 
 export const Route = createFileRoute("/_authenticated/entregas")({
   component: Page,
@@ -56,17 +58,17 @@ function statusMeta(
   const isVenda = tipo === "venda";
   if (status === "pending")
     return {
-      label: isVenda ? "à espera de compra" : "à espera",
+      label: isVenda ? "Pendente" : "à espera",
       color: "bg-muted text-muted-foreground border-border",
     };
   if (status === "approved")
     return {
-      label: isVenda ? "comprado / pago" : "entregue ao bairro",
+      label: isVenda ? "Pago" : "Entregue",
       color: "bg-success/15 text-success border-success/30",
     };
   if (status === "rejected")
     return {
-      label: isVenda ? "compra recusada" : "entrega recusada",
+      label: isVenda ? "Recusada" : "Recusada",
       color: "bg-destructive/15 text-destructive border-destructive/30",
     };
   return {
@@ -80,12 +82,12 @@ const TIPO_META: Record<
   { label: string; Icon: LucideIcon; tone: string }
 > = {
   entrega: {
-    label: "Entrega ao bairro",
+    label: "Entrega de stock",
     Icon: Package,
     tone: "bg-info/15 text-info border-info/30",
   },
   venda: {
-    label: "Venda ao bairro",
+    label: "Aquisição interna",
     Icon: Coins,
     tone: "bg-warning/15 text-warning border-warning/30",
   },
@@ -99,12 +101,13 @@ function Page() {
   return (
     <>
       <PageHeader
-        eyebrow="Largar à firma"
+        eyebrow="Entregas"
         title="Entregas"
-        description="Lixo, madeiras, mat-primas, minérios, corpos, prints e drogas. A firma paga."
+        description="Registo de entregas de material operacional e recursos."
         action={<NewDelivery />}
       />
-      <Tabs value={tab} onValueChange={setTab}>
+      <FadeIn>
+        <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="mine">As minhas</TabsTrigger>
           {isManager && <TabsTrigger value="manage">Para conferir</TabsTrigger>}
@@ -118,6 +121,7 @@ function Page() {
           </TabsContent>
         )}
       </Tabs>
+      </FadeIn>
     </>
   );
 }
@@ -138,12 +142,25 @@ function DelList({
   });
   const m = useMutation({
     mutationFn: (v: { id: string; approve: boolean }) => decFn({ data: v }),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ["deliveries"] });
+      const prev = qc.getQueryData(["deliveries", scope]);
+      qc.setQueryData(["deliveries", scope], (old: any) =>
+        old?.map((d: any) =>
+          d.id === vars.id ? { ...d, status: vars.approve ? "approved" : "rejected" } : d
+        )
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["deliveries", scope], ctx.prev);
+      toast.error(_e.message);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       qc.invalidateQueries({ queryKey: ["stock"] });
       toast.success("Feito.");
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   if (list.isLoading)
@@ -154,8 +171,8 @@ function DelList({
         <PackageOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
           {scope === "mine"
-            ? "Ainda não largaste nada à firma."
-            : "Sem entregas para conferir."}
+            ? "Sem registos de entrega."
+            : "Sem entregas pendentes."}
         </p>
       </Card>
     );
@@ -205,7 +222,7 @@ function DelList({
                       </span>
                       <span className="font-mono text-muted-foreground">
                         {l.unit_value != null
-                          ? fmtNum(l.unit_value * l.qty)
+                          ? fmtPrice(l.unit_value * l.qty)
                           : "—"}
                       </span>
                     </li>
@@ -220,29 +237,31 @@ function DelList({
                     <span />
                   )}
                   <span className="font-mono text-base font-semibold">
-                    {fmtNum(d.total_value)}
+                    {fmtPrice(d.total_value)}
                   </span>
                 </div>
               </div>
               {canDecide && d.status === "pending" && (
                 <div className="flex flex-col gap-1.5">
-                  <Button
+                  <ButtonLoading
                     size="sm"
+                    loading={m.isPending}
                     onClick={() => m.mutate({ id: d.id, approve: true })}
                     disabled={m.isPending}
                   >
                     <Check className="mr-1 h-3 w-3" />
                     {d.tipo === "venda" ? "Comprar" : "Receber"}
-                  </Button>
-                  <Button
+                  </ButtonLoading>
+                  <ButtonLoading
                     size="sm"
                     variant="outline"
+                    loading={m.isPending}
                     onClick={() => m.mutate({ id: d.id, approve: false })}
                     disabled={m.isPending}
                   >
                     <X className="mr-1 h-3 w-3" />
                     Recusar
-                  </Button>
+                  </ButtonLoading>
                 </div>
               )}
             </div>
@@ -285,8 +304,8 @@ function NewDelivery() {
     onSuccess: () => {
       toast.success(
         tipo === "venda"
-          ? "Pedido de compra enviado."
-          : "Entrega submetida. A chefia confirma.",
+          ? "Aquisição registada com sucesso."
+          : "Entrega submetida. Aguarda confirmação.",
       );
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       setOpen(false);
@@ -301,12 +320,12 @@ function NewDelivery() {
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="mr-1 h-4 w-4" />
-          Largar material
+          Nova entrega
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>O que vens largar?</DialogTitle>
+          <DialogTitle>Registar nova entrega</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
           <div>
@@ -328,7 +347,7 @@ function NewDelivery() {
                   <Package className="h-3 w-3" /> Entregar
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Vai para o stock do bairro
+                  Integra no inventário
                 </div>
               </button>
               <button
@@ -345,7 +364,7 @@ function NewDelivery() {
                   <Coins className="h-3 w-3" /> Vender
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  A chefia paga ao morador
+                  Compensação ao colaborador
                 </div>
               </button>
             </div>
@@ -368,7 +387,7 @@ function NewDelivery() {
                     <SelectItem key={i.id} value={String(i.id)}>
                       {i.name}{" "}
                       <span className="text-muted-foreground">
-                        · {i.subcategory}
+                        · {fmtCategoryLabel(i.subcategory)}
                       </span>
                     </SelectItem>
                   ))}
@@ -419,9 +438,9 @@ function NewDelivery() {
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button disabled={m.isPending} onClick={() => m.mutate()}>
+          <ButtonLoading loading={m.isPending} onClick={() => m.mutate()}>
             {m.isPending ? "A enviar…" : "Submeter"}
-          </Button>
+          </ButtonLoading>
         </DialogFooter>
       </DialogContent>
     </Dialog>
