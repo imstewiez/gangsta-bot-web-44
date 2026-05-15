@@ -28,8 +28,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </main>
 
             <footer className="mx-auto flex w-full max-w-7xl items-center justify-between border-t border-border/40 px-4 py-8 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50">
-              <span>© Firma RedWood</span>
-              <span>Unidade · Força · Propósito</span>
+              <span>© Ballas Gang</span>
+              <span>Sangue · Roxo · Bairro</span>
             </footer>
           </div>
         </div>
