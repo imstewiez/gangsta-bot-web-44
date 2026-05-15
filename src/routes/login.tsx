@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import redwoodLogo from "@/assets/redwood-logo.png";
+import redwoodLogo from "@/assets/ballas-logo.png";
 import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
 
 export const Route = createFileRoute("/login")({
@@ -47,7 +47,7 @@ function LoginPage() {
         >
           <img
             src={redwoodLogo}
-            alt="RedWood"
+            alt="Ballas Gang"
             className="h-11 w-11 rounded-sm object-contain drop-shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_70%,transparent)]"
           />
           <span className="text-display text-sm tracking-[0.25em]">

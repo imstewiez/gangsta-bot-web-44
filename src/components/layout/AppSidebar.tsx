@@ -27,7 +27,7 @@ import { useAuth } from "@/lib/auth";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { TIER_LABELS, TIER_ACCENT } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
-import redwoodLogo from "@/assets/redwood-logo.png";
+import redwoodLogo from "@/assets/ballas-logo.png";
 import { Button } from "@/components/ui/button";
 
 type NavItem = {
@@ -103,7 +103,7 @@ export function AppSidebar() {
         <Link to="/dashboard" className="flex items-center gap-2.5 px-2 py-2 group">
           <img
             src={redwoodLogo}
-            alt="RedWood"
+            alt="Ballas Gang"
             className="h-9 w-9 shrink-0 rounded-sm object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_60%,transparent)] transition-transform group-hover:scale-105"
           />
           {!collapsed && (
