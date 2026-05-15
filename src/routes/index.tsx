@@ -87,7 +87,7 @@ function Landing() {
         </section>
 
         <footer className="flex items-center justify-between border-t border-border/40 pt-6 text-[11px] uppercase tracking-widest text-muted-foreground/60">
-          <span>© RedWood</span>
+          <span>© Ballas Gang</span>
           <span className="hidden sm:inline">
             Lealdade primeiro · resto depois
           </span>
