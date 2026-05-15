@@ -52,7 +52,7 @@ export async function pgOne<T = unknown>(
 }
 
 type PgClientLike = {
-  query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
+  query: (text: string, params?: unknown[]) => Promise<{ rows: any[] }>;
 };
 
 export async function withClient<T>(
