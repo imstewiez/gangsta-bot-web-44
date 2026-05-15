@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
-import redwoodLogo from "@/assets/redwood-logo.png";
+import redwoodLogo from "@/assets/ballas-logo.png";
 import { ArrowRight, Lock, KeyRound } from "lucide-react";
 import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
 
@@ -29,12 +29,12 @@ function Landing() {
           <div className="flex items-center gap-3">
             <img
               src={redwoodLogo}
-              alt="RedWood"
+              alt="Ballas Gang"
               className="h-12 w-12 rounded-sm object-contain drop-shadow-[0_0_22px_color-mix(in_oklab,var(--primary)_70%,transparent)]"
             />
             <div className="leading-tight">
               <div className="text-display text-sm tracking-[0.28em]">
-                RedWood
+                Ballas Gang
               </div>
               <div className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">
                 Acesso reservado
@@ -87,7 +87,7 @@ function Landing() {
         </section>
 
         <footer className="flex items-center justify-between border-t border-border/40 pt-6 text-[11px] uppercase tracking-widest text-muted-foreground/60">
-          <span>© RedWood</span>
+          <span>© Ballas Gang</span>
           <span className="hidden sm:inline">
             Lealdade primeiro · resto depois
           </span>

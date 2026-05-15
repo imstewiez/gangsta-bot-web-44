@@ -6,6 +6,7 @@ interface RedWoodBrandProps {
   showTagline?: boolean;
 }
 
+// Mantém o nome do export por retro-compat, mas a marca é Ballas Gang.
 export function RedWoodBrand({ className, size = "md", showTagline = false }: RedWoodBrandProps) {
   const sizes = {
     sm: { firma: "text-sm", red: "text-sm", tag: "text-[10px]" },
@@ -18,15 +19,17 @@ export function RedWoodBrand({ className, size = "md", showTagline = false }: Re
     <div className={cn("flex flex-col leading-none", className)}>
       <div className="flex items-baseline gap-1">
         <span className={cn("font-medium tracking-tight text-foreground", s.firma)}>
-          Firma
+          Ballas
         </span>
-        <span className={cn("font-bold tracking-tight text-red-600", s.red)}>
-          RedWood
+        <span
+          className={cn("font-bold tracking-tight bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent", s.red)}
+        >
+          Gang
         </span>
       </div>
       {showTagline && (
         <span className={cn("tracking-[0.25em] uppercase text-muted-foreground/70 mt-0.5", s.tag)}>
-          Unidade · Força · Propósito
+          Sangue · Roxo · Bairro
         </span>
       )}
     </div>
@@ -35,7 +38,7 @@ export function RedWoodBrand({ className, size = "md", showTagline = false }: Re
 
 export function RedWoodTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn("font-bold text-red-600", className)}>
+    <span className={cn("font-bold bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent", className)}>
       {children}
     </span>
   );
