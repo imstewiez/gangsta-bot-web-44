@@ -1,8 +1,8 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
-import redwoodLogo from "@/assets/ballas-logo.png";
-import { ArrowRight, Lock, KeyRound } from "lucide-react";
+import ballasLogo from "@/assets/ballas-logo.png";
+import { ArrowRight, Lock, KeyRound, ShieldAlert } from "lucide-react";
 import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
 
 export const Route = createFileRoute("/")({
@@ -18,75 +18,103 @@ function Landing() {
   return (
     <div className="ambient-bg relative min-h-screen overflow-hidden">
       <CinematicBackdrop />
+
+      {/* Decorative scanlines + corner crosshair frame */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 hairline-top"
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(180deg, transparent 0 2px, oklch(1 0 0 / 0.6) 2px 3px)",
+        }}
       />
+      <CornerMarks />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 hairline-top" />
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8">
         {/* Header */}
         <header className="flex items-center justify-between animate-rise">
           <div className="flex items-center gap-3">
-            <img
-              src={redwoodLogo}
-              alt="Ballas Gang"
-              className="h-12 w-12 rounded-sm object-contain drop-shadow-[0_0_22px_color-mix(in_oklab,var(--primary)_70%,transparent)]"
-            />
+            <div className="relative">
+              <span className="absolute inset-0 -z-10 rounded-full bg-primary/40 blur-2xl animate-pulse-glow" />
+              <img
+                src={ballasLogo}
+                alt="Ballas Gang"
+                className="h-12 w-12 rounded-sm object-contain drop-shadow-[0_0_22px_color-mix(in_oklab,var(--primary)_85%,transparent)]"
+              />
+            </div>
             <div className="leading-tight">
-              <div className="text-display text-sm tracking-[0.28em]">
-                Ballas Gang
+              <div className="text-display text-sm tracking-[0.32em]">
+                Ballas <span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Gang</span>
               </div>
-              <div className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.32em] text-muted-foreground/80">
+                <ShieldAlert className="h-3 w-3 text-primary/80" />
                 Acesso reservado
               </div>
             </div>
           </div>
           <Link
             to="/login"
-            className="btn-shine inline-flex items-center gap-2 rounded-sm border border-border/80 bg-background/40 px-5 py-2.5 text-display text-xs tracking-widest text-muted-foreground backdrop-blur transition-all hover:border-primary/70 hover:text-foreground hover:shadow-[0_0_24px_-8px_var(--primary)]"
+            className="btn-shine group inline-flex items-center gap-2 rounded-sm border border-border/80 bg-background/40 px-5 py-2.5 text-display text-xs tracking-[0.25em] text-muted-foreground backdrop-blur transition-all hover:border-primary/70 hover:text-foreground hover:shadow-[0_0_24px_-8px_var(--primary)]"
           >
-            <KeyRound className="h-3.5 w-3.5" />
+            <KeyRound className="h-3.5 w-3.5 transition-transform group-hover:rotate-12" />
             Entrar
           </Link>
         </header>
 
         {/* Hero */}
-        <section className="my-auto py-20 animate-rise delay-100">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-background/40 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-primary backdrop-blur">
+        <section className="relative my-auto py-16 animate-rise delay-100">
+          {/* Vertical timestamp / location strip */}
+          <div className="pointer-events-none absolute -left-2 top-1/2 hidden -translate-y-1/2 -rotate-90 origin-left text-[10px] uppercase tracking-[0.5em] text-muted-foreground/40 md:block">
+            Lat 38.7223° · Lon −9.1393° · Bairro
+          </div>
+
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.32em] text-primary backdrop-blur-md shadow-[0_0_30px_-10px_var(--primary)]">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 animate-ping" />
+              <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-70 animate-ping" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
             Apenas membros
           </div>
 
-          <h1 className="mt-7 max-w-3xl text-display text-6xl font-bold leading-[0.92] md:text-8xl text-glow">
-            O bairro
-            <br />
-            <span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">
+          {/* Headline — leading-tight + pt on second line so the É acento has air */}
+          <h1 className="mt-7 max-w-3xl text-display text-6xl font-bold leading-[1.05] md:text-8xl md:leading-[1.02] text-glow">
+            <span className="block">O bairro</span>
+            <span className="block bg-gradient-to-b from-primary via-primary/90 to-blood bg-clip-text text-transparent pt-2 md:pt-3">
               é nosso.
             </span>
           </h1>
 
-          <p className="mt-8 max-w-lg text-base leading-relaxed text-muted-foreground/90">
-            Acesso restrito. Membros apenas. Se não és da firma, não há nada para ti aqui.
-          </p>
+          <div className="mt-8 flex max-w-lg items-start gap-3">
+            <span className="mt-2 block h-px w-10 shrink-0 bg-gradient-to-r from-primary to-transparent" />
+            <p className="text-base leading-relaxed text-muted-foreground/90">
+              Acesso restrito. Membros apenas. Se não és da firma, não há nada para ti aqui.
+            </p>
+          </div>
 
-          <div className="mt-10 flex flex-wrap items-center gap-4">
+          <div className="mt-10 flex flex-wrap items-center gap-5">
             <Link
               to="/login"
-              className="btn-shine group inline-flex items-center gap-2 rounded-sm bg-primary px-7 py-3.5 text-display text-sm font-bold tracking-wider text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_40px_-6px_var(--primary)]"
+              className="btn-shine group relative inline-flex items-center gap-2 rounded-sm bg-gradient-to-b from-primary to-blood px-8 py-4 text-display text-sm font-bold tracking-[0.18em] text-primary-foreground shadow-[0_0_40px_-6px_var(--primary)] transition-all hover:shadow-[0_0_60px_-4px_var(--primary)] hover:-translate-y-0.5"
             >
+              <span className="absolute -inset-px rounded-sm bg-gradient-to-b from-white/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
               Entrar
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
-            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.28em] text-muted-foreground/70">
+            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.3em] text-muted-foreground/70">
               <Lock className="h-3 w-3" /> Só para os de dentro
             </span>
           </div>
+
+          {/* Code-style chip */}
+          <div className="mt-12 inline-flex items-center gap-2 rounded-sm border border-border/60 bg-background/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70 backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+            Sessão segura · canal encriptado
+          </div>
         </section>
 
-        <footer className="flex items-center justify-between border-t border-border/40 pt-6 text-[11px] uppercase tracking-widest text-muted-foreground/60">
+        <footer className="flex items-center justify-between border-t border-border/40 pt-6 text-[11px] uppercase tracking-[0.28em] text-muted-foreground/60">
           <span>© Ballas Gang</span>
           <span className="hidden sm:inline">
             Lealdade primeiro · resto depois
@@ -94,5 +122,18 @@ function Landing() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function CornerMarks() {
+  const base =
+    "pointer-events-none absolute h-6 w-6 border-primary/40";
+  return (
+    <>
+      <div className={`${base} top-4 left-4 border-l border-t`} />
+      <div className={`${base} top-4 right-4 border-r border-t`} />
+      <div className={`${base} bottom-4 left-4 border-l border-b`} />
+      <div className={`${base} bottom-4 right-4 border-r border-b`} />
+    </>
   );
 }
