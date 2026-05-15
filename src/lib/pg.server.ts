@@ -19,7 +19,7 @@ function getSupabase() {
   return supabaseInstance;
 }
 
-export async function pgQuery<T = unknown>(
+export async function pgQuery<T = any>(
   text: string,
   params: ReadonlyArray<unknown> = [],
 ): Promise<T[]> {
@@ -31,7 +31,7 @@ export async function pgQuery<T = unknown>(
       query = query.replace(new RegExp(`\\$${i + 1}\\b`, 'g'), val);
     });
 
-    const { data, error } = await getSupabase().rpc('exec_sql', { sql_query: query });
+    const { data, error } = await (getSupabase() as any).rpc('exec_sql', { sql_query: query });
     if (error) throw error;
     const rows = (data as any[] | null) ?? [];
     console.log("[pgQuery] OK", { text: text.slice(0, 60), rows: rows.length });
