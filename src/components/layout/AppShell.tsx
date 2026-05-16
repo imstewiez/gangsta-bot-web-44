@@ -27,7 +27,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <footer className="mx-auto flex w-full max-w-7xl items-center justify-between border-t border-border/40 px-4 py-8 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50 font-display">
               <span>© Ballas Gang</span>
-              <span>Sangue · Roxo · Bairro</span>
             </footer>
           </div>
         </div>
