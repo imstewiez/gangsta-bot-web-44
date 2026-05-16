@@ -65,11 +65,6 @@ function Landing() {
 
         {/* Hero */}
         <section className="relative my-auto py-16 animate-rise delay-100">
-          {/* Vertical timestamp / location strip */}
-          <div className="pointer-events-none absolute -left-2 top-1/2 hidden -translate-y-1/2 -rotate-90 origin-left text-[10px] uppercase tracking-[0.5em] text-muted-foreground/40 md:block">
-            Lat 38.7223° · Lon −9.1393° · Bairro
-          </div>
-
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.32em] text-primary backdrop-blur-md shadow-[0_0_30px_-10px_var(--primary)]">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-70 animate-ping" />
@@ -102,23 +97,14 @@ function Landing() {
               Entrar
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
-            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.3em] text-muted-foreground/70">
-              <Lock className="h-3 w-3" /> Só para os de dentro
-            </span>
+
           </div>
 
-          {/* Code-style chip */}
-          <div className="mt-12 inline-flex items-center gap-2 rounded-sm border border-border/60 bg-background/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70 backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            Sessão segura · canal encriptado
-          </div>
+
         </section>
 
-        <footer className="flex items-center justify-between border-t border-border/40 pt-6 text-[11px] uppercase tracking-[0.28em] text-muted-foreground/60">
+        <footer className="border-t border-border/40 pt-6 text-[11px] uppercase tracking-[0.28em] text-muted-foreground/60">
           <span>© Ballas Gang</span>
-          <span className="hidden sm:inline">
-            Lealdade primeiro · resto depois
-          </span>
         </footer>
       </div>
     </div>
