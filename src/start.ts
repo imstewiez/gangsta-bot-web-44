@@ -27,9 +27,6 @@ const authedFetch: typeof fetch = async (input, init) => {
       const token = data.session?.access_token;
       if (token) {
         headers.set("authorization", `Bearer ${token}`);
-        console.log("[authedFetch] attached token for", typeof input === "string" ? input : "request");
-      } else {
-        console.warn("[authedFetch] no session token available");
       }
     } catch (e) {
       console.error("[authedFetch] failed to attach auth:", e);

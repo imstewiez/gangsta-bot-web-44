@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne, withClient } from "./pg.server";
 import { enqueueNotification } from "./notifier.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { IdSchema, StatusSchema } from "./security";
 
 export type TagRequestRow = {
   id: number;
@@ -19,7 +20,7 @@ export type TagRequestRow = {
 export const listTagRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { status?: string | null }) => ({
-    status: d?.status ?? "pending",
+    status: StatusSchema.optional().parse(d?.status) ?? "pending",
   }))
   .handler(async ({ data }): Promise<TagRequestRow[]> => {
     const params: unknown[] = [];
@@ -41,7 +42,7 @@ export const listTagRequests = createServerFn({ method: "GET" })
 
 export const approveTagRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: number }) => d)
+  .inputValidator((d: { id: number }) => ({ id: IdSchema.parse(d.id) }))
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");

@@ -12,6 +12,17 @@
   },
   "vars": {
     "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdWN2Ymtvenh0YWN3enZnZ2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDAwMjcsImV4cCI6MjA5NDE3NjAyN30.Rf7AHVSigbdQxkvMSwHY2pDYgjoLyG2oqSAw4E-v2Lc",
   },
+  "headers": [
+    {
+      "test": "*",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
+        "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+      },
+    },
+  ],
 }

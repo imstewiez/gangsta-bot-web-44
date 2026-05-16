@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { withClient, pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { WeekStartSchema } from "./security";
 
 export type WeekInfo = {
   week_start: string;
@@ -33,7 +34,9 @@ export const listRecentWeeks = createServerFn({ method: "GET" })
  */
 export const recomputeWeek = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { week_start?: string | null }) => d)
+  .inputValidator((d: { week_start?: string | null }) => ({
+    week_start: WeekStartSchema.parse(d.week_start),
+  }))
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");

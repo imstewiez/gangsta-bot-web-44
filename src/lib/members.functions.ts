@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
+import { IdSchema } from "./security";
 
 export type MemberRow = {
   id: number;
@@ -68,7 +69,7 @@ export type MemberDetail = {
 
 export const getMember = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: number }) => d)
+  .inputValidator((d: { id: number }) => ({ id: IdSchema.parse(d.id) }))
   .handler(async ({ data }): Promise<MemberDetail> => {
     const member = await pgOne<MemberRow>(
       `select ${SELECT_MEMBER} from members where id = $1`,

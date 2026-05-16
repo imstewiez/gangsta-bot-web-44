@@ -2,6 +2,7 @@
 // Uses Supabase REST API instead of TCP sockets — works reliably on Cloudflare Workers.
 // NEVER import this file from client code.
 import { createClient } from "@supabase/supabase-js";
+import { escapeSqlParam } from "./security";
 
 let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
@@ -19,22 +20,33 @@ function getSupabase() {
   return supabaseInstance;
 }
 
+/**
+ * Execute a SQL query via Supabase RPC (exec_sql).
+ * Parameters are safely escaped before interpolation.
+ * NEVER concatenate user input directly into the query text.
+ */
 export async function pgQuery<T = any>(
   text: string,
   params: ReadonlyArray<unknown> = [],
 ): Promise<T[]> {
   try {
-    // Replace $1, $2, ... with actual values for the RPC call
     let query = text;
-    params.forEach((param, i) => {
-      const val = param === null ? 'NULL' : typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : String(param);
-      query = query.replace(new RegExp(`\\$${i + 1}\\b`, 'g'), val);
-    });
+    // Replace placeholders from highest index to lowest to avoid $10 becoming $1
+    for (let i = params.length - 1; i >= 0; i--) {
+      const val = escapeSqlParam(params[i]);
+      query = query.replace(new RegExp(`\\$${i + 1}\\b`, "g"), val);
+    }
 
-    const { data, error } = await (getSupabase() as any).rpc('exec_sql', { sql_query: query });
+    // Safety: reject multi-statement queries at runtime
+    const normalized = query.replace(/'[^']*'/g, "''").toLowerCase();
+    const statements = normalized.split(";").filter((s) => s.trim().length > 0);
+    if (statements.length > 1) {
+      throw new Error("Multi-statement queries are not allowed via pgQuery");
+    }
+
+    const { data, error } = await (getSupabase() as any).rpc("exec_sql", { sql_query: query });
     if (error) throw error;
     const rows = (data as any[] | null) ?? [];
-    console.log("[pgQuery] OK", { text: text.slice(0, 60), rows: rows.length });
     return rows as T[];
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
