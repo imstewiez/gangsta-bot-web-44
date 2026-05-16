@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -14,7 +14,7 @@ import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
 export const Route = createFileRoute("/_authenticated/membros/")({ component: Page });
 
 function Page() {
-  const fn = useServerFn(listMembers);
+  const fn = useAuthedServerFn(listMembers);
   const { data, isLoading, error } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
   const [q, setQ] = useState("");
   const list = Array.isArray(data) ? data : [];

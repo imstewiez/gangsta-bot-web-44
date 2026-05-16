@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import {
   listUnfinalizedSaidas,
@@ -26,9 +26,9 @@ export const Route = createFileRoute("/_authenticated/liquidacao")({
 });
 
 function Page() {
-  const listFn = useServerFn(listUnfinalizedSaidas);
-  const detailFn = useServerFn(getSaidaDetail);
-  const liqFn = useServerFn(liquidateSaida);
+  const listFn = useAuthedServerFn(listUnfinalizedSaidas);
+  const detailFn = useAuthedServerFn(getSaidaDetail);
+  const liqFn = useAuthedServerFn(liquidateSaida);
   const qc = useQueryClient();
   const [openId, setOpenId] = useState<number | null>(null);
 

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import {
   listOrders,
@@ -83,7 +83,7 @@ const NEXT_STATES: Record<
 };
 
 function Page() {
-  const meFn = useServerFn(getCurrentMember);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;
   const [tab, setTab] = useState<string>("mine");
@@ -124,8 +124,8 @@ function OrdersList({
   scope: "mine" | "manage";
   canManage: boolean;
 }) {
-  const fn = useServerFn(listOrders);
-  const transFn = useServerFn(transitionOrder);
+  const fn = useAuthedServerFn(listOrders);
+  const transFn = useAuthedServerFn(transitionOrder);
   const qc = useQueryClient();
   const orders = useQuery({
     queryKey: ["orders", scope],
@@ -257,8 +257,8 @@ function OrdersList({
 
 function NewOrder() {
   const [open, setOpen] = useState(false);
-  const catFn = useServerFn(getCatalog);
-  const createFn = useServerFn(createOrder);
+  const catFn = useAuthedServerFn(getCatalog);
+  const createFn = useAuthedServerFn(createOrder);
   const qc = useQueryClient();
   const cat = useQuery({
     queryKey: ["catalog"],

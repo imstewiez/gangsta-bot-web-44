@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import {
   Home, Users, Trophy, Sparkles,
   ShoppingBag, PackageOpen, Crosshair,
@@ -85,7 +85,7 @@ export function AppSidebar() {
   const { profile, signOut } = useAuth();
   const loc = useLocation();
 
-  const meFn = useServerFn(getCurrentMember);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn(), staleTime: 60_000 });
 
   const canSeeInv = me.data?.can_see_inventory ?? false;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,10 +36,10 @@ export function MemberAdminPanel({
   const qc = useQueryClient();
   const nav = useNavigate();
 
-  const renameFn = useServerFn(adminRenameMember);
-  const tierFn = useServerFn(adminSetTier);
-  const kickFn = useServerFn(adminKickMember);
-  const adjustFn = useServerFn(adminAdjustStats);
+  const renameFn = useAuthedServerFn(adminRenameMember);
+  const tierFn = useAuthedServerFn(adminSetTier);
+  const kickFn = useAuthedServerFn(adminKickMember);
+  const adjustFn = useAuthedServerFn(adminAdjustStats);
 
   const [name, setName] = useState(member.display_name ?? "");
   const [nick, setNick] = useState(member.nick ?? "");

@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { listAppUsers, setUserRole } from "@/lib/admin.functions";
@@ -36,8 +36,8 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 function AdminPage() {
-  const listFn = useServerFn(listAppUsers);
-  const setFn = useServerFn(setUserRole);
+  const listFn = useAuthedServerFn(listAppUsers);
+  const setFn = useAuthedServerFn(setUserRole);
   const qc = useQueryClient();
   const users = useQuery({ queryKey: ["appUsers"], queryFn: () => listFn() });
   const m = useMutation({

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import { listSaidas, createOperation } from "@/lib/operations.functions";
 import { listMembersLite } from "@/lib/inventory.functions";
@@ -41,7 +41,7 @@ const STATUS_COLOR: Record<string, string> = {
 const TYPES = ["bagueta", "monte", "labs", "guetto", "treino", "outro"];
 
 function Page() {
-  const fn = useServerFn(listSaidas);
+  const fn = useAuthedServerFn(listSaidas);
   const { data, isLoading } = useQuery({
     queryKey: ["saidas"],
     queryFn: () => fn(),
@@ -97,8 +97,8 @@ function Page() {
 
 function NewSaida() {
   const [open, setOpen] = useState(false);
-  const membersFn = useServerFn(listMembersLite);
-  const createFn = useServerFn(createOperation);
+  const membersFn = useAuthedServerFn(listMembersLite);
+  const createFn = useAuthedServerFn(createOperation);
   const qc = useQueryClient();
   const members = useQuery({
     queryKey: ["membersLite"],

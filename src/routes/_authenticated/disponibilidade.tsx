@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { listAvailability, getAvailabilityVotes } from "@/lib/ops.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,8 +17,8 @@ export const Route = createFileRoute("/_authenticated/disponibilidade")({
 });
 
 function Page() {
-  const fn = useServerFn(listAvailability);
-  const votesFn = useServerFn(getAvailabilityVotes);
+  const fn = useAuthedServerFn(listAvailability);
+  const votesFn = useAuthedServerFn(getAvailabilityVotes);
   const sessions = useQuery({
     queryKey: ["availability"],
     queryFn: () => fn(),

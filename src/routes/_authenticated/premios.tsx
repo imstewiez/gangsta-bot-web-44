@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import {
   listPrizes,
@@ -35,9 +35,9 @@ export const Route = createFileRoute("/_authenticated/premios")({
 });
 
 function Page() {
-  const fn = useServerFn(listPrizes);
-  const setFn = useServerFn(setPrize);
-  const genFn = useServerFn(generatePrizeForCurrentWeek);
+  const fn = useAuthedServerFn(listPrizes);
+  const setFn = useAuthedServerFn(setPrize);
+  const genFn = useAuthedServerFn(generatePrizeForCurrentWeek);
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const prizes = useQuery({ queryKey: ["prizes"], queryFn: () => fn() });

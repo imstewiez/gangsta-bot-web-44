@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { listAuditLogs } from "@/lib/ops.functions";
@@ -180,7 +180,7 @@ export const Route = createFileRoute("/_authenticated/auditoria")({
 });
 
 function Page() {
-  const fn = useServerFn(listAuditLogs);
+  const fn = useAuthedServerFn(listAuditLogs);
   const logs = useQuery({
     queryKey: ["auditLogs"],
     queryFn: () => fn({ data: { limit: 200 } }),

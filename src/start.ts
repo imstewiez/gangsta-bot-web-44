@@ -1,5 +1,4 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
-import { attachSupabaseAuth } from "./integrations/supabase/auth-attacher";
 
 import { renderErrorPage } from "./lib/error-page";
 
@@ -26,9 +25,14 @@ const authedFetch: typeof fetch = async (input, init) => {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      if (token) headers.set("authorization", `Bearer ${token}`);
+      if (token) {
+        headers.set("authorization", `Bearer ${token}`);
+        console.log("[authedFetch] attached token for", typeof input === "string" ? input : "request");
+      } else {
+        console.warn("[authedFetch] no session token available");
+      }
     } catch (e) {
-      console.error("[serverFn fetch] failed to attach auth:", e);
+      console.error("[authedFetch] failed to attach auth:", e);
     }
   }
   return fetch(input, { ...init, headers });
@@ -36,6 +40,5 @@ const authedFetch: typeof fetch = async (input, init) => {
 
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware],
-  functionMiddleware: [attachSupabaseAuth],
   serverFns: { fetch: authedFetch },
 }));

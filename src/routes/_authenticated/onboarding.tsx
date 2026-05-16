@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
@@ -43,9 +43,9 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
 
 function Page() {
   const [tab, setTab] = useState("pending");
-  const fn = useServerFn(listTagRequests);
-  const approveFn = useServerFn(approveTagRequest);
-  const denyFn = useServerFn(denyTagRequest);
+  const fn = useAuthedServerFn(listTagRequests);
+  const approveFn = useAuthedServerFn(approveTagRequest);
+  const denyFn = useAuthedServerFn(denyTagRequest);
   const qc = useQueryClient();
   const reqs = useQuery({
     queryKey: ["tagRequests", tab],

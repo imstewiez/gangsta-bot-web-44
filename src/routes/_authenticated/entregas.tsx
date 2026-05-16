@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import {
   listDeliveries,
@@ -94,7 +94,7 @@ const TIPO_META: Record<
 };
 
 function Page() {
-  const meFn = useServerFn(getCurrentMember);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;
   const [tab, setTab] = useState("mine");
@@ -133,8 +133,8 @@ function DelList({
   scope: "mine" | "manage";
   canDecide: boolean;
 }) {
-  const fn = useServerFn(listDeliveries);
-  const decFn = useServerFn(decideDelivery);
+  const fn = useAuthedServerFn(listDeliveries);
+  const decFn = useAuthedServerFn(decideDelivery);
   const qc = useQueryClient();
   const list = useQuery({
     queryKey: ["deliveries", scope],
@@ -274,8 +274,8 @@ function DelList({
 
 function NewDelivery() {
   const [open, setOpen] = useState(false);
-  const catFn = useServerFn(getCatalog);
-  const createFn = useServerFn(createDelivery);
+  const catFn = useAuthedServerFn(getCatalog);
+  const createFn = useAuthedServerFn(createDelivery);
   const qc = useQueryClient();
   const cat = useQuery({
     queryKey: ["catalog"],

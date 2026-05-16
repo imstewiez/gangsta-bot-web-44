@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import {
   getLeaderboard,
@@ -33,7 +33,7 @@ const MEDAL_ICONS = [
 ] as const;
 
 function Page() {
-  const fn = useServerFn(getLeaderboard);
+  const fn = useAuthedServerFn(getLeaderboard);
   const [period, setPeriod] = useState<LeaderboardPeriod>("week");
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", period],

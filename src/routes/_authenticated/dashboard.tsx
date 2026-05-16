@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { getHomeKpis } from "@/lib/dashboard.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const fn = useServerFn(getHomeKpis);
+  const fn = useAuthedServerFn(getHomeKpis);
   const { profile } = useAuth();
   const { data, isLoading, error } = useQuery({
     queryKey: ["home-kpis"],

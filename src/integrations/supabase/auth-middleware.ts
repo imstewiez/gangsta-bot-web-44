@@ -29,6 +29,7 @@ export const requireSupabaseAuth = createMiddleware({
   }
 
   const authHeader = request.headers.get("authorization");
+  console.log("[auth-middleware] auth header present:", !!authHeader);
 
   if (!authHeader) {
     throw new Response("Unauthorized: No authorization header provided", {
@@ -66,8 +67,11 @@ export const requireSupabaseAuth = createMiddleware({
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
+    console.error("[auth-middleware] getUser error:", error?.message);
     throw new Response("Unauthorized: Invalid token", { status: 401 });
   }
+
+  console.log("[auth-middleware] authenticated user:", data.user.id);
 
   return next({
     context: {

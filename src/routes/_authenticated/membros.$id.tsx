@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { getMember } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -26,8 +26,8 @@ export const Route = createFileRoute("/_authenticated/membros/$id")({
 
 function Page() {
   const { id } = Route.useParams();
-  const fn = useServerFn(getMember);
-  const meFn = useServerFn(getCurrentMember);
+  const fn = useAuthedServerFn(getMember);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const { data, isLoading } = useQuery({
     queryKey: ["member", id],
     queryFn: () => fn({ data: { id: Number(id) } }),

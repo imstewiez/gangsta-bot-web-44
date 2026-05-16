@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { getStock, getLedger } from "@/lib/inventory.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -112,7 +112,7 @@ const MOV_LABEL: Record<string, string> = {
 };
 
 function Page() {
-  const meFn = useServerFn(getCurrentMember);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
 
   if (me.isLoading) {
@@ -162,7 +162,7 @@ function Page() {
 }
 
 function StockTable() {
-  const fn = useServerFn(getStock);
+  const fn = useAuthedServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
 
@@ -280,7 +280,7 @@ function StockTable() {
 }
 
 function LedgerTable() {
-  const fn = useServerFn(getLedger);
+  const fn = useAuthedServerFn(getLedger);
   const q = useQuery({
     queryKey: ["ledger"],
     queryFn: () => fn({ data: { limit: 50 } }),

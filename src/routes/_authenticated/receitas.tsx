@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useState } from "react";
 import {
   listRecipes,
@@ -27,9 +27,9 @@ export const Route = createFileRoute("/_authenticated/receitas")({
 });
 
 function Page() {
-  const fn = useServerFn(listRecipes);
-  const calcFn = useServerFn(computeCraftFeasibility);
-  const meFn = useServerFn(getCurrentMember);
+  const fn = useAuthedServerFn(listRecipes);
+  const calcFn = useAuthedServerFn(computeCraftFeasibility);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;
   const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => fn() });

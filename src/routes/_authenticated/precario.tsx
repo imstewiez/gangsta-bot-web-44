@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useMemo, useState } from "react";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import {
@@ -37,8 +37,8 @@ const VENDA_GROUPS: { key: string; label: string }[] = [
 ];
 
 function Page() {
-  const catFn = useServerFn(getCatalog);
-  const meFn = useServerFn(getCurrentMember);
+  const catFn = useAuthedServerFn(getCatalog);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn() });
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const [tab, setTab] = useState("compra");
