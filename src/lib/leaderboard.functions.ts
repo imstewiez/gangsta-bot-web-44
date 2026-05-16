@@ -32,7 +32,18 @@ export const getLeaderboard = createServerFn({ method: "GET" })
           ? `wr.week_start >= date_trunc('month', current_date)::date`
           : `true`;
 
-    return pgQuery<LeaderRow>(
+    // Debug: check if table has any rows
+    const countRes = await pgQuery<{ count: number }>(
+      "select count(*)::int as count from weekly_rankings"
+    );
+    console.log("[leaderboard] weekly_rankings count:", countRes[0]?.count ?? "unknown");
+
+    const maxWeekRes = await pgQuery<{ max_week: string | null }>(
+      "select max(week_start) as max_week from weekly_rankings"
+    );
+    console.log("[leaderboard] latest week:", maxWeekRes[0]?.max_week ?? "none");
+
+    const rows = await pgQuery<LeaderRow>(
       `select wr.member_id,
               m.display_name, m.nickname as nick, m.tier,
               sum(coalesce(wr.kills_count,0))::int                as kills,
@@ -57,6 +68,8 @@ export const getLeaderboard = createServerFn({ method: "GET" })
           and m.deleted_at is null
         group by wr.member_id, m.display_name, m.nickname, m.tier
         order by score desc nulls last
-        limit 200`,
-    ).catch(() => []);
+        limit 200`
+    );
+    console.log("[leaderboard] rows returned:", rows.length);
+    return rows;
   });
