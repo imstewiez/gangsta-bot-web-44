@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ROLE_LABELS, POSITION_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
-import { Users } from "lucide-react";
+import { Users, RotateCcw } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
 
 export const Route = createFileRoute("/_authenticated/membros/")({ component: Page });
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/membros/")({ component: Pa
 function Page() {
   useRealtimeSync(["members"]);
   const fn = useAuthedServerFn(listMembers);
-  const { data, isLoading, error } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
   const [q, setQ] = useState("");
   const list = Array.isArray(data) ? data : [];
   const filtered = list.filter((m) =>
@@ -39,8 +39,15 @@ function Page() {
         icon={Users}
         action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
       {error && (
-        <div className="mb-3 rounded-sm border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          Erro a carregar membros: {error instanceof Error ? error.message : String(error)}
+        <div className="mb-4 flex items-center gap-3 rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm animate-rise">
+          <span className="text-destructive">{error instanceof Error ? error.message : "Erro a carregar membros."}</span>
+          <button
+            onClick={() => refetch()}
+            className="ml-auto inline-flex items-center gap-1 text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Tentar de novo
+          </button>
         </div>
       )}
       <div className="overflow-hidden rounded-sm border border-border">
@@ -60,7 +67,7 @@ function Page() {
               <TableRowsSkeleton rows={8} cols={6} widths={["w-40", "w-24", "w-28", "w-16", "w-24", "w-20"]} />
             )}
             {sorted.map((m) => (
-              <tr key={m.id} className="border-t border-border hover:bg-accent/30">
+              <tr key={m.id} className="border-t border-border hover:bg-accent/30 transition-colors duration-150 cursor-pointer">
                 <td className="px-3 py-2">
                   <Link to="/membros/$id" params={{ id: String(m.id) }} className="font-medium hover:text-primary inline-flex items-center gap-2">
                     <TierIcon tier={m.tier} size="sm" />

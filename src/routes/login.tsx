@@ -29,7 +29,6 @@ function LoginPage() {
         },
       });
       if (error) throw error;
-      // OAuth redirect happens automatically — no navigation needed
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Não foi desta.";
       toast.error(msg);
@@ -40,10 +39,15 @@ function LoginPage() {
   return (
     <div className="ambient-bg relative min-h-screen overflow-hidden">
       <CinematicBackdrop />
+
+      {/* Animated gradient orb */}
+      <div className="pointer-events-none absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/10 blur-[100px] animate-pulse-glow" />
+      <div className="pointer-events-none absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-blood/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: "1.2s" }} />
+
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
         <Link
           to="/"
-          className="mb-10 flex items-center gap-3 self-start animate-rise"
+          className="mb-12 flex items-center gap-3 self-start animate-rise"
         >
           <img
             src={redwoodLogo}
@@ -55,28 +59,28 @@ function LoginPage() {
           </span>
         </Link>
 
-        <div className="card-frame rounded-xl p-7 animate-rise delay-100">
-          <div className="text-display text-[11px] tracking-[0.3em] text-primary mb-2">
+        <div className="card-frame rounded-xl p-8 animate-rise delay-100">
+          <div className="text-display text-[11px] tracking-[0.3em] text-primary mb-3">
             Entrada
           </div>
-          <h1 className="mb-1 text-display text-3xl font-bold text-glow">
+          <h1 className="mb-2 text-display text-3xl font-bold text-glow leading-tight">
             Diz quem és.
           </h1>
-          <p className="mb-6 text-sm text-muted-foreground">
-            Acesso reservado a membros da firma.
+          <p className="mb-8 text-sm text-muted-foreground leading-relaxed">
+            Acesso reservado a membros da firma. Se não tens conta, fala com a chefia.
           </p>
 
           <Button
             disabled={loading}
             onClick={handleDiscordLogin}
-            className="btn-shine w-full gap-2 text-display tracking-wider"
+            className="btn-shine w-full gap-2 text-display tracking-wider h-11"
           >
             <DiscordIcon className="h-4 w-4" />
             {loading ? "A abrir…" : "Entrar com Discord"}
           </Button>
         </div>
 
-        <p className="mt-6 text-center text-xs uppercase tracking-[0.24em] text-muted-foreground/60">
+        <p className="mt-8 text-center text-[10px] uppercase tracking-[0.24em] text-muted-foreground/50">
           Sem conta? Fala com a chefia no Discord.
         </p>
       </div>

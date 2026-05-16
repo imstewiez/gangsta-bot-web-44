@@ -1,22 +1,32 @@
-import { PackageOpen, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 
-/** Estado vazio bonito para listas sem dados. */
+/** Estado vazio com estilo temático Ballas Gang. */
 export function EmptyState({
-  icon: Icon = PackageOpen,
+  icon: Icon,
   title = "Nada por aqui",
   description = "Ainda não há nada para mostrar.",
+  action,
 }: {
   icon?: LucideIcon;
   title?: string;
   description?: string;
+  action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-muted">
-        <Icon className="h-5 w-5 text-muted-foreground" />
+    <div className="flex flex-col items-center justify-center py-14 text-center animate-rise">
+      <div className="relative mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-primary/10 ring-1 ring-primary/30">
+        {Icon ? (
+          <Icon className="h-5 w-5 text-primary/80" />
+        ) : (
+          <span className="text-lg">∅</span>
+        )}
+        <span className="absolute inset-0 rounded-full bg-primary/10 blur-lg" />
       </div>
-      <h3 className="text-display text-sm">{title}</h3>
-      <p className="mt-1 max-w-xs text-xs text-muted-foreground">{description}</p>
+      <h3 className="text-display text-sm tracking-wider">{title}</h3>
+      <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+        {description}
+      </p>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

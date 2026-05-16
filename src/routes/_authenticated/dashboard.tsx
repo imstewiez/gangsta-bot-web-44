@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const fn = useAuthedServerFn(getHomeKpis);
   const { profile } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["home-kpis"],
     queryFn: () => fn(),
   });
@@ -51,13 +51,19 @@ function Dashboard() {
       <PageHeader
         eyebrow="Casa"
         title={`${saud}, ${nome}.`}
-        description="O que se passa no bairro, agora."
+        description="Stats ao vivo do bairro. Quem entra, quem sai, quem marca pontos."
         icon={HomeIcon}
       />
       {error && (
-        <p className="text-destructive text-sm">
-          Caiu qualquer coisa: {(error as Error).message}
-        </p>
+        <div className="mb-4 flex items-center gap-3 rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm animate-rise">
+          <span className="text-destructive">{(error as Error).message || "Não conseguimos carregar os dados."}</span>
+          <button
+            onClick={() => refetch()}
+            className="ml-auto text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
+          >
+            Tentar de novo →
+          </button>
+        </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -349,8 +355,8 @@ function Kpi({
   return (
     <div
       className={
-        "rounded-sm border bg-card p-4 transition-colors " +
-        (accent ? "border-primary/40" : "border-border")
+        "rounded-sm border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] " +
+        (accent ? "border-primary/40 hover:shadow-[0_8px_30px_-12px_color-mix(in_oklab,var(--primary)_30%,transparent)]" : "border-border")
       }
     >
       <div className="flex items-center justify-between">
