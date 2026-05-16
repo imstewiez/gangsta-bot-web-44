@@ -130,7 +130,7 @@ export function AppSidebar() {
           return (
             <SidebarGroup key={g.label}>
               {!collapsed && (
-                <SidebarGroupLabel className="text-[10px] tracking-[0.32em]">
+                <SidebarGroupLabel className="text-[10px] tracking-[0.32em] font-display">
                   {g.label}
                 </SidebarGroupLabel>
               )}
