@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
 import { NotificationBell } from "./NotificationBell";
-import { RedWoodBrand } from "./RedWoodBrand";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -16,7 +15,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <header className="shrink-0 z-40 flex h-14 items-center gap-2 border-b border-border/60 bg-background/70 px-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
             <div className="ml-auto flex items-center gap-3">
-              <RedWoodBrand size="sm" />
               <NotificationBell />
             </div>
             <div aria-hidden className="absolute inset-x-0 -bottom-px hairline-top" />
@@ -27,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {children}
             </main>
 
-            <footer className="mx-auto flex w-full max-w-7xl items-center justify-between border-t border-border/40 px-4 py-8 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50">
+            <footer className="mx-auto flex w-full max-w-7xl items-center justify-between border-t border-border/40 px-4 py-8 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50 font-display">
               <span>© Ballas Gang</span>
               <span>Sangue · Roxo · Bairro</span>
             </footer>

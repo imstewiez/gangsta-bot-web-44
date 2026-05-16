@@ -108,7 +108,9 @@ export function AppSidebar() {
           />
           {!collapsed && (
             <div className="leading-tight">
-              <div className="text-display text-sm tracking-[0.24em]">Ballas Gang</div>
+              <div className="text-display text-sm tracking-[0.24em]">
+                <span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Ballas</span> Gang
+              </div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/80">
                 Casa fechada
               </div>

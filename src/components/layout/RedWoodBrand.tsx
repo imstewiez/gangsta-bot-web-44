@@ -28,7 +28,7 @@ export function RedWoodBrand({ className, size = "md", showTagline = false }: Re
         </span>
       </div>
       {showTagline && (
-        <span className={cn("tracking-[0.25em] uppercase text-muted-foreground/70 mt-0.5", s.tag)}>
+        <span className={cn("tracking-[0.25em] uppercase text-muted-foreground/70 mt-0.5 font-display", s.tag)}>
           Sangue · Roxo · Bairro
         </span>
       )}
