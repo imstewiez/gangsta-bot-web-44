@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { getMember } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/membros/$id")({
 });
 
 function Page() {
+  useRealtimeSync(["members"]);
   const { id } = Route.useParams();
   const fn = useAuthedServerFn(getMember);
   const meFn = useAuthedServerFn(getCurrentMember);

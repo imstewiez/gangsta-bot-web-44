@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -14,6 +15,7 @@ import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
 export const Route = createFileRoute("/_authenticated/membros/")({ component: Page });
 
 function Page() {
+  useRealtimeSync(["members"]);
   const fn = useAuthedServerFn(listMembers);
   const { data, isLoading, error } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
   const [q, setQ] = useState("");

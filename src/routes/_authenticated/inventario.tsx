@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { getStock, getLedger } from "@/lib/inventory.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -112,6 +113,7 @@ const MOV_LABEL: Record<string, string> = {
 };
 
 function Page() {
+  useRealtimeSync([{ table: "inventory", queryKeys: [["stock"], ["ledger"]] }]);
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
 

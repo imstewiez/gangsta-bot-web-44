@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import {
   listUnfinalizedSaidas,
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/liquidacao")({
 });
 
 function Page() {
+  useRealtimeSync([{ table: "operations", queryKeys: [["liq:list"], ["liq:detail"], ["saidas"]] }]);
   const listFn = useAuthedServerFn(listUnfinalizedSaidas);
   const detailFn = useAuthedServerFn(getSaidaDetail);
   const liqFn = useAuthedServerFn(liquidateSaida);

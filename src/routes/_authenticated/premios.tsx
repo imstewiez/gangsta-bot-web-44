@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import {
   listPrizes,
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/_authenticated/premios")({
 });
 
 function Page() {
+  useRealtimeSync(["prizes"]);
   const fn = useAuthedServerFn(listPrizes);
   const setFn = useAuthedServerFn(setPrize);
   const genFn = useAuthedServerFn(generatePrizeForCurrentWeek);

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import { listSaidas, createOperation } from "@/lib/operations.functions";
 import { listMembersLite } from "@/lib/inventory.functions";
@@ -41,6 +42,7 @@ const STATUS_COLOR: Record<string, string> = {
 const TYPES = ["bagueta", "monte", "labs", "guetto", "treino", "outro"];
 
 function Page() {
+  useRealtimeSync([{ table: "operations", queryKeys: [["saidas"]] }]);
   const fn = useAuthedServerFn(listSaidas);
   const { data, isLoading } = useQuery({
     queryKey: ["saidas"],

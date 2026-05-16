@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import {
   listRecipes,
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/_authenticated/receitas")({
 });
 
 function Page() {
+  useRealtimeSync(["recipes"]);
   const fn = useAuthedServerFn(listRecipes);
   const calcFn = useAuthedServerFn(computeCraftFeasibility);
   const meFn = useAuthedServerFn(getCurrentMember);
