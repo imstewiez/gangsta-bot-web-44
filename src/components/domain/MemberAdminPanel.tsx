@@ -24,12 +24,23 @@ type Member = {
   tier: string | null;
 };
 
+type Stats = {
+  kills: number;
+  deaths: number;
+  saidas: number;
+  deliveries: number;
+  vendas: number;
+  orders: number;
+};
+
 export function MemberAdminPanel({
   member,
+  stats,
   myTier,
   canManage,
 }: {
   member: Member;
+  stats: Stats;
   myTier: string | null;
   canManage: boolean;
 }) {
@@ -44,10 +55,16 @@ export function MemberAdminPanel({
   const [name, setName] = useState(member.display_name ?? "");
   const [nick, setNick] = useState(member.nick ?? "");
   const [tier, setTier] = useState<string>(member.tier ?? "young_blood");
-  const [killsStr, setKillsStr] = useState("0");
-  const [deathsStr, setDeathsStr] = useState("0");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+
+  // Delta inputs (all start at "0")
+  const [killsDelta, setKillsDelta] = useState("0");
+  const [deathsDelta, setDeathsDelta] = useState("0");
+  const [saidasDelta, setSaidasDelta] = useState("0");
+  const [deliveriesDelta, setDeliveriesDelta] = useState("0");
+  const [vendasDelta, setVendasDelta] = useState("0");
+  const [ordersDelta, setOrdersDelta] = useState("0");
 
   async function run<T>(label: string, fn: () => Promise<T>, ok: string) {
     setBusy(label);
@@ -62,6 +79,14 @@ export function MemberAdminPanel({
       setBusy(null);
     }
   }
+
+  const hasAnyDelta =
+    Number(killsDelta) !== 0 ||
+    Number(deathsDelta) !== 0 ||
+    Number(saidasDelta) !== 0 ||
+    Number(deliveriesDelta) !== 0 ||
+    Number(vendasDelta) !== 0 ||
+    Number(ordersDelta) !== 0;
 
   return (
     <Card className="border-primary/40">
@@ -158,44 +183,87 @@ export function MemberAdminPanel({
         </section>
 
         {/* Ajustar estatísticas */}
-        <section className="space-y-2 border-t border-border pt-4">
+        <section className="space-y-3 border-t border-border pt-4">
           <div className="flex items-center gap-2 text-display text-xs text-muted-foreground">
-            <Activity className="h-3.5 w-3.5" /> Ajustar stats (enganos /
-            testes)
+            <Activity className="h-3.5 w-3.5" /> Ajustar stats
           </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <div>
-              <Label className="text-xs">Kills (+/-)</Label>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Kills */}
+            <div className="space-y-1">
+              <Label className="text-xs">Kills (atual: {stats.kills})</Label>
               <Input
                 type="number"
-                value={killsStr}
-                onChange={(e) => setKillsStr(e.target.value)}
+                value={killsDelta}
+                onChange={(e) => setKillsDelta(e.target.value)}
+                placeholder="+/-"
               />
             </div>
-            <div>
-              <Label className="text-xs">Mortes (+/-)</Label>
+            {/* Deaths */}
+            <div className="space-y-1">
+              <Label className="text-xs">Mortes (atual: {stats.deaths})</Label>
               <Input
                 type="number"
-                value={deathsStr}
-                onChange={(e) => setDeathsStr(e.target.value)}
+                value={deathsDelta}
+                onChange={(e) => setDeathsDelta(e.target.value)}
+                placeholder="+/-"
               />
             </div>
-            <div>
-              <Label className="text-xs">Motivo</Label>
+            {/* Saídas */}
+            <div className="space-y-1">
+              <Label className="text-xs">Saídas (atual: {stats.saidas})</Label>
               <Input
-                placeholder="ex: corrigir bug"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                type="number"
+                value={saidasDelta}
+                onChange={(e) => setSaidasDelta(e.target.value)}
+                placeholder="+/-"
+              />
+            </div>
+            {/* Entregas */}
+            <div className="space-y-1">
+              <Label className="text-xs">Entregas (atual: {stats.deliveries})</Label>
+              <Input
+                type="number"
+                value={deliveriesDelta}
+                onChange={(e) => setDeliveriesDelta(e.target.value)}
+                placeholder="+/-"
+              />
+            </div>
+            {/* Vendas */}
+            <div className="space-y-1">
+              <Label className="text-xs">Vendas (atual: {stats.vendas})</Label>
+              <Input
+                type="number"
+                value={vendasDelta}
+                onChange={(e) => setVendasDelta(e.target.value)}
+                placeholder="+/-"
+              />
+            </div>
+            {/* Encomendas */}
+            <div className="space-y-1">
+              <Label className="text-xs">Encomendas (atual: {stats.orders})</Label>
+              <Input
+                type="number"
+                value={ordersDelta}
+                onChange={(e) => setOrdersDelta(e.target.value)}
+                placeholder="+/-"
               />
             </div>
           </div>
+
+          <div>
+            <Label className="text-xs">Motivo</Label>
+            <Input
+              placeholder="ex: corrigir bug"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+
           <Button
             size="sm"
             variant="secondary"
-            disabled={
-              busy !== null ||
-              (Number(killsStr) === 0 && Number(deathsStr) === 0)
-            }
+            disabled={busy !== null || !hasAnyDelta}
             onClick={() =>
               run(
                 "adjust",
@@ -203,8 +271,12 @@ export function MemberAdminPanel({
                   adjustFn({
                     data: {
                       id: member.id,
-                      kills_delta: killsStr || undefined,
-                      deaths_delta: deathsStr || undefined,
+                      kills_delta: Number(killsDelta) || undefined,
+                      deaths_delta: Number(deathsDelta) || undefined,
+                      saidas_delta: Number(saidasDelta) || undefined,
+                      deliveries_delta: Number(deliveriesDelta) || undefined,
+                      sales_delta: Number(vendasDelta) || undefined,
+                      orders_delta: Number(ordersDelta) || undefined,
                       reason: reason || undefined,
                     },
                   }),
@@ -214,10 +286,6 @@ export function MemberAdminPanel({
           >
             Aplicar ajuste
           </Button>
-          <p className="text-[11px] text-muted-foreground">
-            Para encomendas / entregas / vendas / saídas, ajusta nas próprias
-            páginas — aqui só PvP.
-          </p>
         </section>
 
         {/* Kick */}

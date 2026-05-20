@@ -150,6 +150,14 @@ function Page() {
               nick: m.nick,
               tier: m.tier,
             }}
+            stats={{
+              kills: data.kills,
+              deaths: data.deaths,
+              saidas: data.saidas,
+              deliveries: data.deliveries,
+              vendas: data.vendas,
+              orders: data.orders,
+            }}
             myTier={myTier}
             canManage={canManage}
           />
