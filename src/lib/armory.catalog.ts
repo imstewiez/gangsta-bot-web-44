@@ -303,7 +303,7 @@ export function pricingDisplayCategory(
 ): ArmoryCategory | null {
   if (sub === "armas_orange") return "armas_orange";
   if (sub === "armas_red" || sub === "azul" || sub === "vermelha" || sub === "amarela") {
-    if (isOrangeWeapon(itemName)) return "armas_orange";
+    if (isOrangeWeapon(itemName ?? null)) return "armas_orange";
     return "armas_red";
   }
   if (sub === "carregadores") return "carregadores";

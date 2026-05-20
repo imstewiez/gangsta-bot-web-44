@@ -54,7 +54,7 @@ function Page() {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   };
 
-  const groups = groupBy((i) => i.category);
+  const groups = groupBy((i) => i.category ?? "outros");
 
   return (
     <>

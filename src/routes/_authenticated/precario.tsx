@@ -233,7 +233,7 @@ function SellTable({
 }) {
   if (!items.length) return null;
   const sorted = [...items].sort((a, b) => (b.min_sale_price ?? 0) - (a.min_sale_price ?? 0));
-  const cfg = ARMORY_CAT_CONFIG[catKey as any];
+  const cfg = (ARMORY_CAT_CONFIG as any)[catKey];
   return (
     <section>
       <h2 className={cn("mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest", cfg?.headerColor ?? "text-muted-foreground")}>

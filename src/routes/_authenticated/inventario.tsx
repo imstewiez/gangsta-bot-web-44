@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { fmtNum, fmtDate } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History } from "lucide-react";
+import { Package, History, Crosshair } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 import { ARMORY_CAT_CONFIG } from "@/lib/armory.catalog";
 
