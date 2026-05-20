@@ -9,8 +9,7 @@ import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Shield, ShieldOff, Hammer, Tag } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Shield, ShieldOff } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
@@ -75,35 +74,6 @@ function AdminPage() {
         title="Definições"
         description="Gerir permissões"
       />
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <Link
-          to="/admin/receitas"
-          from="/admin"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4 backdrop-blur-sm interactive-card hover:border-primary/40 transition-colors"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Hammer className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <div className="text-sm font-medium">Receitas</div>
-            <div className="text-[11px] text-muted-foreground">Editar quantidades</div>
-          </div>
-        </Link>
-        <Link
-          to="/admin/precos"
-          from="/admin"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4 backdrop-blur-sm interactive-card hover:border-primary/40 transition-colors"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Tag className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <div className="text-sm font-medium">Preços</div>
-            <div className="text-[11px] text-muted-foreground">Editar valores</div>
-          </div>
-        </Link>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="text-display text-sm">
