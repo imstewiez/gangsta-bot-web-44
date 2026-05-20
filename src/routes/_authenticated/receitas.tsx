@@ -301,16 +301,42 @@ function Page() {
               <Input type="number" min={1} value={qtyStr} onChange={(e) => setQtyStr(e.target.value)} />
             </div>
             {result && (
-              <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
-                <div className="font-medium">{result.item_name} × {result.requested_qty}</div>
-                <div>Custo total: <strong>{fmtNum(Math.round(result.total_cost))} €</strong></div>
-                <div className={result.feasible ? "text-emerald-500 mt-2" : "text-red-500 mt-2"}>
-                  {result.feasible ? "Stock suficiente" : "Stock insuficiente:"}
+              <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs space-y-3">
+                <div className="font-medium text-sm">{result.item_name} × {result.requested_qty}</div>
+                
+                {/* Materiais necessários */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Materiais necessários</div>
+                  <ul className="space-y-1">
+                    {result.ingredients.map((ing) => (
+                      <li key={ing.name} className="flex justify-between items-center">
+                        <span className={ing.in_stock < ing.needed ? "text-red-400" : "text-foreground"}>
+                          {ing.name}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {ing.needed}× ({ing.in_stock} stock) = {fmtNum(Math.round(ing.line_cost))} €
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                {/* Custo total */}
+                <div className="border-t border-border pt-2">
+                  <div className="flex justify-between items-center font-semibold text-sm">
+                    <span>Custo total (dinheiro sujo):</span>
+                    <span>{fmtNum(Math.round(result.total_cost))} €</span>
+                  </div>
+                </div>
+                
+                {/* Status stock */}
+                <div className={result.feasible ? "text-emerald-500" : "text-red-500"}>
+                  {result.feasible ? "✅ Stock suficiente" : "❌ Stock insuficiente:"}
                 </div>
                 {!result.feasible && (
-                  <ul className="mt-1 space-y-0.5">
+                  <ul className="space-y-0.5">
                     {result.missing.map((m) => (
-                      <li key={m.name}>· {m.name}: faltam {m.missing} (tens {m.in_stock} / precisas {m.needed})</li>
+                      <li key={m.name} className="text-red-400">· {m.name}: faltam {m.missing} (tens {m.in_stock} / precisas {m.needed})</li>
                     ))}
                   </ul>
                 )}

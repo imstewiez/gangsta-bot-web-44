@@ -127,6 +127,13 @@ export type CraftFeasibility = {
     in_stock: number;
     missing: number;
   }>;
+  ingredients: Array<{
+    name: string;
+    needed: number;
+    in_stock: number;
+    unit_cost: number;
+    line_cost: number;
+  }>;
 };
 
 export const computeCraftFeasibility = createServerFn({ method: "POST" })
@@ -160,10 +167,20 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     );
     let total_cost = 0;
     const missing: CraftFeasibility["missing"] = [];
+    const ingredients: CraftFeasibility["ingredients"] = [];
     for (const ing of ings) {
       const needed = Number(ing.quantity) * data.quantity;
       const stock = Number(ing.in_stock ?? 0);
-      total_cost += needed * Number(ing.unit_cost ?? 0);
+      const unitCost = Number(ing.unit_cost ?? 0);
+      const lineCost = needed * unitCost;
+      total_cost += lineCost;
+      ingredients.push({
+        name: ing.name,
+        needed,
+        in_stock: stock,
+        unit_cost: unitCost,
+        line_cost: lineCost,
+      });
       if (stock < needed) {
         missing.push({
           name: ing.name,
@@ -180,5 +197,72 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
       total_cost,
       feasible: missing.length === 0,
       missing,
+      ingredients,
+    };
+  });
+
+export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { item_id: number; quantity: number }) => {
+    if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
+    if (!Number.isFinite(d.quantity) || d.quantity <= 0)
+      throw new Error("quantidade inválida");
+    return d;
+  })
+  .handler(async ({ data }): Promise<CraftFeasibility | null> => {
+    const recipe = await pgOne<{ recipe_id: number; item_name: string }>(
+      `select r.id as recipe_id, i.name as item_name from craft_recipes r join items i on i.id = r.item_id where r.item_id = $1 limit 1`,
+      [data.item_id],
+    );
+    if (!recipe) return null;
+    const ings = await pgQuery<{
+      ingredient_item_id: number;
+      name: string;
+      quantity: number;
+      unit_cost: string | null;
+      in_stock: number | null;
+    }>(
+      `select ri.ingredient_item_id, ii.name,
+              ri.quantity,
+              coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost,
+              coalesce((select sum(balance) from inventory_balance b where b.item_id = ri.ingredient_item_id), 0) as in_stock
+         from recipe_ingredients ri
+         join items ii on ii.id = ri.ingredient_item_id
+        where ri.recipe_id = $1`,
+      [recipe.recipe_id],
+    );
+    let total_cost = 0;
+    const missing: CraftFeasibility["missing"] = [];
+    const ingredients: CraftFeasibility["ingredients"] = [];
+    for (const ing of ings) {
+      const needed = Number(ing.quantity) * data.quantity;
+      const stock = Number(ing.in_stock ?? 0);
+      const unitCost = Number(ing.unit_cost ?? 0);
+      const lineCost = needed * unitCost;
+      total_cost += lineCost;
+      ingredients.push({
+        name: ing.name,
+        needed,
+        in_stock: stock,
+        unit_cost: unitCost,
+        line_cost: lineCost,
+      });
+      if (stock < needed) {
+        missing.push({
+          name: ing.name,
+          needed,
+          in_stock: stock,
+          missing: needed - stock,
+        });
+      }
+    }
+    return {
+      recipe_id: recipe.recipe_id,
+      item_name: recipe.item_name,
+      requested_qty: data.quantity,
+      total_cost,
+      feasible: missing.length === 0,
+      missing,
+      ingredients,
     };
   });

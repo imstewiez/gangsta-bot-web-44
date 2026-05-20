@@ -7,6 +7,7 @@ import {
   createOrder,
   transitionOrder,
 } from "@/lib/orders.functions";
+import { computeCraftFeasibilityByItemId } from "@/lib/recipes.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -260,6 +261,7 @@ function NewOrder() {
   const [open, setOpen] = useState(false);
   const catFn = useAuthedServerFn(getCatalog);
   const createFn = useAuthedServerFn(createOrder);
+  const simFn = useAuthedServerFn(computeCraftFeasibilityByItemId);
   const qc = useQueryClient();
   const cat = useQuery({
     queryKey: ["catalog"],
@@ -272,6 +274,11 @@ function NewOrder() {
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("1");
   const [notes, setNotes] = useState("");
+  const sim = useQuery({
+    queryKey: ["order-sim", item, qty],
+    queryFn: () => simFn({ data: { item_id: Number(item), quantity: Number(qty) || 1 } }),
+    enabled: open && !!item && Number(qty) > 0,
+  });
   const m = useMutation({
     mutationFn: () =>
       createFn({
@@ -330,6 +337,36 @@ function NewOrder() {
               onChange={(e) => setQty(e.target.value)}
             />
           </div>
+
+          {/* Simulação de materiais */}
+          {sim.data && (
+            <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Materiais necessários</div>
+              <ul className="space-y-1">
+                {sim.data.ingredients.map((ing) => (
+                  <li key={ing.name} className="flex justify-between items-center">
+                    <span className={ing.in_stock < ing.needed ? "text-red-400" : "text-foreground"}>
+                      {ing.name}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {ing.needed}× ({ing.in_stock} stock) = {fmtNum(Math.round(ing.line_cost))} €
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-border pt-2 flex justify-between items-center font-semibold text-sm">
+                <span>Custo total (dinheiro sujo):</span>
+                <span>{fmtNum(Math.round(sim.data.total_cost))} €</span>
+              </div>
+              <div className={sim.data.feasible ? "text-emerald-500" : "text-red-500"}>
+                {sim.data.feasible ? "✅ Stock suficiente" : "❌ Stock insuficiente"}
+              </div>
+            </div>
+          )}
+          {sim.isLoading && item && (
+            <div className="text-xs text-muted-foreground">A calcular materiais...</div>
+          )}
+
           <div>
             <label className="text-xs text-muted-foreground">
               Recado (opcional)
