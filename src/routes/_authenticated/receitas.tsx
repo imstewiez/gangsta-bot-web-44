@@ -310,36 +310,22 @@ function Page() {
                   <ul className="space-y-1">
                     {result.ingredients.map((ing) => (
                       <li key={ing.name} className="flex justify-between items-center">
-                        <span className={ing.in_stock < ing.needed ? "text-red-400" : "text-foreground"}>
-                          {ing.name}
-                        </span>
+                        <span className="text-foreground">{ing.name}</span>
                         <span className="text-muted-foreground">
-                          {ing.needed}× ({ing.in_stock} stock) = {fmtNum(Math.round(ing.line_cost))} €
+                          {ing.needed}× = {fmtNum(Math.round(ing.line_cost))} €
                         </span>
                       </li>
                     ))}
                   </ul>
                 </div>
                 
-                {/* Custo total */}
+                {/* Dinheiro sujo */}
                 <div className="border-t border-border pt-2">
                   <div className="flex justify-between items-center font-semibold text-sm">
-                    <span>Custo total (dinheiro sujo):</span>
-                    <span>{fmtNum(Math.round(result.total_cost))} €</span>
+                    <span>Dinheiro sujo a dar:</span>
+                    <span className="text-emerald-400">{fmtNum(Math.round(result.dirty_money))} €</span>
                   </div>
                 </div>
-                
-                {/* Status stock */}
-                <div className={result.feasible ? "text-emerald-500" : "text-red-500"}>
-                  {result.feasible ? "✅ Stock suficiente" : "❌ Stock insuficiente:"}
-                </div>
-                {!result.feasible && (
-                  <ul className="space-y-0.5">
-                    {result.missing.map((m) => (
-                      <li key={m.name} className="text-red-400">· {m.name}: faltam {m.missing} (tens {m.in_stock} / precisas {m.needed})</li>
-                    ))}
-                  </ul>
-                )}
               </div>
             )}
           </div>

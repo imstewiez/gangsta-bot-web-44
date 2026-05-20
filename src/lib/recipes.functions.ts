@@ -119,18 +119,10 @@ export type CraftFeasibility = {
   recipe_id: number;
   item_name: string;
   requested_qty: number;
-  total_cost: number;
-  feasible: boolean;
-  missing: Array<{
-    name: string;
-    needed: number;
-    in_stock: number;
-    missing: number;
-  }>;
+  dirty_money: number;
   ingredients: Array<{
     name: string;
     needed: number;
-    in_stock: number;
     unit_cost: number;
     line_cost: number;
   }>;
@@ -145,58 +137,44 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }): Promise<CraftFeasibility> => {
-    const head = await pgOne<{ item_name: string }>(
-      `select i.name as item_name from craft_recipes r join items i on i.id = r.item_id where r.id = $1`,
+    const head = await pgOne<{ item_name: string; tier: string | null; subcategory: string | null }>(
+      `select i.name as item_name, r.tier, i.subcategory
+       from craft_recipes r join items i on i.id = r.item_id where r.id = $1`,
       [data.recipe_id],
     );
+    const isOrange = (head?.tier === "orange") || (head?.subcategory === "armas_orange");
     const ings = await pgQuery<{
-      ingredient_item_id: number;
       name: string;
       quantity: number;
       unit_cost: string | null;
-      in_stock: number | null;
     }>(
-      `select ri.ingredient_item_id, ii.name,
-              ri.quantity,
-              coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost,
-              coalesce((select sum(balance) from inventory_balance b where b.item_id = ri.ingredient_item_id), 0) as in_stock
+      `select ii.name, ri.quantity, coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost
          from recipe_ingredients ri
          join items ii on ii.id = ri.ingredient_item_id
         where ri.recipe_id = $1`,
       [data.recipe_id],
     );
-    let total_cost = 0;
-    const missing: CraftFeasibility["missing"] = [];
+    let dirty_money = 0;
     const ingredients: CraftFeasibility["ingredients"] = [];
     for (const ing of ings) {
       const needed = Number(ing.quantity) * data.quantity;
-      const stock = Number(ing.in_stock ?? 0);
       const unitCost = Number(ing.unit_cost ?? 0);
       const lineCost = needed * unitCost;
-      total_cost += lineCost;
-      ingredients.push({
-        name: ing.name,
-        needed,
-        in_stock: stock,
-        unit_cost: unitCost,
-        line_cost: lineCost,
-      });
-      if (stock < needed) {
-        missing.push({
-          name: ing.name,
-          needed,
-          in_stock: stock,
-          missing: needed - stock,
-        });
+      dirty_money += lineCost;
+      // Orange weapons: only show Peças as material, everything else is included in dirty money
+      if (isOrange) {
+        if (ing.name.toLowerCase().includes("peça")) {
+          ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
+        }
+      } else {
+        ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
       }
     }
     return {
       recipe_id: data.recipe_id,
       item_name: head?.item_name ?? "?",
       requested_qty: data.quantity,
-      total_cost,
-      feasible: missing.length === 0,
-      missing,
+      dirty_money,
       ingredients,
     };
   });
@@ -210,59 +188,44 @@ export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" }
     return d;
   })
   .handler(async ({ data }): Promise<CraftFeasibility | null> => {
-    const recipe = await pgOne<{ recipe_id: number; item_name: string }>(
-      `select r.id as recipe_id, i.name as item_name from craft_recipes r join items i on i.id = r.item_id where r.item_id = $1 limit 1`,
+    const recipe = await pgOne<{ recipe_id: number; item_name: string; tier: string | null; subcategory: string | null }>(
+      `select r.id as recipe_id, i.name as item_name, r.tier, i.subcategory
+       from craft_recipes r join items i on i.id = r.item_id where r.item_id = $1 limit 1`,
       [data.item_id],
     );
     if (!recipe) return null;
+    const isOrange = (recipe.tier === "orange") || (recipe.subcategory === "armas_orange");
     const ings = await pgQuery<{
-      ingredient_item_id: number;
       name: string;
       quantity: number;
       unit_cost: string | null;
-      in_stock: number | null;
     }>(
-      `select ri.ingredient_item_id, ii.name,
-              ri.quantity,
-              coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost,
-              coalesce((select sum(balance) from inventory_balance b where b.item_id = ri.ingredient_item_id), 0) as in_stock
+      `select ii.name, ri.quantity, coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost
          from recipe_ingredients ri
          join items ii on ii.id = ri.ingredient_item_id
         where ri.recipe_id = $1`,
       [recipe.recipe_id],
     );
-    let total_cost = 0;
-    const missing: CraftFeasibility["missing"] = [];
+    let dirty_money = 0;
     const ingredients: CraftFeasibility["ingredients"] = [];
     for (const ing of ings) {
       const needed = Number(ing.quantity) * data.quantity;
-      const stock = Number(ing.in_stock ?? 0);
       const unitCost = Number(ing.unit_cost ?? 0);
       const lineCost = needed * unitCost;
-      total_cost += lineCost;
-      ingredients.push({
-        name: ing.name,
-        needed,
-        in_stock: stock,
-        unit_cost: unitCost,
-        line_cost: lineCost,
-      });
-      if (stock < needed) {
-        missing.push({
-          name: ing.name,
-          needed,
-          in_stock: stock,
-          missing: needed - stock,
-        });
+      dirty_money += lineCost;
+      if (isOrange) {
+        if (ing.name.toLowerCase().includes("peça")) {
+          ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
+        }
+      } else {
+        ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
       }
     }
     return {
       recipe_id: recipe.recipe_id,
       item_name: recipe.item_name,
       requested_qty: data.quantity,
-      total_cost,
-      feasible: missing.length === 0,
-      missing,
+      dirty_money,
       ingredients,
     };
   });

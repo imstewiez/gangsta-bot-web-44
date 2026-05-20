@@ -345,21 +345,16 @@ function NewOrder() {
               <ul className="space-y-1">
                 {sim.data.ingredients.map((ing) => (
                   <li key={ing.name} className="flex justify-between items-center">
-                    <span className={ing.in_stock < ing.needed ? "text-red-400" : "text-foreground"}>
-                      {ing.name}
-                    </span>
+                    <span className="text-foreground">{ing.name}</span>
                     <span className="text-muted-foreground">
-                      {ing.needed}× ({ing.in_stock} stock) = {fmtNum(Math.round(ing.line_cost))} €
+                      {ing.needed}× = {fmtNum(Math.round(ing.line_cost))} €
                     </span>
                   </li>
                 ))}
               </ul>
               <div className="border-t border-border pt-2 flex justify-between items-center font-semibold text-sm">
-                <span>Custo total (dinheiro sujo):</span>
-                <span>{fmtNum(Math.round(sim.data.total_cost))} €</span>
-              </div>
-              <div className={sim.data.feasible ? "text-emerald-500" : "text-red-500"}>
-                {sim.data.feasible ? "✅ Stock suficiente" : "❌ Stock insuficiente"}
+                <span>Dinheiro sujo a dar:</span>
+                <span className="text-emerald-400">{fmtNum(Math.round(sim.data.dirty_money))} €</span>
               </div>
             </div>
           )}
