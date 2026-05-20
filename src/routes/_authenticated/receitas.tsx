@@ -47,7 +47,7 @@ export const Route = createFileRoute("/_authenticated/receitas")({
 });
 
 function printBadge(tier: string | null): { label: string; cls: string } | null {
-  if (!tier || tier === "orange") return null;
+  if (!tier) return null;
   const label = PRINT_LABELS[tier] ?? tier;
   const cls = PRINT_BADGE_CLASS[tier] ?? "";
   if (!cls) return null;
