@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
 import { toast } from "sonner";
-import { Plus, ShoppingBag } from "lucide-react";
+import { Plus, ShoppingBag, Swords, Skull, Cylinder, Crosshair, FlaskConical, Wrench, Shield, Trash2, TreePine, Gem, Pickaxe, Package, FileText, Truck, DollarSign } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
