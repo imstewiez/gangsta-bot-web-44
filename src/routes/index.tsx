@@ -60,7 +60,7 @@ function Landing() {
                 src={ballasLogo}
                 alt="Ballas Gang"
                 draggable={false}
-                className="logo-hd h-20 w-20 md:h-24 md:w-24 select-none object-contain transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
+                className="logo-hd h-28 w-28 md:h-36 md:w-36 select-none object-contain transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
                 style={parallax(8)}
               />
             </div>
@@ -76,18 +76,6 @@ function Landing() {
         </header>
 
         <div className="relative my-auto py-16">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block"
-            style={parallax(-14)}
-          >
-            <img
-              src={ballasLogo}
-              alt=""
-              className="logo-hd h-[480px] w-[480px] object-contain opacity-[0.07] mix-blend-screen"
-            />
-          </div>
-
           <h1
             className="max-w-3xl text-display text-6xl font-bold leading-[1.02] md:text-8xl md:leading-[1.0] text-glow animate-rise delay-200"
             style={parallax(-4)}
