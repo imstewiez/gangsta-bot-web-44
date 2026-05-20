@@ -442,3 +442,71 @@
     box-shadow: 0 0 0 8px color-mix(in oklab, var(--primary) 0%, transparent);
   }
 }
+
+/* ───────── Scroll reveal ───────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ───────── Slow bounce for scroll cue ───────── */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(6px); opacity: 1; }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 2.2s ease-in-out infinite;
+}
+
+/* ───────── High-quality logo rendering ───────── */
+.logo-hd {
+  image-rendering: -webkit-optimize-contrast;
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--primary) 55%, transparent))
+    drop-shadow(0 0 40px color-mix(in oklab, var(--blood) 30%, transparent));
+}
+
+/* ───────── Uniform icon sizing ───────── */
+svg.lucide {
+  stroke-width: 1.75;
+  flex-shrink: 0;
+}
+
+.icon-xs { width: 0.875rem; height: 0.875rem; }
+.icon-sm { width: 1rem;     height: 1rem; }
+.icon-md { width: 1.125rem; height: 1.125rem; }
+.icon-lg { width: 1.25rem;  height: 1.25rem; }
+.icon-xl { width: 1.5rem;   height: 1.5rem; }
+
+/* Sidebar icons — uniform 16px, slightly bolder stroke */
+[data-sidebar="menu-button"] svg {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2;
+}
+
+/* Section header icon chips — uniform */
+.icon-chip {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.375rem;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 35%, transparent);
+  color: var(--primary);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+.icon-chip:hover {
+  transform: translateY(-1px) scale(1.05);
+  background: color-mix(in oklab, var(--primary) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 60%, transparent),
+    0 0 20px -6px color-mix(in oklab, var(--primary) 50%, transparent);
+}
+
