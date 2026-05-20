@@ -247,8 +247,8 @@ export const PRINT_LABELS: Record<string, string> = {
   amarela: "Print Amarela",
   vermelha: "Print Vermelha",
   laranja: "Print Laranja",
-  orange: "Orange",
-  red: "Red",
+  orange: "Print Orange",
+  red: "Print Red",
 };
 
 export const PRINT_BADGE_CLASS: Record<string, string> = {
