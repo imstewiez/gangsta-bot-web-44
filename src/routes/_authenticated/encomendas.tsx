@@ -316,15 +316,41 @@ function NewOrder() {
               <SelectTrigger>
                 <SelectValue placeholder="Seleciona" />
               </SelectTrigger>
-              <SelectContent>
-                {items.map((i) => (
-                  <SelectItem key={i.id} value={String(i.id)}>
-                    {i.name}{" "}
-                    <span className="text-muted-foreground">
-                      · {fmtCategoryLabel(i.subcategory)}
-                    </span>
-                  </SelectItem>
-                ))}
+              <SelectContent className="max-h-[60vh]">
+                {(() => {
+                  const ICONS: Record<string, React.ElementType> = {
+                    armas_orange: Swords, armas_red: Skull, carregadores: Cylinder,
+                    acessorios_armas: Crosshair, drogas: FlaskConical, materiais_craft: Wrench,
+                    coletes: Shield, lixo: Trash2, madeiras: TreePine, materias_primas: Gem,
+                    minerios: Pickaxe, corpos: Package, prints: FileText,
+                    entrega_bairrista: Truck, venda_bairrista: DollarSign,
+                  };
+                  const groups = new Map<string, typeof items>();
+                  for (const i of items) {
+                    const key = i.subcategory || "outros";
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key)!.push(i);
+                  }
+                  const sorted = Array.from(groups.entries()).sort((a, b) =>
+                    fmtCategoryLabel(a[0]).localeCompare(fmtCategoryLabel(b[0]))
+                  );
+                  return sorted.map(([sub, list]) => {
+                    const Icon = ICONS[sub];
+                    return (
+                      <SelectGroup key={sub}>
+                        <SelectLabel className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary/80 px-2 py-1.5 border-b border-border/50 mb-1">
+                          {Icon && <Icon className="h-3.5 w-3.5" />}
+                          {fmtCategoryLabel(sub)}
+                        </SelectLabel>
+                        {list.map((i) => (
+                          <SelectItem key={i.id} value={String(i.id)} className="text-sm py-1.5">
+                            {i.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    );
+                  });
+                })()}
               </SelectContent>
             </Select>
           </div>
