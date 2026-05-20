@@ -82,10 +82,10 @@ async function normalizeCatastrophicSsrResponse(
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url);
-    if (url.hostname === "redwood.pt") {
-      url.hostname = "www.redwood.pt";
+    if (url.hostname === "ballasgang.pt") {
+      url.hostname = "www.ballasgang.pt";
       url.protocol = "https:";
-      return Response.redirect(url.toString(), 301);
+      return Response.redirect(url.toString(), 308);
     }
 
     try {

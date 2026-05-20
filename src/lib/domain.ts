@@ -29,34 +29,36 @@ export const TIER_LABELS: Record<string, string> = {
 
 // Gradiente por tier — replicado do servidor de Discord.
 // Linear-gradient ~135deg, dois stops.
+// Gradients sincronizados com as cores dos roles do Discord.
 export const TIER_GRADIENT: Record<string, string> = {
-  manda_chuva: "linear-gradient(135deg, #e6e6e6 0%, #b8003a 100%)",
-  kingpin: "linear-gradient(135deg, #d4d4d4 0%, #1a1a1a 100%)",
-  og: "linear-gradient(135deg, #0d0d0d 0%, #6b6b6b 100%)",
-  real_gangster: "linear-gradient(135deg, #5a0a0a 0%, #d40015 100%)",
-  patrao_di_zona: "linear-gradient(135deg, #0a1a3a 0%, #2563eb 100%)",
-  gangster_fodido: "linear-gradient(135deg, #2a2a2a 0%, #c95a1a 100%)",
-  o_gunao: "linear-gradient(135deg, #14361e 0%, #5fb368 100%)",
-  young_blood: "linear-gradient(135deg, #e91e63 0%, #ff8fbf 100%)",
-  bairrista: "linear-gradient(135deg, #2a2a2a 0%, #b8651a 100%)",
+  manda_chuva: "linear-gradient(135deg, #f5dba0 0%, #eec16d 100%)",
+  kingpin: "linear-gradient(135deg, #d4d6d9 0%, #b3b5b8 100%)",
+  og: "linear-gradient(135deg, #7a0000 0%, #470000 100%)",
+  real_gangster: "linear-gradient(135deg, #c49fff 0%, #9e6bff 100%)",
+  patrao_di_zona: "linear-gradient(135deg, #0533c9 0%, #021e85 100%)",
+  gangster_fodido: "linear-gradient(135deg, #5ac4cc 0%, #3a8f97 100%)",
+  o_gunao: "linear-gradient(135deg, #9abf98 0%, #70966e 100%)",
+  young_blood: "linear-gradient(135deg, #7fd1f0 0%, #4cadd0 100%)",
+  bairrista: "linear-gradient(135deg, #a794d9 0%, #826bc2 100%)",
 };
 
 // Cor "principal" do tier — para textos e bordas.
+// Cores de texto/borda sincronizadas com as cores dos roles do Discord.
 export const TIER_ACCENT: Record<string, string> = {
-  manda_chuva: "#ff3a6a",
-  kingpin: "#cfd6e0",
-  og: "#a0a0a0",
-  real_gangster: "#ff2c3a",
+  manda_chuva: "#eec16d",
+  kingpin: "#b3b5b8",
+  og: "#a52a2a",
+  real_gangster: "#9e6bff",
   patrao_di_zona: "#3b82f6",
-  gangster_fodido: "#e07a3a",
-  o_gunao: "#7fce85",
-  young_blood: "#ff7fb5",
-  bairrista: "#d28a4a",
+  gangster_fodido: "#3a8f97",
+  o_gunao: "#70966e",
+  young_blood: "#4cadd0",
+  bairrista: "#826bc2",
 };
 
-// Tag "Chefia de RedWood" — vermelho sólido da firma.
-export const REDWOOD_GRADIENT =
-  "linear-gradient(135deg, #ff2c3a 0%, #8a000f 100%)";
+// Tag "Chefia de Ballas" — roxo púrpura da firma.
+export const BALLAS_GRADIENT =
+  "linear-gradient(135deg, #9b59b6 0%, #6c3483 100%)";
 
 // Ordem hierárquica (mais baixo → mais alto).
 export const TIER_ORDER: string[] = [
@@ -70,7 +72,7 @@ export const TIER_ORDER: string[] = [
   "manda_chuva",
 ];
 
-// Tag "Chefia de RedWood" — patrões di zona e acima representam a firma.
+// Tag "Chefia de Ballas" — patrões di zona e acima representam a firma.
 export const CHEFIA_TIERS = new Set<string>([
   "patrao_di_zona",
   "real_gangster",
@@ -112,38 +114,38 @@ export const POSITION_LABELS: Record<string, string> = {
 export function tierColor(tier: string | null | undefined): string {
   switch (tier) {
     case "manda_chuva":
-      // rosa-sangue, topo da hierarquia
-      return "bg-[oklch(0.55_0.22_0)/0.22] text-[oklch(0.85_0.15_0)] border-[oklch(0.55_0.22_0)/0.55]";
+      // dourado Manda-Chuva
+      return "bg-[#eec16d/0.22] text-[#eec16d] border-[#eec16d/0.55]";
     case "kingpin":
-      // diamante / ciano gelado
-      return "bg-[oklch(0.55_0.15_200)/0.22] text-[oklch(0.85_0.12_200)] border-[oklch(0.55_0.15_200)/0.55]";
+      // prateado Kingpin
+      return "bg-[#b3b5b8/0.22] text-[#b3b5b8] border-[#b3b5b8/0.55]";
     case "og":
-      // chumbo / preto-violeta
-      return "bg-[oklch(0.30_0.04_300)/0.45] text-[oklch(0.88_0.03_300)] border-[oklch(0.50_0.05_300)/0.55]";
+      // vinho escuro OG
+      return "bg-[#470000/0.35] text-[#c94a4a] border-[#470000/0.55]";
     case "real_gangster":
-      // vermelho RedWood clássico
-      return "bg-primary/22 text-primary border-primary/55";
+      // roxo Real Gangster
+      return "bg-[#9e6bff/0.22] text-[#9e6bff] border-[#9e6bff/0.55]";
     case "patrao_di_zona":
-      // azul chefia
-      return "bg-info/22 text-info border-info/55";
+      // azul escuro Patrão
+      return "bg-[#021e85/0.22] text-[#3b82f6] border-[#021e85/0.55]";
     case "gangster_fodido":
-      // verde-musgo
-      return "bg-[oklch(0.45_0.10_150)/0.30] text-[oklch(0.85_0.12_150)] border-[oklch(0.55_0.12_150)/0.55]";
+      // verde-azulado Gangster Fodido
+      return "bg-[#3a8f97/0.22] text-[#3a8f97] border-[#3a8f97/0.55]";
     case "o_gunao":
-      // âmbar tabaco
-      return "bg-warning/22 text-warning border-warning/55";
+      // verde musgo O Gunão
+      return "bg-[#70966e/0.22] text-[#70966e] border-[#70966e/0.55]";
     case "young_blood":
-      // rosa fresco
-      return "bg-[oklch(0.60_0.18_350)/0.22] text-[oklch(0.85_0.14_350)] border-[oklch(0.60_0.18_350)/0.55]";
+      // azul claro Young Blood
+      return "bg-[#4cadd0/0.22] text-[#4cadd0] border-[#4cadd0/0.55]";
     case "bairrista":
     default:
       return "bg-muted text-muted-foreground border-border";
   }
 }
 
-// Cor da tag "Chefia de RedWood" — sempre vermelho RedWood.
-export const REDWOOD_BADGE_CLASS =
-  "bg-primary/15 text-primary border-primary/45";
+// Cor da tag "Chefia de Ballas" — sempre roxo Ballas.
+export const BALLAS_BADGE_CLASS =
+  "bg-purple-500/15 text-purple-400 border-purple-500/45";
 export const BAIRRISTA_BADGE_CLASS =
   "bg-muted text-muted-foreground border-border";
 

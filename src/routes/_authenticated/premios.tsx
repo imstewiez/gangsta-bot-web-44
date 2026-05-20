@@ -70,7 +70,7 @@ function Page() {
       <PageHeader
         eyebrow="Ranking"
         title="Prémios semanais"
-        description="Top semanal — o vencedor leva o prémio."
+        description="Top semanal"
         action={
           isAdmin ? (
             <Button
@@ -86,12 +86,12 @@ function Page() {
       />
       <div className="space-y-2">
         {prizes.isLoading && (
-          <p className="text-muted-foreground">A carregar…</p>
+          <p className="text-muted-foreground">A carregar</p>
         )}
         {(prizes.data ?? []).map((p) => (
           <div
             key={p.id}
-            className="flex items-center gap-4 rounded-sm border border-border bg-card p-4"
+            className="flex items-center gap-4 rounded-sm border border-border bg-card p-4 interactive-row"
           >
             <Trophy className="h-5 w-5 text-primary" />
             <div className="flex-1">
@@ -102,7 +102,7 @@ function Page() {
                 </span>
               </div>
               <div className="text-xs text-muted-foreground">
-                {p.prize_description ?? "Sem prémio definido"}
+                {p.prize_description ?? "Prémio por definir"}
                 {p.hybrid_score != null
                   ? ` · score ${fmtNum(Math.round(p.hybrid_score))}`
                   : ""}
@@ -176,7 +176,7 @@ function Page() {
               Cancelar
             </Button>
             <Button onClick={() => m.mutate()} disabled={m.isPending}>
-              {m.isPending ? "…" : "Guardar"}
+              {m.isPending ? "" : "Guardar"}
             </Button>
           </DialogFooter>
         </DialogContent>

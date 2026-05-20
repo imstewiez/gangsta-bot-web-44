@@ -13,6 +13,11 @@
   "vars": {
     "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
   },
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "ballasgang.pt", "custom_domain": true },
+    { "pattern": "www.ballasgang.pt", "custom_domain": true }
+  ],
   "headers": [
     {
       "test": "*",

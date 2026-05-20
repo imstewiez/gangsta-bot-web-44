@@ -10,11 +10,11 @@ async function autoCloseStaleOperations(): Promise<void> {
   try {
     await pgQuery(
       `update operations
-         set status = 'fechada_auto',
+         set status = 'concluida',
              end_time = coalesce(end_time, now()),
              updated_at = now()
        where deleted_at is null
-         and status in ('planeada','em_curso','agendada','iniciada','em_liquidacao')
+         and status in ('criada','trancagem','em_preparacao','em_curso','em_liquidacao')
          and coalesce(start_time, date::timestamp, created_at) < now() - interval '12 hours'`,
     );
   } catch (err) {

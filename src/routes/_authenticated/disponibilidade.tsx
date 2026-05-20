@@ -34,7 +34,7 @@ function Page() {
       <PageHeader
         eyebrow="Estrutura"
         title="Disponibilidade"
-        description="Sessões diárias e votos."
+        description="Disponibilidade diária"
       />
       <div className="grid gap-3 lg:grid-cols-2">
         <Card>
@@ -50,10 +50,10 @@ function Page() {
                 key={s.id}
                 onClick={() => setOpenId(s.id)}
                 className={
-                  "flex w-full items-center gap-3 rounded-sm border px-3 py-2 text-left text-sm " +
+                  "flex w-full cursor-pointer items-center gap-3 rounded-sm border px-3 py-2 text-left text-sm " +
                   (openId === s.id
                     ? "border-primary bg-accent/40"
-                    : "border-border hover:bg-accent/30")
+                    : "border-border interactive-row")
                 }
               >
                 <div className="flex-1">
@@ -73,7 +73,7 @@ function Page() {
               </button>
             ))}
             {!sessions.isLoading && !sessions.data?.length && (
-              <EmptyState title="Sem sessões" description="Nenhumas sessões encontradas." />
+              <EmptyState title="Nenhuma sessão" description="Nenhuma sessão" />
             )}
           </CardContent>
         </Card>
@@ -129,7 +129,7 @@ function Page() {
                   );
                 })}
                 {!votes.data.slots.length && (
-                  <EmptyState title="Sem slots" description="Nenhuns slots encontrados." />
+                  <EmptyState title="Nenhum slot" description="Nenhum slot" />
                 )}
               </div>
             )}

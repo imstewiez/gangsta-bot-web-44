@@ -14,15 +14,22 @@ export type NotifPayload = {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
-async function insertNotifs(userIds: string[], n: NotifPayload) {
-  if (!userIds.length) return;
-  const rows = userIds.map((uid) => ({
-    user_id: uid,
-    type: n.type,
-    title: n.title,
-    body: n.body ?? null,
-    link: n.link ?? null,
-  }));
+async function insertNotifs(
+  entries: { user_id?: string | null; discord_id?: string | null }[],
+  n: NotifPayload,
+) {
+  if (!entries.length) return;
+  const rows = entries
+    .filter((e) => e.user_id || e.discord_id)
+    .map((e) => ({
+      user_id: e.user_id ?? null,
+      discord_id: e.discord_id ?? null,
+      type: n.type,
+      title: n.title,
+      body: n.body ?? null,
+      link: n.link ?? null,
+    }));
+  if (!rows.length) return;
   const { error } = await supabaseAdmin.from("notifications").insert(rows);
   if (error) console.error("[notifications] insert failed:", error.message);
 }
@@ -33,22 +40,35 @@ export async function notifyUserIds(
   userIds: string[],
   n: NotifPayload,
 ) {
-  return insertNotifs(userIds, n);
+  return insertNotifs(
+    userIds.map((uid) => ({ user_id: uid })),
+    n,
+  );
 }
 
-// Notify by discord IDs — resolves to user_ids via profiles
+// Notify by discord IDs — resolves to user_ids via profiles; fallback to discord_id
 export async function notifyUsers(
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
   discordIds: string[],
   n: NotifPayload,
 ) {
   if (!discordIds.length) return;
-  const { data } = await supabase
-    .from("profiles")
-    .select("user_id, discord_id")
-    .in("discord_id", discordIds);
-  const ids = (data ?? []).map((r: { user_id: string }) => r.user_id);
-  return insertNotifs(ids, n);
+  const rows = await pgQuery<{ user_id: string | null; discord_id: string }>(
+    `select p.user_id, m.discord_id
+     from members m
+     left join profiles p on p.discord_id = m.discord_id
+     where m.discord_id = any($1::text[])`,
+    [discordIds],
+  );
+  const entries = rows.map((r) => ({
+    user_id: r.user_id,
+    discord_id: r.discord_id,
+  }));
+  if (!entries.length) {
+    console.warn("[notifications] no members found for discord IDs:", discordIds);
+    return;
+  }
+  return insertNotifs(entries, n);
 }
 
 // Notify all managers (patrão di zona, kingpin, manda-chuva, chefia)
@@ -59,6 +79,7 @@ export async function notifyManagers(
   const managers = await pgQuery<{ discord_id: string }>(
     `select discord_id from members
      where deleted_at is null
+       and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') = 'active')
        and discord_id is not null
        and (tier in ('patrao_di_zona','kingpin','manda_chuva') or role in ('chefia','manda_chuva','kingpin'))`,
   );

@@ -9,27 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { fmtNum, fmtDate } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
-import { Crosshair, Package, History } from "lucide-react";
+import { Package, History } from "lucide-react";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
+import { ARMORY_CAT_CONFIG } from "@/lib/armory.catalog";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
   component: Page,
 });
 
-type CatMeta = { label: string; tone: string; order: number };
 
-const GROUPS: Record<string, CatMeta> = {
-  armas_red: { label: "Armas Red", tone: "destructive", order: 1 },
-  armas_orange: { label: "Armas Orange", tone: "warning", order: 2 },
-  carregadores: { label: "Carregadores", tone: "primary", order: 3 },
-  acessorios_armas: { label: "Acessórios", tone: "info", order: 4 },
-  drogas: { label: "Drogas", tone: "success", order: 5 },
-  materiais_craft: {
-    label: "Materiais de Craft",
-    tone: "muted",
-    order: 6,
-  },
-};
 
 function normalizeName(n: string): string {
   return n
@@ -89,14 +77,11 @@ function classifyRow(r: { category: string | null; item_name: string }): string 
   return null;
 }
 
-const TONE_BG: Record<string, string> = {
-  warning: "bg-warning/15 border-warning/40 text-warning",
-  destructive: "bg-destructive/15 border-destructive/40 text-destructive",
-  info: "bg-info/15 border-info/40 text-info",
-  primary: "bg-primary/15 border-primary/40 text-primary",
-  success: "bg-success/15 border-success/40 text-success",
-  muted: "bg-muted/40 border-border text-muted-foreground",
-};
+function catBg(cat: string): string {
+  const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
+  if (!cfg) return "bg-muted/40 border-border text-muted-foreground";
+  return `${cfg.bg} ${cfg.border} ${cfg.color}`;
+}
 
 const MOV_LABEL: Record<string, string> = {
   saldo_inicial: "Saldo inicial",
@@ -109,7 +94,7 @@ const MOV_LABEL: Record<string, string> = {
   ajuste_manual: "Ajuste",
   perda_saida: "Perdido",
   apreendido: "Apreendido",
-  craftado: "Crafte",
+  craftado: "Craftado",
 };
 
 function Page() {
@@ -118,7 +103,7 @@ function Page() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
 
   if (me.isLoading) {
-    return <p className="text-muted-foreground">A abrir o armazém…</p>;
+    return <p className="text-muted-foreground">A carregar inventário</p>;
   }
   if (!me.data?.can_see_inventory) {
     return (
@@ -139,15 +124,15 @@ function Page() {
       <PageHeader
         eyebrow="Armazém"
         title="Inventário"
-        description="Armas e carregadores que a firma tem em casa. Movimentos automáticos via entregas e encomendas."
+        description="Stock da firma"
         icon={Package}
       />
       <Tabs defaultValue="stock">
         <TabsList>
-          <TabsTrigger value="stock">
+          <TabsTrigger value="stock" className="interactive-tab">
             <Package className="mr-1.5 h-3.5 w-3.5" /> Stock
           </TabsTrigger>
-          <TabsTrigger value="ledger">
+          <TabsTrigger value="ledger" className="interactive-tab">
             <History className="mr-1.5 h-3.5 w-3.5" /> Movimentos
           </TabsTrigger>
         </TabsList>
@@ -176,7 +161,7 @@ function StockTable() {
   }, {});
   const total = Object.values(groups).reduce((s, arr) => s + arr.length, 0);
 
-  if (q.isLoading) return <p className="text-muted-foreground">A contar…</p>;
+  if (q.isLoading) return <p className="text-muted-foreground">A carregar</p>;
   if (!total)
     return (
       <Card className="p-8 text-center text-muted-foreground">
@@ -194,7 +179,8 @@ function StockTable() {
   return (
     <div className="space-y-6">
       {ordered.map(([cat, items]) => {
-        const meta = GROUPS[cat] ?? { label: cat, tone: "muted", order: 99 };
+        const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
+        const meta = cfg ?? { label: cat, tone: "muted", order: 99, icon: Package, color: "", bg: "", border: "", headerColor: "" };
         const totalQty = items.reduce((s, r) => s + (r.qty ?? 0), 0);
         const value = items.reduce(
           (s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0),
@@ -208,11 +194,11 @@ function StockTable() {
             <header
               className={
                 "flex items-center justify-between gap-3 border-b px-4 py-2.5 " +
-                TONE_BG[meta.tone]
+                catBg(cat)
               }
             >
               <div className="flex items-center gap-2">
-                <CategoryIcon category={cat} tone={meta.tone} size={18} />
+                <CategoryIcon category={cat} size={18} />
                 <h2 className="text-display text-sm uppercase tracking-widest">
                   {meta.label}
                 </h2>
@@ -241,7 +227,7 @@ function StockTable() {
                       return (
                         <tr
                           key={r.item_id}
-                          className="border-t border-border hover:bg-accent/30"
+                          className="border-t border-border interactive-row"
                         >
                           <td className="px-3 py-2 font-medium">
                             <span className="inline-flex items-center gap-2">
@@ -289,7 +275,7 @@ function LedgerTable() {
   });
   const rows = q.data ?? [];
 
-  if (q.isLoading) return <p className="text-muted-foreground">A carregar…</p>;
+  if (q.isLoading) return <p className="text-muted-foreground">A carregar</p>;
   if (!rows.length)
     return (
       <Card className="p-8 text-center text-muted-foreground">
@@ -313,7 +299,7 @@ function LedgerTable() {
           {rows.map((r) => (
             <tr
               key={r.id}
-              className="border-t border-border hover:bg-accent/30"
+              className="border-t border-border interactive-row"
             >
               <td className="px-3 py-2 text-muted-foreground">
                 {fmtDate(r.created_at).split(",")[0]}

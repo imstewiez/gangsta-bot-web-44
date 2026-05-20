@@ -30,6 +30,7 @@ export const listMembers = createServerFn({ method: "GET" })
         `select ${SELECT_MEMBER}
          from members
          where deleted_at is null
+           and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted'))
          order by
            case coalesce(role,'bairrista')
              when 'manda_chuva' then 1
@@ -103,11 +104,11 @@ export const getMember = createServerFn({ method: "GET" })
         [data.id],
       ),
       pgOne<{ count: string }>(
-        "select count(*)::text as count from kill_logs where killer_id = $1",
+        "select coalesce((select kills_total::text from all_time_stats where member_id = $1), '0') as count",
         [data.id],
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
-        "select count(*)::text as count from kill_logs where victim_id = $1",
+        "select coalesce((select deaths_total::text from all_time_stats where member_id = $1), '0') as count",
         [data.id],
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(

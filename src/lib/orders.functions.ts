@@ -121,7 +121,7 @@ export const createOrder = createServerFn({ method: "POST" })
       type: "order_new",
       title: "Nova encomenda",
       body: `${me.display_name ?? "Membro"} pediu ${data.quantity}× ${item.name}`,
-      link: "/encomendas",
+      link: "/entregas",
     });
     return { id: row?.id };
   });
@@ -230,7 +230,7 @@ export const transitionOrder = createServerFn({ method: "POST" })
             type: "order_update",
             title: `Encomenda #${data.id} · ${STATUS_PT[data.to] ?? data.to}`,
             body: `${before.item_name ?? "Item"} — ${STATUS_PT[data.to] ?? data.to}`,
-            link: "/encomendas",
+            link: "/entregas",
           });
         }
         return { ok: true as const };

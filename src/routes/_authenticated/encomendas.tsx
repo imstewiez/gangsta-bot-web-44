@@ -90,17 +90,17 @@ function Page() {
   return (
     <>
       <PageHeader
-        eyebrow="Supply"
+        eyebrow="Operação"
         title="Encomendas"
-        description="Catálogo operacional. As encomendas são processadas pela direção."
+        description="Pedidos e encomendas"
         icon={ShoppingBag}
         action={<NewOrder />}
       />
       <FadeIn>
         <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="mine">As minhas</TabsTrigger>
-          {isManager && <TabsTrigger value="manage">Para tratar</TabsTrigger>}
+          <TabsTrigger value="mine" className="interactive-tab">As minhas</TabsTrigger>
+          {isManager && <TabsTrigger value="manage" className="interactive-tab">Para tratar</TabsTrigger>}
         </TabsList>
         <TabsContent value="mine" className="mt-4">
           <OrdersList scope="mine" canManage={false} />
@@ -166,20 +166,20 @@ function OrdersList({
       }
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["stock"] });
-      toast.success("Feito.");
+      toast.success("Guardado");
     },
   });
 
   if (orders.isLoading)
-    return <p className="text-muted-foreground">A puxar pedidos…</p>;
+    return <p className="text-muted-foreground">A carregar pedidos</p>;
   if (!orders.data?.length)
     return (
       <Card className="p-10 text-center">
         <ShoppingBag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
           {scope === "mine"
-            ? "Ainda não pediste nada."
-            : "Caixa de entrada limpa."}
+            ? "Nenhum pedido"
+            : "Nenhuma encomenda"}
         </p>
       </Card>
     );
@@ -280,7 +280,7 @@ function NewOrder() {
         },
       }),
     onSuccess: () => {
-      toast.success("Encomenda registada com sucesso.");
+      toast.success("Encomenda registada");
       qc.invalidateQueries({ queryKey: ["orders"] });
       setOpen(false);
       setItem("");
@@ -305,7 +305,7 @@ function NewOrder() {
             <label className="text-xs text-muted-foreground">Item</label>
             <Select value={item} onValueChange={setItem}>
               <SelectTrigger>
-                <SelectValue placeholder="Escolhe…" />
+                <SelectValue placeholder="Seleciona" />
               </SelectTrigger>
               <SelectContent>
                 {items.map((i) => (
@@ -336,7 +336,7 @@ function NewOrder() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Para quê, para quando…"
+              placeholder="Notas"
             />
           </div>
         </div>
@@ -348,7 +348,7 @@ function NewOrder() {
             disabled={!item || !qty || m.isPending}
             onClick={() => m.mutate()}
           >
-            {m.isPending ? "A enviar…" : "Pedir"}
+            {m.isPending ? "A processar" : "Pedir"}
           </Button>
         </DialogFooter>
       </DialogContent>

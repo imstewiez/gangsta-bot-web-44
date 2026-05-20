@@ -78,23 +78,23 @@ function Page() {
       <PageHeader
         eyebrow="Chefia"
         title="Onboarding"
-        description="Pedidos de tag."
+        description="Novos membros"
       />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           {["pending", "approved", "denied", "all"].map((s) => (
-            <TabsTrigger key={s} value={s}>
+            <TabsTrigger key={s} value={s} className="interactive-tab">
               {s}
             </TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
       <div className="mt-4 space-y-2">
-        {reqs.isLoading && <p className="text-muted-foreground">A carregar…</p>}
+        {reqs.isLoading && <p className="text-muted-foreground">A carregar</p>}
         {(reqs.data ?? []).map((r) => (
           <div
             key={r.id}
-            className="flex items-center gap-3 rounded-sm border border-border bg-card p-3"
+            className="flex items-center gap-3 rounded-sm border border-border bg-card p-3 interactive-row"
           >
             <div className="flex-1">
               <div className="font-medium">
@@ -155,7 +155,7 @@ function Page() {
               disabled={!reason || deny.isPending}
               onClick={() => deny.mutate()}
             >
-              {deny.isPending ? "…" : "Recusar"}
+              {deny.isPending ? "" : "Recusar"}
             </Button>
           </DialogFooter>
         </DialogContent>

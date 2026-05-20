@@ -49,8 +49,15 @@ export async function pgQuery<T = any>(
     const rows = (data as any[] | null) ?? [];
     return rows as T[];
   } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    console.error("[pgQuery] ERROR", { text: text.slice(0, 60), error: err });
+    let err: string;
+    if (e instanceof Error) {
+      err = e.message;
+    } else if (typeof e === "object" && e !== null) {
+      err = JSON.stringify(e);
+    } else {
+      err = String(e);
+    }
+    console.error("[pgQuery] ERROR", { text: text.slice(0, 200), error: err });
     throw e;
   }
 }

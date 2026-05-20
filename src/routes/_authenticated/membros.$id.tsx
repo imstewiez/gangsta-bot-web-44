@@ -39,12 +39,12 @@ function Page() {
     queryFn: () => meFn(),
     staleTime: 60_000,
   });
-  if (isLoading) return <p className="text-muted-foreground">A carregar…</p>;
+  if (isLoading) return <p className="text-muted-foreground">A carregar</p>;
   if (!data?.member)
     return (
       <p>
         Membro não encontrado.{" "}
-        <Link to="/membros" className="text-primary">
+        <Link to="/membros" className="text-primary interactive-link cursor-pointer">
           Voltar
         </Link>
       </p>

@@ -27,6 +27,12 @@ export type HomeKpis = {
   totalSaidasWeek: number; // operações fechadas/finalizadas na semana
   totalKillsWeek: number;
   totalOpsWeek: number; // saídas iniciadas na semana (qualquer estado)
+  // Saídas stats
+  winRate: number; // % de vitórias nas saídas fechadas/finalizadas
+  avgKillsPerSaida: number;
+  topOpsParticipants: { display_name: string | null; tier: string | null; ops: number }[];
+  nextSaida: { tipo: string | null; spot: string | null; scheduled_at: string | null } | null;
+  // Existing
   byTier: { tier: string; count: number }[];
   topWeek: RankRow[];
   topWeekLabel: string | null;
@@ -58,6 +64,7 @@ async function topForWeek(weekStart: string | null): Promise<RankRow[]> {
      join members m on m.id = wr.member_id
      where wr.week_start = $1
        and m.deleted_at is null
+       and (m.status = 'ativo' or m.status is null and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted'))
      order by score desc nulls last
      limit 5`,
     [weekStart],
@@ -73,6 +80,10 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       saidasWeek,
       opsWeek,
       killsWeek,
+      winRateRows,
+      avgKillsRow,
+      topOpsRow,
+      nextSaidaRow,
       weeks,
       monthRows,
       prize,
@@ -81,18 +92,19 @@ export const getHomeKpis = createServerFn({ method: "GET" })
         `select coalesce(tier, 'unknown') as tier, count(*)::text as count
          from members
          where deleted_at is null
-           and (lifecycle_state is null or lifecycle_state::text = 'active')
+           and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') = 'active')
          group by 1 order by 2 desc`,
       ).catch(() => []),
       pgOne<{ count: string }>(
         `select count(*)::text as count from members
          where deleted_at is null
+           and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') = 'active')
            and joined_at >= now() - interval '7 days'`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
         `select count(*)::text as count from operations
          where deleted_at is null
-           and status in ('finalizada','fechada','fechada_auto','encerrada')
+           and status in ('concluida','cancelada')
            and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
@@ -101,9 +113,47 @@ export const getHomeKpis = createServerFn({ method: "GET" })
            and coalesce(start_time, date::timestamp, created_at) >= now() - interval '7 days'`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
-        `select count(*)::text as count from kill_logs
-         where coalesce(date::timestamp, created_at) >= now() - interval '7 days'`,
+        `select coalesce(sum(kills_total)::text, '0') as count from all_time_stats`,
       ).catch(() => ({ count: "0" })),
+      pgQuery<{ wins: number; total: number }>(
+        `select
+           count(*) filter (where coalesce(our_kills,0) > 0 and (enemy_count is null or coalesce(our_kills,0) >= coalesce(enemy_count,0)))::int as wins,
+           count(*)::int as total
+         from operations
+         where deleted_at is null
+           and status in ('concluida','cancelada')
+           and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`,
+      ).catch(() => [{ wins: 0, total: 0 }]),
+      pgOne<{ avg: string }>(
+        `select coalesce(avg(coalesce(our_kills,0))::text, '0') as avg
+         from operations
+         where deleted_at is null
+           and status in ('concluida','cancelada')
+           and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`,
+      ).catch(() => ({ avg: "0" })),
+      pgQuery<{ display_name: string | null; tier: string | null; ops: number }>(
+        `select m.display_name, m.tier,
+                sum(coalesce(wr.operations_count,0))::int as ops
+         from weekly_rankings wr
+         join members m on m.id = wr.member_id
+         where wr.week_start = (select max(week_start) from weekly_rankings)
+           and m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted'))
+         group by m.display_name, m.tier
+         having sum(coalesce(wr.operations_count,0)) > 0
+         order by ops desc
+         limit 3`,
+      ).catch(() => []),
+      pgOne<{ tipo: string | null; spot: string | null; scheduled_at: string | null }>(
+        `select operation_type as tipo, spot,
+                coalesce(start_time, (date::timestamp + coalesce(scheduled_time, '00:00'::time)))::text as scheduled_at
+         from operations
+         where deleted_at is null
+           and status in ('criada','trancagem','em_preparacao','em_curso')
+           and coalesce(start_time, date::timestamp, created_at) >= now()
+         order by coalesce(start_time, date::timestamp, created_at) asc
+         limit 1`,
+      ).catch(() => null),
       pgQuery<{ week_start: string }>(
         `select to_char(week_start,'YYYY-MM-DD') as week_start
          from weekly_rankings
@@ -123,6 +173,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          join members m on m.id = wr.member_id
          where wr.week_start >= date_trunc('month', current_date)::date
            and m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted'))
          group by m.display_name, m.nickname
          having sum(${SCORE_EXPR}) > 0
          order by score desc nulls last
@@ -154,11 +205,17 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       year: "numeric",
     }).format(new Date());
 
+    const wr = winRateRows[0] ?? { wins: 0, total: 0 };
+
     return {
       newMembersWeek: Number(newMembers?.count ?? 0),
       totalSaidasWeek: Number(saidasWeek?.count ?? 0),
       totalKillsWeek: Number(killsWeek?.count ?? 0),
       totalOpsWeek: Number(opsWeek?.count ?? 0),
+      winRate: wr.total > 0 ? Math.round((wr.wins / wr.total) * 100) : 0,
+      avgKillsPerSaida: Number(Number(avgKillsRow?.avg ?? 0).toFixed(1)),
+      topOpsParticipants: topOpsRow,
+      nextSaida: nextSaidaRow,
       byTier: byTier.map((r) => ({ tier: r.tier, count: Number(r.count) })),
       topWeek,
       topWeekLabel: latestWeek,
@@ -187,11 +244,11 @@ export const getAdminKpis = createServerFn({ method: "GET" })
       pgOne<{ count: string }>(
         `select count(*)::text as count from members
          where deleted_at is null
-           and (lifecycle_state is null or lifecycle_state::text = 'active')`,
+           and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') = 'active')`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
         `select count(*)::text as count from operations
-         where status in ('planeada','em_curso','em_liquidacao','agendada','iniciada')
+         where status in ('criada','trancagem','em_preparacao','em_curso','em_liquidacao')
            and deleted_at is null`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(

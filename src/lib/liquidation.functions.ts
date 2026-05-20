@@ -18,12 +18,12 @@ export const listUnfinalizedSaidas = createServerFn({ method: "GET" })
   .handler(async (): Promise<UnfinalizedSaida[]> => {
     return pgQuery<UnfinalizedSaida>(
       `select o.id, o.operation_type, o.spot,
-              coalesce(o.status, 'planeada') as status,
+              coalesce(o.status, 'criada') as status,
               coalesce(o.start_time, (o.date::timestamp + coalesce(o.scheduled_time, '00:00'::time))) as scheduled_at,
               (select count(*)::int from operation_participants p where p.operation_id = o.id) as participants
          from operations o
         where o.deleted_at is null
-          and (o.status is null or o.status not in ('finalizada','cancelada'))
+          and (o.status is null or o.status not in ('concluida','cancelada'))
         order by coalesce(o.start_time, o.date::timestamp, o.created_at) desc
         limit 100`,
     );
@@ -76,7 +76,7 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<SaidaDetail | null> => {
     const op = await pgOne<SaidaDetail["operation"]>(
-      `select o.id, o.operation_type, o.spot, coalesce(o.status,'planeada') as status,
+      `select o.id, o.operation_type, o.spot, coalesce(o.status,'criada') as status,
               coalesce(o.start_time,(o.date::timestamp + coalesce(o.scheduled_time,'00:00'::time))) as scheduled_at,
               o.leader_id, o.notes,
               coalesce(o.supplied_value,0)::float as supplied_value,
@@ -120,7 +120,7 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
  * - Para cada participante, calcula valores (issued / returned / lost / consumed) a partir de operation_materials
  * - Marca todos os participantes como settled
  * - Atualiza agregados na operation (supplied/returned/lost/consumed, gross e net)
- * - Marca a operação como 'finalizada' com end_time = now()
+ * - Marca a operação como 'concluida' com end_time = now()
  * - Enfileira notificação Discord
  * Tudo dentro de uma única transação.
  */
@@ -141,8 +141,8 @@ export const liquidateSaida = createServerFn({ method: "POST" })
           [data.id],
         );
         if (!op.rows[0]) throw new Error("Saída não encontrada");
-        if (op.rows[0].status === "finalizada")
-          throw new Error("Saída já finalizada");
+        if (op.rows[0].status === "concluida")
+          throw new Error("Saída já concluída");
 
         // Aggregate per participant from operation_materials, joining unit price from items
         const perPart = await c.query(
@@ -202,7 +202,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
 
         await c.query(
           `update operations
-              set status = 'finalizada',
+              set status = 'concluida',
                   end_time = coalesce(end_time, now()),
                   liquidation_started_at = coalesce(liquidation_started_at, now()),
                   supplied_value = $1,

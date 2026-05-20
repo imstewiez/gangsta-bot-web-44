@@ -6,7 +6,7 @@ interface RedWoodBrandProps {
   showTagline?: boolean;
 }
 
-// Mantém o nome do export por retro-compat, mas a marca é Ballas Gang.
+// Componente de marca Ballas Gang.
 export function RedWoodBrand({ className, size = "md", showTagline = false }: RedWoodBrandProps) {
   const sizes = {
     sm: { firma: "text-sm", red: "text-sm", tag: "text-[10px]" },
@@ -29,7 +29,7 @@ export function RedWoodBrand({ className, size = "md", showTagline = false }: Re
       </div>
       {showTagline && (
         <span className={cn("tracking-[0.25em] uppercase text-muted-foreground/70 mt-0.5 font-display", s.tag)}>
-          Firma RedWood
+          Ballas Gang
         </span>
       )}
     </div>

@@ -19,9 +19,14 @@ import {
   Home as HomeIcon,
   Sparkles,
   Users,
+  TrendingUp,
+  Swords,
+  Clock,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -51,17 +56,17 @@ function Dashboard() {
       <PageHeader
         eyebrow="Casa"
         title={`${saud}, ${nome}.`}
-        description="Stats ao vivo do bairro. Quem entra, quem sai, quem marca pontos."
+        description="Resumo da firma"
         icon={HomeIcon}
       />
       {error && (
         <div className="mb-4 flex items-center gap-3 rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm animate-rise">
-          <span className="text-destructive">{(error as Error).message || "Não conseguimos carregar os dados."}</span>
+          <span className="text-destructive">{(error as Error).message || "Erro ao carregar dados"}</span>
           <button
             onClick={() => refetch()}
-            className="ml-auto text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
+            className="ml-auto cursor-pointer text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
           >
-            Tentar de novo →
+            Tentar novamente
           </button>
         </div>
       )}
@@ -75,25 +80,93 @@ function Dashboard() {
           accent
         />
         <Kpi
-          icon={DoorOpen}
-          label="Saídas fechadas"
+          icon={Crosshair}
+          label="Saídas (7d)"
           value={data?.totalSaidasWeek}
           loading={isLoading}
+          subtext={`${data?.totalOpsWeek ?? 0} iniciadas`}
         />
         <Kpi
-          icon={Crosshair}
-          label="Saídas iniciadas"
-          value={data?.totalOpsWeek}
+          icon={Trophy}
+          label="Win Rate"
+          value={`${data?.winRate ?? 0}%`}
           loading={isLoading}
+          tone={data?.winRate && data.winRate >= 60 ? "success" : data?.winRate && data.winRate >= 40 ? "warning" : "destructive"}
         />
         <Kpi
-          icon={Skull}
-          label="Kills (7d)"
-          value={data?.totalKillsWeek}
+          icon={Swords}
+          label="Kills/Saída"
+          value={data?.avgKillsPerSaida ?? 0}
           loading={isLoading}
           tone="destructive"
         />
       </div>
+
+      {/* Next saida + Top ops participants */}
+      {(data?.nextSaida || (data?.topOpsParticipants && data.topOpsParticipants.length > 0)) && (
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          {data?.nextSaida && (
+            <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 via-card to-card">
+              <CardContent className="flex items-center gap-4 p-5">
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-amber-500/20 ring-1 ring-amber-500/40">
+                  <Clock className="h-6 w-6 text-amber-400" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-display text-[11px] tracking-[0.3em] text-amber-400 uppercase">
+                    Próxima saída
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="truncate">{data.nextSaida.spot ?? "Spot não definido"}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {data.nextSaida.tipo ?? "Saída"} ·{" "}
+                    {data.nextSaida.scheduled_at
+                      ? new Date(data.nextSaida.scheduled_at).toLocaleString("pt-PT", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "Data por definir"}
+                  </div>
+                </div>
+                <Link
+                  to="/operacoes"
+                  className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-amber-400 interactive-link"
+                >
+                  VER SAÍDAS →
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {data?.topOpsParticipants && data.topOpsParticipants.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-display text-sm flex items-center gap-2">
+                  <Crosshair className="h-4 w-4 text-primary" />
+                  Mais ativos (saídas)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {data.topOpsParticipants.map((p, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="grid w-6 place-items-center text-xs text-muted-foreground">
+                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                      </span>
+                      <TierIcon tier={p.tier} size="sm" />
+                      <span className="flex-1 truncate text-sm">{p.display_name ?? "—"}</span>
+                      <span className="text-display text-sm tabular-nums">{p.ops}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {data?.prize?.winner_name && (
         <Card className="mt-6 border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card">
@@ -122,7 +195,7 @@ function Dashboard() {
             </div>
             <Link
               to="/premios"
-              className="text-display text-[10px] tracking-[0.2em] text-primary hover:underline"
+              className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-primary interactive-link"
             >
               VER PRÉMIOS →
             </Link>
@@ -339,46 +412,53 @@ function Kpi({
   accent,
   icon: Icon,
   tone,
+  subtext,
 }: {
   label: string;
-  value?: number;
+  value?: number | string;
   loading: boolean;
   accent?: boolean;
-  tone?: "destructive";
+  tone?: "destructive" | "success" | "warning";
   icon?: React.ComponentType<{ className?: string }>;
+  subtext?: string;
 }) {
   const valueColor = accent
     ? "text-primary"
     : tone === "destructive"
       ? "text-destructive"
-      : "text-foreground";
+      : tone === "success"
+        ? "text-emerald-400"
+        : tone === "warning"
+          ? "text-amber-400"
+          : "text-foreground";
+  const iconColor = accent
+    ? "text-primary"
+    : tone === "destructive"
+      ? "text-destructive"
+      : tone === "success"
+        ? "text-emerald-400"
+        : tone === "warning"
+          ? "text-amber-400"
+          : "text-muted-foreground/60";
   return (
     <div
-      className={
-        "rounded-sm border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] " +
-        (accent ? "border-primary/40 hover:shadow-[0_8px_30px_-12px_color-mix(in_oklab,var(--primary)_30%,transparent)]" : "border-border")
-      }
+      className={cn(
+        "rounded-xl border bg-card/60 p-4 backdrop-blur-sm interactive-card",
+        accent ? "border-primary/40" : "border-border/60",
+      )}
     >
       <div className="flex items-center justify-between">
         <div className="text-display text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
           {label}
         </div>
-        {Icon && (
-          <Icon
-            className={
-              "h-4 w-4 " +
-              (accent
-                ? "text-primary"
-                : tone === "destructive"
-                  ? "text-destructive"
-                  : "text-muted-foreground/60")
-            }
-          />
-        )}
+        {Icon && <Icon className={cn("h-4 w-4", iconColor)} />}
       </div>
-      <div className={"mt-1 text-3xl font-bold tabular-nums " + valueColor}>
-        {loading ? "…" : fmtNum(value)}
+      <div className={cn("mt-1 text-3xl font-bold tabular-nums font-display", valueColor)}>
+        {loading ? "" : typeof value === "number" ? fmtNum(value) : value}
       </div>
+      {subtext && (
+        <div className="mt-1 text-[10px] text-muted-foreground/60">{subtext}</div>
+      )}
     </div>
   );
 }

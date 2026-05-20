@@ -128,7 +128,7 @@ export const createDelivery = createServerFn({ method: "POST" })
       type: "delivery_new",
       title:
         data.tipo === "venda" ? "Pedido de compra" : "Nova entrega de material",
-      body: `${me.display_name ?? "Membro"} ${verb} ${totalQty} itens (€${Math.round(totalValue)})`,
+      body: `${me.display_name ?? "Membro"} ${verb} ${totalQty} ${totalQty === 1 ? "item" : "itens"} (€${Math.round(totalValue)})`,
       link: "/entregas",
     });
     return { id: row?.id };

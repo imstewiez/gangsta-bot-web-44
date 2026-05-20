@@ -17,7 +17,13 @@ export const Route = createFileRoute("/_authenticated/membros/")({ component: Pa
 function Page() {
   useRealtimeSync(["members"]);
   const fn = useAuthedServerFn(listMembers);
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["members"], queryFn: () => fn() });
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["members"],
+    queryFn: () => fn(),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+  });
   const [q, setQ] = useState("");
   const list = Array.isArray(data) ? data : [];
   const filtered = list.filter((m) =>
@@ -35,7 +41,7 @@ function Page() {
   });
   return (
     <>
-      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} no total. Carrega num membro para ver o perfil completo.`}
+      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} membros`}
         icon={Users}
         action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
       {error && (
@@ -43,7 +49,7 @@ function Page() {
           <span className="text-destructive">{error instanceof Error ? error.message : "Erro a carregar membros."}</span>
           <button
             onClick={() => refetch()}
-            className="ml-auto inline-flex items-center gap-1 text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
+            className="ml-auto inline-flex cursor-pointer items-center gap-1 text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
           >
             <RotateCcw className="h-3 w-3" />
             Tentar de novo
@@ -67,7 +73,7 @@ function Page() {
               <TableRowsSkeleton rows={8} cols={6} widths={["w-40", "w-24", "w-28", "w-16", "w-24", "w-20"]} />
             )}
             {sorted.map((m) => (
-              <tr key={m.id} className="border-t border-border hover:bg-accent/30 transition-colors duration-150 cursor-pointer">
+              <tr key={m.id} className="border-t border-border interactive-row transition-colors duration-150 cursor-pointer">
                 <td className="px-3 py-2">
                   <Link to="/membros/$id" params={{ id: String(m.id) }} className="font-medium hover:text-primary inline-flex items-center gap-2">
                     <TierIcon tier={m.tier} size="sm" />

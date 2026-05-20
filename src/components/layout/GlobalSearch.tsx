@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 
 const PAGES = [
-  { label: "Dashboard", path: "/", icon: null },
+  { label: "Casa", path: "/", icon: null },
   { label: "Inventário", path: "/inventario", icon: Package },
   { label: "Preçário", path: "/precario", icon: ShoppingBag },
   { label: "Receitas", path: "/receitas", icon: null },
@@ -31,7 +31,7 @@ const PAGES = [
   { label: "Auditoria", path: "/auditoria", icon: null },
   { label: "Disponibilidade", path: "/disponibilidade", icon: null },
   { label: "Liquidação", path: "/liquidacao", icon: null },
-  { label: "Admin", path: "/admin", icon: null },
+  { label: "Definições", path: "/admin", icon: null },
 ];
 
 const ACTIONS = [

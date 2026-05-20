@@ -24,6 +24,7 @@ export type RecipeRow = {
   estimated_value: number;
   margin: number;
   margin_pct: number | null;
+  recipe_category: string | null;
 };
 
 export const listRecipes = createServerFn({ method: "GET" })
@@ -46,8 +47,10 @@ export const listRecipes = createServerFn({ method: "GET" })
       ing_subcategory: string | null;
       quantity: number | null;
       unit_cost: string | null;
+      recipe_category: string | null;
     }>(
       `select r.id as recipe_id, r.item_id, i.name as item_name, i.category, i.subcategory, r.tier, i.unit,
+              r.category as recipe_category,
               i.estimated_value,
               ri.ingredient_item_id as ing_item_id,
               ii.name as ing_name,
@@ -80,6 +83,7 @@ export const listRecipes = createServerFn({ method: "GET" })
           estimated_value: Number(r.estimated_value ?? 0),
           margin: 0,
           margin_pct: null,
+          recipe_category: r.recipe_category,
         };
         map.set(r.recipe_id, recipe);
       }

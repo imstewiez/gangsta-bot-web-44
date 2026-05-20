@@ -130,6 +130,8 @@ export const listMembersLite = createServerFn({ method: "GET" })
   .handler(async () => {
     return pgQuery<{ id: number; label: string }>(
       `select id, coalesce(display_name, username, nickname, discord_id) as label
-       from members where deleted_at is null order by label`,
+       from members where deleted_at is null
+         and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted'))
+       order by label`,
     );
   });

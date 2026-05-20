@@ -1,5 +1,5 @@
 import { TIER_LABELS, TIER_ACCENT, isChefia } from "@/lib/domain";
-import { TierIcon, RedWoodIcon } from "./TierIcon";
+import { TierIcon, BallasIcon } from "./TierIcon";
 
 type Size = "xs" | "sm" | "md";
 
@@ -60,8 +60,8 @@ export function AffiliationBadge({
           PAD[size]
         }
       >
-        <RedWoodIcon size={ICON_SIZE[size]} />
-        <span className="leading-none">RedWood</span>
+        <BallasIcon size={ICON_SIZE[size]} />
+        <span className="leading-none">Ballas</span>
       </span>
     );
   }

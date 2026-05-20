@@ -8,7 +8,7 @@ import {
   Home,
   type LucideIcon,
 } from "lucide-react";
-import { TIER_GRADIENT, REDWOOD_GRADIENT } from "@/lib/domain";
+import { TIER_GRADIENT, BALLAS_GRADIENT } from "@/lib/domain";
 
 // Pawn (Gangster Fodido) — lucide não tem peças de xadrez.
 function Pawn(props: React.SVGProps<SVGSVGElement>) {
@@ -107,7 +107,7 @@ export function TierIcon({
   );
 }
 
-export function RedWoodIcon({ size = "sm" }: { size?: Size }) {
+export function BallasIcon({ size = "sm" }: { size?: Size }) {
   const s = SIZE[size];
   return (
     <span
@@ -115,13 +115,13 @@ export function RedWoodIcon({ size = "sm" }: { size?: Size }) {
       className={
         "inline-grid place-items-center rounded-full ring-1 ring-black/40 shrink-0"
       }
-      style={{ background: REDWOOD_GRADIENT, width: s.box, height: s.box }}
+      style={{ background: BALLAS_GRADIENT, width: s.box, height: s.box }}
     >
       <span
         className="text-white text-[10px] font-display font-black leading-none"
         style={{ fontSize: Math.max(8, s.icon - 2) }}
       >
-        R
+        B
       </span>
     </span>
   );

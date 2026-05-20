@@ -28,8 +28,12 @@ import { Route as AuthenticatedDisponibilidadeRouteImport } from './routes/_auth
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedOperacoesIndexRouteImport } from './routes/_authenticated/operacoes.index'
 import { Route as AuthenticatedMembrosIndexRouteImport } from './routes/_authenticated/membros.index'
+import { Route as AuthenticatedOperacoesIdRouteImport } from './routes/_authenticated/operacoes.$id'
 import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros.$id'
+import { Route as AuthenticatedAdminReceitasRouteImport } from './routes/_authenticated/admin.receitas'
+import { Route as AuthenticatedAdminPrecosRouteImport } from './routes/_authenticated/admin.precos'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -126,22 +130,46 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedOperacoesIndexRoute =
+  AuthenticatedOperacoesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedOperacoesRoute,
+  } as any)
 const AuthenticatedMembrosIndexRoute =
   AuthenticatedMembrosIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedMembrosRoute,
   } as any)
+const AuthenticatedOperacoesIdRoute =
+  AuthenticatedOperacoesIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedOperacoesRoute,
+  } as any)
 const AuthenticatedMembrosIdRoute = AuthenticatedMembrosIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AuthenticatedMembrosRoute,
 } as any)
+const AuthenticatedAdminReceitasRoute =
+  AuthenticatedAdminReceitasRouteImport.update({
+    id: '/receitas',
+    path: '/receitas',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPrecosRoute =
+  AuthenticatedAdminPrecosRouteImport.update({
+    id: '/precos',
+    path: '/precos',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
@@ -151,19 +179,23 @@ export interface FileRoutesByFullPath {
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/operacoes': typeof AuthenticatedOperacoesRoute
+  '/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/precos': typeof AuthenticatedAdminPrecosRoute
+  '/admin/receitas': typeof AuthenticatedAdminReceitasRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
+  '/operacoes/$id': typeof AuthenticatedOperacoesIdRoute
   '/membros/': typeof AuthenticatedMembrosIndexRoute
+  '/operacoes/': typeof AuthenticatedOperacoesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
@@ -172,21 +204,24 @@ export interface FileRoutesByTo {
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/operacoes': typeof AuthenticatedOperacoesRoute
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/precos': typeof AuthenticatedAdminPrecosRoute
+  '/admin/receitas': typeof AuthenticatedAdminReceitasRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
+  '/operacoes/$id': typeof AuthenticatedOperacoesIdRoute
   '/membros': typeof AuthenticatedMembrosIndexRoute
+  '/operacoes': typeof AuthenticatedOperacoesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
@@ -196,14 +231,18 @@ export interface FileRoutesById {
   '/_authenticated/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
-  '/_authenticated/operacoes': typeof AuthenticatedOperacoesRoute
+  '/_authenticated/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/_authenticated/admin/precos': typeof AuthenticatedAdminPrecosRoute
+  '/_authenticated/admin/receitas': typeof AuthenticatedAdminReceitasRoute
   '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
+  '/_authenticated/operacoes/$id': typeof AuthenticatedOperacoesIdRoute
   '/_authenticated/membros/': typeof AuthenticatedMembrosIndexRoute
+  '/_authenticated/operacoes/': typeof AuthenticatedOperacoesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -226,8 +265,12 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/tops'
     | '/auth/callback'
+    | '/admin/precos'
+    | '/admin/receitas'
     | '/membros/$id'
+    | '/operacoes/$id'
     | '/membros/'
+    | '/operacoes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -241,14 +284,17 @@ export interface FileRouteTypes {
     | '/inventario'
     | '/liquidacao'
     | '/onboarding'
-    | '/operacoes'
     | '/precario'
     | '/premios'
     | '/receitas'
     | '/tops'
     | '/auth/callback'
+    | '/admin/precos'
+    | '/admin/receitas'
     | '/membros/$id'
+    | '/operacoes/$id'
     | '/membros'
+    | '/operacoes'
   id:
     | '__root__'
     | '/'
@@ -270,8 +316,12 @@ export interface FileRouteTypes {
     | '/_authenticated/receitas'
     | '/_authenticated/tops'
     | '/auth/callback'
+    | '/_authenticated/admin/precos'
+    | '/_authenticated/admin/receitas'
     | '/_authenticated/membros/$id'
+    | '/_authenticated/operacoes/$id'
     | '/_authenticated/membros/'
+    | '/_authenticated/operacoes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -416,12 +466,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/operacoes/': {
+      id: '/_authenticated/operacoes/'
+      path: '/'
+      fullPath: '/operacoes/'
+      preLoaderRoute: typeof AuthenticatedOperacoesIndexRouteImport
+      parentRoute: typeof AuthenticatedOperacoesRoute
+    }
     '/_authenticated/membros/': {
       id: '/_authenticated/membros/'
       path: '/'
       fullPath: '/membros/'
       preLoaderRoute: typeof AuthenticatedMembrosIndexRouteImport
       parentRoute: typeof AuthenticatedMembrosRoute
+    }
+    '/_authenticated/operacoes/$id': {
+      id: '/_authenticated/operacoes/$id'
+      path: '/$id'
+      fullPath: '/operacoes/$id'
+      preLoaderRoute: typeof AuthenticatedOperacoesIdRouteImport
+      parentRoute: typeof AuthenticatedOperacoesRoute
     }
     '/_authenticated/membros/$id': {
       id: '/_authenticated/membros/$id'
@@ -430,8 +494,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMembrosIdRouteImport
       parentRoute: typeof AuthenticatedMembrosRoute
     }
+    '/_authenticated/admin/receitas': {
+      id: '/_authenticated/admin/receitas'
+      path: '/receitas'
+      fullPath: '/admin/receitas'
+      preLoaderRoute: typeof AuthenticatedAdminReceitasRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/precos': {
+      id: '/_authenticated/admin/precos'
+      path: '/precos'
+      fullPath: '/admin/precos'
+      preLoaderRoute: typeof AuthenticatedAdminPrecosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminPrecosRoute: typeof AuthenticatedAdminPrecosRoute
+  AuthenticatedAdminReceitasRoute: typeof AuthenticatedAdminReceitasRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminPrecosRoute: AuthenticatedAdminPrecosRoute,
+  AuthenticatedAdminReceitasRoute: AuthenticatedAdminReceitasRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedMembrosRouteChildren {
   AuthenticatedMembrosIdRoute: typeof AuthenticatedMembrosIdRoute
@@ -446,8 +537,24 @@ const AuthenticatedMembrosRouteChildren: AuthenticatedMembrosRouteChildren = {
 const AuthenticatedMembrosRouteWithChildren =
   AuthenticatedMembrosRoute._addFileChildren(AuthenticatedMembrosRouteChildren)
 
+interface AuthenticatedOperacoesRouteChildren {
+  AuthenticatedOperacoesIdRoute: typeof AuthenticatedOperacoesIdRoute
+  AuthenticatedOperacoesIndexRoute: typeof AuthenticatedOperacoesIndexRoute
+}
+
+const AuthenticatedOperacoesRouteChildren: AuthenticatedOperacoesRouteChildren =
+  {
+    AuthenticatedOperacoesIdRoute: AuthenticatedOperacoesIdRoute,
+    AuthenticatedOperacoesIndexRoute: AuthenticatedOperacoesIndexRoute,
+  }
+
+const AuthenticatedOperacoesRouteWithChildren =
+  AuthenticatedOperacoesRoute._addFileChildren(
+    AuthenticatedOperacoesRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAuditoriaRoute: typeof AuthenticatedAuditoriaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDisponibilidadeRoute: typeof AuthenticatedDisponibilidadeRoute
@@ -457,7 +564,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLiquidacaoRoute: typeof AuthenticatedLiquidacaoRoute
   AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
-  AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRoute
+  AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRouteWithChildren
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
@@ -465,7 +572,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAuditoriaRoute: AuthenticatedAuditoriaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDisponibilidadeRoute: AuthenticatedDisponibilidadeRoute,
@@ -475,7 +582,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLiquidacaoRoute: AuthenticatedLiquidacaoRoute,
   AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
-  AuthenticatedOperacoesRoute: AuthenticatedOperacoesRoute,
+  AuthenticatedOperacoesRoute: AuthenticatedOperacoesRouteWithChildren,
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,

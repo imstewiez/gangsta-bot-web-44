@@ -1,4 +1,4 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import {
@@ -84,6 +84,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const { profile, signOut } = useAuth();
   const loc = useLocation();
+  const navigate = useNavigate();
 
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn(), staleTime: 60_000 });
@@ -110,9 +111,6 @@ export function AppSidebar() {
             <div className="leading-tight">
               <div className="text-display text-sm tracking-[0.24em]">
                 <span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Ballas</span> Gang
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/80">
-                Casa fechada
               </div>
             </div>
           )}
@@ -186,9 +184,9 @@ export function AppSidebar() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={signOut}
+              onClick={async () => { await signOut(); navigate({ to: "/login" }); }}
               title="Sair do bairro"
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
             >
               <LogOut className="h-4 w-4" />
             </Button>
@@ -197,9 +195,9 @@ export function AppSidebar() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={signOut}
+            onClick={async () => { await signOut(); navigate({ to: "/login" }); }}
             title="Sair do bairro"
-            className="mx-auto h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+            className="mx-auto h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
           >
             <LogOut className="h-4 w-4" />
           </Button>

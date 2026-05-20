@@ -26,7 +26,7 @@ function NotFoundComponent() {
         <div className="mt-6">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="inline-flex cursor-pointer items-center justify-center rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Voltar
           </Link>
@@ -50,7 +50,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="cursor-pointer rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Tentar de novo
           </button>
@@ -72,14 +72,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
-        { title: "Firma RedWood — Unidade · Força · Propósito" },
+        { title: "Ballas Gang" },
         {
           name: "description",
           content:
-            "Painel operacional da Firma RedWood — gestão interna, recursos e estrutura hierárquica.",
+            "Painel operacional da Ballas Gang — gestão interna, recursos e estrutura hierárquica.",
         },
-        { property: "og:title", content: "Firma RedWood — Unidade · Força · Propósito" },
-        { name: "twitter:title", content: "Firma RedWood — Unidade · Força · Propósito" },
+        { property: "og:title", content: "Ballas Gang" },
+        { name: "twitter:title", content: "Ballas Gang" },
         { name: "description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
         { property: "og:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
         { name: "twitter:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
@@ -89,7 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { property: "og:type", content: "website" },
       ],
       links: [
-        { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+        { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
         { rel: "stylesheet", href: appCss },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         {

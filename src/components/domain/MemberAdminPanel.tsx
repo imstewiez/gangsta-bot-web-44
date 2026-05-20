@@ -157,7 +157,7 @@ export function MemberAdminPanel({
           )}
         </section>
 
-        {/* Ajustar stats */}
+        {/* Ajustar estatísticas */}
         <section className="space-y-2 border-t border-border pt-4">
           <div className="flex items-center gap-2 text-display text-xs text-muted-foreground">
             <Activity className="h-3.5 w-3.5" /> Ajustar stats (enganos /
@@ -208,7 +208,7 @@ export function MemberAdminPanel({
                       reason: reason || undefined,
                     },
                   }),
-                "Stats ajustadas",
+                "Estatísticas ajustadas",
               )
             }
           >

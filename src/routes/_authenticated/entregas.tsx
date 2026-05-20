@@ -105,14 +105,14 @@ function Page() {
       <PageHeader
         eyebrow="Entregas"
         title="Entregas"
-        description="Registo de entregas de material operacional e recursos."
+        description="Registo de entregas"
         action={<NewDelivery />}
       />
       <FadeIn>
         <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="mine">As minhas</TabsTrigger>
-          {isManager && <TabsTrigger value="manage">Para conferir</TabsTrigger>}
+          <TabsTrigger value="mine" className="interactive-tab">As minhas</TabsTrigger>
+          {isManager && <TabsTrigger value="manage" className="interactive-tab">Para conferir</TabsTrigger>}
         </TabsList>
         <TabsContent value="mine" className="mt-4">
           <DelList scope="mine" canDecide={false} />
@@ -161,20 +161,20 @@ function DelList({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       qc.invalidateQueries({ queryKey: ["stock"] });
-      toast.success("Feito.");
+      toast.success("Guardado");
     },
   });
 
   if (list.isLoading)
-    return <p className="text-muted-foreground">A puxar entregas…</p>;
+    return <p className="text-muted-foreground">A carregar entregas</p>;
   if (!list.data?.length)
     return (
       <Card className="p-10 text-center">
         <PackageOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
           {scope === "mine"
-            ? "Sem registos de entrega."
-            : "Sem entregas pendentes."}
+            ? "Nenhum registo"
+            : "Nenhuma pendente"}
         </p>
       </Card>
     );
@@ -332,17 +332,17 @@ function NewDelivery() {
         <div className="grid gap-3">
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">
-              É para…
+              É para
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setTipo("entrega")}
                 className={
-                  "rounded-sm border px-3 py-2 text-left text-sm transition-colors " +
+                  "rounded-sm cursor-pointer border px-3 py-2 text-left text-sm transition-colors " +
                   (tipo === "entrega"
                     ? "border-info bg-info/15 text-info"
-                    : "border-border bg-card hover:bg-accent/30")
+                    : "border-border bg-card interactive-row")
                 }
               >
                 <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider">
@@ -356,10 +356,10 @@ function NewDelivery() {
                 type="button"
                 onClick={() => setTipo("venda")}
                 className={
-                  "rounded-sm border px-3 py-2 text-left text-sm transition-colors " +
+                  "rounded-sm cursor-pointer border px-3 py-2 text-left text-sm transition-colors " +
                   (tipo === "venda"
                     ? "border-warning bg-warning/15 text-warning"
-                    : "border-border bg-card hover:bg-accent/30")
+                    : "border-border bg-card interactive-row")
                 }
               >
                 <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider">
@@ -382,7 +382,7 @@ function NewDelivery() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Item…" />
+                  <SelectValue placeholder="Item" />
                 </SelectTrigger>
                 <SelectContent>
                   {items.map((i) => (
@@ -441,7 +441,7 @@ function NewDelivery() {
             Cancelar
           </Button>
           <ButtonLoading loading={m.isPending} onClick={() => m.mutate()}>
-            {m.isPending ? "A enviar…" : "Submeter"}
+            {m.isPending ? "A processar" : "Submeter"}
           </ButtonLoading>
         </DialogFooter>
       </DialogContent>

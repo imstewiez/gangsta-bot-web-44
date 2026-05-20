@@ -58,7 +58,7 @@ const ACTION_META: Record<
     tone: "text-info",
   },
   member_stats_adjusted: {
-    label: "Stats ajustadas",
+    label: "Estatísticas ajustadas",
     icon: Settings2,
     tone: "text-warning",
   },
@@ -190,7 +190,7 @@ function Page() {
       <PageHeader
         eyebrow="Direção"
         title="Auditoria"
-        description="Registo operacional de todas as movimentações."
+        description="Histórico de ações"
         icon={ScrollText}
       />
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border" style={{ maxHeight: "70vh", overflowY: "auto" }}>
@@ -211,7 +211,7 @@ function Page() {
                   colSpan={5}
                   className="p-6 text-center text-muted-foreground"
                 >
-                  A carregar…
+                  A carregar
                 </td>
               </tr>
             )}
@@ -221,7 +221,7 @@ function Page() {
               return (
                 <tr
                   key={l.id}
-                  className="border-t border-border hover:bg-accent/30"
+                  className="border-t border-border interactive-row"
                 >
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                     {fmtDate(l.created_at)}

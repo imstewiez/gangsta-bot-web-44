@@ -79,7 +79,7 @@ export const recomputeWeek = createServerFn({ method: "POST" })
                 join operations o on o.id = p.operation_id and o.deleted_at is null
                 cross join bounds
                where coalesce(o.end_time, o.start_time, o.date::timestamp) between bounds.ws and bounds.we + interval '1 day'
-                 and o.status = 'finalizada'
+                 and o.status = 'concluida'
                group by p.member_id
             ),
             inv as (
@@ -114,6 +114,7 @@ export const recomputeWeek = createServerFn({ method: "POST" })
               left join inv d on d.member_id = m.id
               left join sales s on s.member_id = m.id
              where m.deleted_at is null
+               and (m.status = 'ativo' or m.status is null and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted'))
                and (coalesce(k.kills_count,0) + coalesce(o.operations_count,0) + coalesce(d.deliveries,0) + coalesce(s.sales,0) > 0)`,
           [ws],
         );

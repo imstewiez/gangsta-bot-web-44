@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { pgQuery, pgOne } from "./pg.server";
+import { pgQuery, pgOne, withClient } from "./pg.server";
 
 export type ParticipantStat = {
   member_id: number;
@@ -36,11 +36,11 @@ async function autoCloseStaleOperations(): Promise<void> {
   try {
     await pgQuery(
       `update operations
-         set status = 'fechada_auto',
+         set status = 'concluida',
              end_time = coalesce(end_time, now()),
              updated_at = now()
        where deleted_at is null
-         and status in ('planeada','em_curso','agendada','iniciada','em_liquidacao')
+         and status in ('criada','trancagem','em_preparacao','em_curso','em_liquidacao')
          and coalesce(start_time, date::timestamp, created_at) < now() - interval '12 hours'`,
     );
   } catch (err) {
@@ -56,7 +56,7 @@ export const listSaidas = createServerFn({ method: "GET" })
       `select o.id,
               o.operation_type as tipo,
               o.spot,
-              coalesce(o.status, 'planeada') as status,
+              coalesce(o.status, 'criada') as status,
               coalesce(o.start_time,
                        (o.date::timestamp + coalesce(o.scheduled_time, '00:00'::time))) as scheduled_at,
               o.end_time as finalized_at,
@@ -193,7 +193,7 @@ export const createOperation = createServerFn({ method: "POST" })
     const row = await pgOne<{ id: number }>(
       `insert into operations
          (operation_type, spot, leader_id, status, date, scheduled_time, start_time, notes, created_by, created_at)
-       values ($1, $2, $3, 'planeada',
+       values ($1, $2, $3, 'criada',
          coalesce(($4::timestamptz)::date, current_date),
          ($4::timestamptz)::time,
          $4::timestamptz, $5, $6, now())
@@ -208,4 +208,56 @@ export const createOperation = createServerFn({ method: "POST" })
       ],
     );
     return { id: row?.id ?? null };
+  });
+
+export const createOperationWithParticipants = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      operation_type: string;
+      spot?: string | null;
+      leader_id?: number | null;
+      scheduled_at?: string | null;
+      notes?: string | null;
+      participants?: number[];
+    }) => {
+      if (!d.operation_type?.trim()) throw new Error("Tipo obrigatório");
+      return d;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const sched = data.scheduled_at ? new Date(data.scheduled_at) : null;
+    return withClient(async (c) => {
+      const op = await c.query(
+        `insert into operations
+           (operation_type, spot, leader_id, status, date, scheduled_time, start_time, notes, created_by, created_at)
+         values ($1, $2, $3, 'criada',
+           coalesce(($4::timestamptz)::date, current_date),
+           ($4::timestamptz)::time,
+           $4::timestamptz, $5, $6, now())
+         returning id`,
+        [
+          data.operation_type,
+          data.spot ?? null,
+          data.leader_id ?? null,
+          sched ? sched.toISOString() : null,
+          data.notes ?? null,
+          `web:${context.userId}`,
+        ],
+      );
+      const opId = op.rows[0]?.id;
+      if (!opId) throw new Error("Falha ao criar saída");
+
+      // Add participants
+      const pids = data.participants ?? [];
+      if (pids.length > 0) {
+        const values = pids.map((_, i) => `($1, $${i + 2}, 'participante')`).join(",");
+        await c.query(
+          `insert into operation_participants (operation_id, member_id, role_in_op) values ${values}`,
+          [opId, ...pids],
+        );
+      }
+
+      return { id: opId };
+    });
   });
