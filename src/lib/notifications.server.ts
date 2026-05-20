@@ -30,7 +30,7 @@ async function insertNotifs(
       link: n.link ?? null,
     }));
   if (!rows.length) return;
-  const { error } = await supabaseAdmin.from("notifications").insert(rows);
+  const { error } = await (supabaseAdmin.from("notifications") as any).insert(rows);
   if (error) console.error("[notifications] insert failed:", error.message);
 }
 

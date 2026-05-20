@@ -247,7 +247,7 @@ function Page() {
 
       <div className="space-y-8">
         {grouped.map(([category, items]) => {
-          const cfg = ARMORY_CAT_CONFIG[category];
+          const cfg = (ARMORY_CAT_CONFIG as any)[category];
           const Icon = cfg?.icon ?? Package;
           return (
             <section key={category} className="animate-rise">
