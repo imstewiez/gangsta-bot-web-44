@@ -40,16 +40,21 @@ import {
   itemSubLabel,
   PRINT_LABELS,
   PRINT_BADGE_CLASS,
+  isOrangeWeapon,
 } from "@/lib/armory.catalog";
 
 export const Route = createFileRoute("/_authenticated/receitas")({
   component: Page,
 });
 
-function printBadge(tier: string | null): { label: string; cls: string } | null {
-  if (!tier) return null;
-  const label = PRINT_LABELS[tier] ?? tier;
-  const cls = PRINT_BADGE_CLASS[tier] ?? "";
+function printBadge(tier: string | null, itemName: string | null): { label: string; cls: string } | null {
+  let effectiveTier = tier;
+  if (!effectiveTier && isOrangeWeapon(itemName)) {
+    effectiveTier = "laranja";
+  }
+  if (!effectiveTier) return null;
+  const label = PRINT_LABELS[effectiveTier] ?? effectiveTier;
+  const cls = PRINT_BADGE_CLASS[effectiveTier] ?? "";
   if (!cls) return null;
   return { label, cls };
 }
@@ -69,7 +74,7 @@ function RecipeCard({
   onUpdateIngredient: (recipeId: number, ingItemId: number, qty: number) => void;
   pending: boolean;
 }) {
-  const badge = printBadge(r.tier);
+  const badge = printBadge(r.tier, r.item_name);
   const [editing, setEditing] = useState<Map<number, string>>(new Map());
 
   return (

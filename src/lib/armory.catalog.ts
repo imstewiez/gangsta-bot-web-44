@@ -275,7 +275,7 @@ const ORANGE_WEAPON_NAMES = [
   "SNS Pistol",
 ];
 
-function isOrangeWeapon(name: string | null): boolean {
+export function isOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
   const n = name.toLowerCase();
   return ORANGE_WEAPON_NAMES.some((o) => n.includes(o.toLowerCase()));
