@@ -15,17 +15,41 @@ import {
 import type { SaidaRow, ParticipantStat } from "@/lib/operations.functions";
 
 const TYPE_STYLES: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  saida: {
+  ataque: {
     bg: "bg-red-500/10",
     text: "text-red-400",
     border: "border-red-500/30",
     icon: "text-red-400",
   },
-  pista: {
+  recolha: {
     bg: "bg-blue-500/10",
     text: "text-blue-400",
     border: "border-blue-500/30",
     icon: "text-blue-400",
+  },
+  craft: {
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-400",
+    border: "border-emerald-500/30",
+    icon: "text-emerald-400",
+  },
+  dominio: {
+    bg: "bg-amber-500/10",
+    text: "text-amber-400",
+    border: "border-amber-500/30",
+    icon: "text-amber-400",
+  },
+  defesa: {
+    bg: "bg-purple-500/10",
+    text: "text-purple-400",
+    border: "border-purple-500/30",
+    icon: "text-purple-400",
+  },
+  outra: {
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+    border: "border-border",
+    icon: "text-muted-foreground",
   },
   outro: {
     bg: "bg-muted",
@@ -35,9 +59,20 @@ const TYPE_STYLES: Record<string, { bg: string; text: string; border: string; ic
   },
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  ataque: "Saída",
+  recolha: "Pista",
+  craft: "Craft",
+  dominio: "Domínio",
+  defesa: "Defesa",
+  outra: "Outra",
+  outro: "Outro",
+};
+
 function TypeBadge({ type }: { type: string | null }) {
   const t = (type ?? "outro").toLowerCase();
   const style = TYPE_STYLES[t] ?? TYPE_STYLES.outro;
+  const label = TYPE_LABELS[t] ?? type ?? "Outro";
   return (
     <span
       className={cn(
@@ -48,7 +83,7 @@ function TypeBadge({ type }: { type: string | null }) {
       )}
     >
       <Crosshair className={cn("h-3 w-3", style.icon)} />
-      {type ?? "Outro"}
+      {label}
     </span>
   );
 }

@@ -7,7 +7,7 @@ import { Crosshair, Footprints, Calendar, FileText, CheckCircle2 } from "lucide-
 
 const TYPE_OPTIONS = [
   {
-    key: "saida",
+    key: "ataque",
     label: "Saída",
     desc: "Máx. 12 participantes",
     icon: Crosshair,
@@ -16,13 +16,49 @@ const TYPE_OPTIONS = [
     border: "border-red-500/30 hover:border-red-500/60",
   },
   {
-    key: "pista",
+    key: "recolha",
     label: "Pista",
     desc: "Sem limite",
     icon: Footprints,
     color: "text-blue-400",
     bg: "bg-blue-500/10",
     border: "border-blue-500/30 hover:border-blue-500/60",
+  },
+  {
+    key: "craft",
+    label: "Craft",
+    desc: "Sessão de crafting",
+    icon: Crosshair,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/30 hover:border-emerald-500/60",
+  },
+  {
+    key: "dominio",
+    label: "Domínio",
+    desc: "Dominação de território",
+    icon: Crosshair,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/30 hover:border-amber-500/60",
+  },
+  {
+    key: "defesa",
+    label: "Defesa",
+    desc: "Defesa do bairro",
+    icon: Crosshair,
+    color: "text-purple-400",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/30 hover:border-purple-500/60",
+  },
+  {
+    key: "outra",
+    label: "Outra",
+    desc: "Outro tipo",
+    icon: Crosshair,
+    color: "text-muted-foreground",
+    bg: "bg-muted",
+    border: "border-border hover:border-border/80",
   },
 ];
 
