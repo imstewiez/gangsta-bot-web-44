@@ -390,11 +390,12 @@ function NewOrder() {
       const n = i.name.toLowerCase();
       return /laranja|azul|vermelh|amarel|dourad|orange|red|blue|yellow/.test(n);
     }
-    if (i.side !== "venda") return false;
-    if (i.subcategory === "armas_brancas") return false;
-    if (i.subcategory === "armas_red" || i.subcategory === "armas_orange") {
+    // Armas Red/Orange (independentemente de side, pois na DB podem ter side=null)
+    if (i.category === "armas_red" || i.category === "armas_orange" || i.subcategory === "armas_red" || i.subcategory === "armas_orange") {
       return isAllowedWeapon(i.name);
     }
+    if (i.side !== "venda") return false;
+    if (i.subcategory === "armas_brancas") return false;
     // Carregadores
     if (i.subcategory === "carregadores" || i.subcategory === "municoes") return true;
     // Coletes e acessórios (vão para o grupo Extras)

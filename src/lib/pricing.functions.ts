@@ -24,7 +24,7 @@ export const getCatalog = createServerFn({ method: "GET" })
        where active = true and deleted_at is null
          and (
            side in ('compra','venda')
-           or category in ('corpos','prints')
+           or category in ('corpos','prints','armas_red','armas_orange')
            or subcategory in ('carregadores','municoes','armas_red','armas_orange')
          )
        order by side, subcategory, purchase_price desc`,
