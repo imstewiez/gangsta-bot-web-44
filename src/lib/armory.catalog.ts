@@ -381,6 +381,12 @@ export function itemDisplayCategory(
   }
 
   // 2. Armas (ANTES de corpos/prints — algumas armas têm category="prints" na DB)
+  // Verificar primeiro pelo nome se é uma arma permitida
+  if (isAllowedWeapon(itemName)) {
+    if (isOrangeWeapon(itemName)) return "armas_orange";
+    return "armas_red";
+  }
+
   if (sub === "armas_orange" || cat === "armas_orange") return "armas_orange";
   if (sub === "armas_red" || cat === "armas_red") {
     if (isOrangeWeapon(itemName)) return "armas_orange";
