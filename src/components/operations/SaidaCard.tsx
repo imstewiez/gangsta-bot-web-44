@@ -11,6 +11,9 @@ import {
   Swords,
   MapPin,
   Clock,
+  Trophy,
+  ShieldAlert,
+  Shield,
 } from "lucide-react";
 import type { SaidaRow, ParticipantStat } from "@/lib/operations.functions";
 
@@ -84,6 +87,26 @@ function TypeBadge({ type }: { type: string | null }) {
     >
       <Crosshair className={cn("h-3 w-3", style.icon)} />
       {label}
+    </span>
+  );
+}
+
+function WinLossBadge({ wasProfitable }: { wasProfitable: boolean | null }) {
+  if (wasProfitable === true)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+        <Trophy className="h-3 w-3" /> Vitória
+      </span>
+    );
+  if (wasProfitable === false)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+        <ShieldAlert className="h-3 w-3" /> Derrota
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <Shield className="h-3 w-3" /> Sem resultado
     </span>
   );
 }
@@ -176,14 +199,19 @@ export function SaidaCard({
         "bg-card/60 backdrop-blur-sm interactive-card",
         isInProgress && "border-primary/40 shadow-[0_0_20px_-8px_rgba(168,85,247,0.25)]",
         !isInProgress && "border-border/60",
-        isFinalized && "opacity-70 hover:opacity-100",
+        isFinalized && saida.was_profitable === true && "border-emerald-500/30",
+        isFinalized && saida.was_profitable === false && "border-red-500/30",
+        isFinalized && saida.was_profitable === null && "opacity-70 hover:opacity-100",
         "animate-rise",
       )}
       style={{ animationDelay: `${Math.min(index * 60, 400)}ms` }}
     >
-      {/* Top row: Type + Status */}
+      {/* Top row: Type + Status + Win/Loss */}
       <div className="flex items-start justify-between gap-2">
-        <TypeBadge type={saida.tipo} />
+        <div className="flex flex-wrap items-center gap-2">
+          <TypeBadge type={saida.tipo} />
+          {isFinalized && <WinLossBadge wasProfitable={saida.was_profitable} />}
+        </div>
         <SaidaStatusBadge status={saida.status} pulse={isInProgress} />
       </div>
 
@@ -198,13 +226,23 @@ export function SaidaCard({
         </span>
       </div>
 
+      {/* Enemy info */}
+      {saida.enemy_name && (
+        <div className="text-xs text-muted-foreground">
+          vs {saida.enemy_name}
+          {saida.enemy_faction ? ` · ${saida.enemy_faction}` : ""}
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="relative h-1 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
             "h-full rounded-full transition-all duration-500",
             saida.status === "em_curso" && "bg-primary",
-            saida.status === "concluida" && "bg-emerald-500",
+            saida.status === "concluida" && saida.was_profitable === true && "bg-emerald-500",
+            saida.status === "concluida" && saida.was_profitable === false && "bg-red-500",
+            saida.status === "concluida" && saida.was_profitable === null && "bg-emerald-500",
             saida.status === "em_liquidacao" && "bg-orange-500",
             saida.status === "criada" && "bg-amber-500",
             saida.status === "trancagem" && "bg-slate-500",

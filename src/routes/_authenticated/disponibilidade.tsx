@@ -10,13 +10,21 @@ import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layo
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/disponibilidade")({
   errorComponent: PageErrorBoundary,
+  head: () => ({
+    meta: [{ title: "Disponibilidade | Ballas Gang" }],
+  }),
   component: Page,
 });
 
 function Page() {
+  useRealtimeSync([
+    { table: "availability_sessions", queryKeys: [["availability"]] },
+    { table: "availability_votes", queryKeys: [["availability"]] },
+  ]);
   const fn = useAuthedServerFn(listAvailability);
   const votesFn = useAuthedServerFn(getAvailabilityVotes);
   const sessions = useQuery({

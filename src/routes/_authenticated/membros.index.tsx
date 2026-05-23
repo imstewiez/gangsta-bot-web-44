@@ -12,7 +12,12 @@ import { TierIcon } from "@/components/domain/TierIcon";
 import { Users, RotateCcw } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
 
-export const Route = createFileRoute("/_authenticated/membros/")({ component: Page });
+export const Route = createFileRoute("/_authenticated/membros/")({
+  head: () => ({
+    meta: [{ title: "Membros | Ballas Gang" }],
+  }),
+  component: Page,
+});
 
 function Page() {
   useRealtimeSync(["members"]);
@@ -58,7 +63,7 @@ function Page() {
       )}
       <div className="overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-secondary text-display text-xs">
+          <thead className="bg-secondary text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="px-3 py-2 text-left">Nome</th>
               <th className="px-3 py-2 text-left">Alcunha</th>

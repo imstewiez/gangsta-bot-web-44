@@ -153,6 +153,8 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertManager(context.supabase, context.userId);
+    // Ensure orders column exists (idempotent)
+    await pgQuery(`ALTER TABLE public.all_time_stats ADD COLUMN IF NOT EXISTS orders integer DEFAULT 0 NOT NULL`);
     const reason = data.reason || "ajuste manual direção";
 
     // Kills
@@ -161,8 +163,8 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       if (data.kills_delta > 0) {
         for (let i = 0; i < n; i++) {
           await pgQuery(
-            "insert into kill_logs (killer_id, victim_name, spot, notes, created_at) values ($1, 'manual', 'ajuste', $2, now())",
-            [data.id, reason],
+            "insert into kill_logs (killer_id, victim_name, spot, notes, created_at, created_by) values ($1, 'manual', 'ajuste', $2, now(), $3)",
+            [data.id, reason, context.userId],
           );
         }
       } else {
@@ -171,6 +173,13 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
           [data.id, n],
         );
       }
+      // Sync all_time_stats
+      await pgQuery(
+        `insert into all_time_stats (member_id, kills_total, updated_at)
+         values ($1, $2, now())
+         on conflict (member_id) do update set kills_total = greatest(0, all_time_stats.kills_total + $2), updated_at = now()`,
+        [data.id, data.kills_delta],
+      );
     }
 
     // Deaths
@@ -188,9 +197,9 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
     // Deliveries
     if (data.deliveries_delta && data.deliveries_delta !== 0) {
       await pgQuery(
-        `insert into all_time_stats (member_id, deliveries_total, updated_at)
+        `insert into all_time_stats (member_id, deliveries, updated_at)
          values ($1, $2, now())
-         on conflict (member_id) do update set deliveries_total = greatest(0, all_time_stats.deliveries_total + $2), updated_at = now()`,
+         on conflict (member_id) do update set deliveries = greatest(0, all_time_stats.deliveries + $2), updated_at = now()`,
         [data.id, data.deliveries_delta],
       );
     }
@@ -198,9 +207,9 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
     // Sales
     if (data.sales_delta && data.sales_delta !== 0) {
       await pgQuery(
-        `insert into all_time_stats (member_id, sales_total, updated_at)
+        `insert into all_time_stats (member_id, sales, updated_at)
          values ($1, $2, now())
-         on conflict (member_id) do update set sales_total = greatest(0, all_time_stats.sales_total + $2), updated_at = now()`,
+         on conflict (member_id) do update set sales = greatest(0, all_time_stats.sales + $2), updated_at = now()`,
         [data.id, data.sales_delta],
       );
     }
@@ -208,9 +217,9 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
     // Orders
     if (data.orders_delta && data.orders_delta !== 0) {
       await pgQuery(
-        `insert into all_time_stats (member_id, orders_total, updated_at)
+        `insert into all_time_stats (member_id, orders, updated_at)
          values ($1, $2, now())
-         on conflict (member_id) do update set orders_total = greatest(0, all_time_stats.orders_total + $2), updated_at = now()`,
+         on conflict (member_id) do update set orders = greatest(0, all_time_stats.orders + $2), updated_at = now()`,
         [data.id, data.orders_delta],
       );
     }
@@ -226,6 +235,128 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
     }
 
     return { ok: true };
+  });
+
+// ---------- Recalculate all_time_stats from source tables ----------
+export const adminRecalcAllTimeStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertManager(context.supabase, context.userId);
+    await pgQuery(`ALTER TABLE public.all_time_stats ADD COLUMN IF NOT EXISTS orders integer DEFAULT 0 NOT NULL`);
+
+    const result = await pgQuery<{ rows_updated: number }>(
+      `with
+       kills_logs_src as (
+         select killer_id as member_id, count(*)::int as kills_total
+         from kill_logs where killer_id is not null group by killer_id
+       ),
+       kills_ops_src as (
+         select p.member_id, sum(p.kills)::int as kills_total
+         from operation_participants p
+         join operations o on o.id = p.operation_id and o.deleted_at is null
+         where o.status = 'concluida' and p.kills > 0
+         group by p.member_id
+       ),
+       kills_src as (
+         select coalesce(l.member_id, o.member_id) as member_id,
+                coalesce(l.kills_total, 0) + coalesce(o.kills_total, 0) as kills_total
+         from kills_logs_src l
+         full outer join kills_ops_src o on l.member_id = o.member_id
+       ),
+       deaths_src as (
+         select p.member_id, count(*) filter (where p.died = true)::int as deaths_total
+         from operation_participants p
+         join operations o on o.id = p.operation_id and o.deleted_at is null
+         where o.status = 'concluida'
+         group by p.member_id
+       ),
+       saidas_src as (
+         select p.member_id, count(*)::int as saidas_total
+         from operation_participants p
+         join operations o on o.id = p.operation_id and o.deleted_at is null
+         where o.status = 'concluida'
+         group by p.member_id
+       ),
+       deliveries_src as (
+         select member_id, count(*)::int as deliveries
+         from inventory_movements
+         where movement_type in ('entrega_bairrista','entrega_oficial') and member_id is not null
+         group by member_id
+       ),
+       sales_src as (
+         select member_id, count(*)::int as sales
+         from inventory_movements
+         where movement_type = 'venda_bairrista' and member_id is not null
+         group by member_id
+       ),
+       orders_src as (
+         select member_id, count(*)::int as orders
+         from orders
+         where member_id is not null
+         group by member_id
+       ),
+       combined as (
+         select m.id as member_id,
+                coalesce(k.kills_total, 0) as kills_total,
+                coalesce(d.deaths_total, 0) as deaths_total,
+                coalesce(s.saidas_total, 0) as saidas_total,
+                coalesce(de.deliveries, 0) as deliveries,
+                coalesce(sa.sales, 0) as sales,
+                coalesce(o.orders, 0) as orders
+         from members m
+         left join kills_src k on k.member_id = m.id
+         left join deaths_src d on d.member_id = m.id
+         left join saidas_src s on s.member_id = m.id
+         left join deliveries_src de on de.member_id = m.id
+         left join sales_src sa on sa.member_id = m.id
+         left join orders_src o on o.member_id = m.id
+         where m.deleted_at is null
+       )
+       insert into all_time_stats (member_id, kills_total, deaths_total, saidas_total, deliveries, sales, orders, updated_at)
+       select member_id, kills_total, deaths_total, saidas_total, deliveries, sales, orders, now()
+       from combined
+       on conflict (member_id) do update set
+         kills_total = excluded.kills_total,
+         deaths_total = excluded.deaths_total,
+         saidas_total = excluded.saidas_total,
+         deliveries = excluded.deliveries,
+         sales = excluded.sales,
+         orders = excluded.orders,
+         updated_at = now();
+
+       select count(*)::int as rows_updated from all_time_stats;`,
+    );
+    return { rows_updated: result[0]?.rows_updated ?? 0 };
+  });
+
+// ---------- Import missing members from profiles ----------
+export const adminImportMissingMembers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertManager(context.supabase, context.userId);
+
+    // Find all profiles with discord_id that don't have a matching member
+    const missing = await pgQuery<{
+      discord_id: string;
+      display_name: string | null;
+    }>(
+      `select p.discord_id, p.display_name
+       from profiles p
+       left join members m on m.discord_id = p.discord_id and m.deleted_at is null
+       where p.discord_id is not null and m.id is null`,
+    );
+
+    let created = 0;
+    for (const p of missing) {
+      const row = await pgOne<{ id: number }>(
+        `insert into members (discord_id, username, display_name, role, status, lifecycle_state, joined_at, created_at, updated_at)
+         values ($1, $2, $3, 'bairrista', 'ativo', 'active', now(), now(), now())
+         returning id`,
+        [p.discord_id, p.display_name ?? "Membro", p.display_name ?? "Membro"],
+      );
+      if (row) created++;
+    }
+    return { created, totalMissing: missing.length };
   });
 
 export const TIER_LIST = TIERS;

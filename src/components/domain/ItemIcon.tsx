@@ -48,12 +48,14 @@ export function inferCategory(name: string, raw?: string | null): CatKey {
     /faca|machete|katana|punh[aã]l|navalha|estilete|taco|cassetete|martelo|p[eé]-de-cabra|barra/.test(n)
   )
     return "armas_brancas";
+  // Armas Red (apenas as 6 permitidas: Heavy Pistol, .50, PDW, P90, Bullpup, Carabina)
   if (
-    /sniper|fuzil|awp|barrett|kar98|ak\b|m4|g36|scar|fal|hk|aug|famas|shotgun|ca[çc]adeira|spas/.test(n)
+    /heavy pistol|\.50|pdw|p90|bullpup|carabina/.test(n)
   )
     return "armas_red";
+  // Armas Orange (apenas as 6 permitidas: Mini SMG, XM3, Micro SMG, TEC 9, TEC Pistol, AP Pistol)
   if (
-    /pistola|glock|deagle|desert|colt|revolver|revólver|beretta|usp|uzi|mp5|mp7|smg|p90|vector/.test(n)
+    /mini smg|pistol xm3|micro smg|tec\s*9|tec[-\s]9|tec pistol|ap pistol/.test(n)
   )
     return "armas_orange";
   if (/print|esquema|blueprint/.test(n)) return "prints";
@@ -84,6 +86,7 @@ const TONE_TEXT: Record<string, string> = {
   primary: "text-primary",
   success: "text-success",
   muted: "text-muted-foreground",
+  orange: "text-orange-400",
 };
 
 const TONE_PUCK: Record<string, string> = {
@@ -94,6 +97,7 @@ const TONE_PUCK: Record<string, string> = {
   primary: "bg-primary/15 ring-1 ring-inset ring-primary/30 text-primary",
   success: "bg-success/15 ring-1 ring-inset ring-success/30 text-success",
   muted: "bg-muted/40 ring-1 ring-inset ring-border text-muted-foreground",
+  orange: "bg-orange-500/15 ring-1 ring-inset ring-orange-500/30 text-orange-400",
 };
 
 // Header de categoria — "puck" arredondado e colorido.
@@ -140,15 +144,33 @@ export function ItemIcon({
 }) {
   const Icon = pickItemIcon(name, category);
   const cat = inferCategory(name, category ?? undefined);
-  const cfg = ARMORY_CAT_CONFIG[cat];
+  const displayCat = (category ?? cat) as keyof typeof ARMORY_CAT_CONFIG;
+  const cfg = ARMORY_CAT_CONFIG[displayCat in ARMORY_CAT_CONFIG ? displayCat : (cat as keyof typeof ARMORY_CAT_CONFIG)];
   let tone = cfg?.tone ?? CATEGORY_TONE[cat] ?? "muted";
 
-  // Cores específicas para prints
   const n = name.toLowerCase();
-  if (n.includes("amarela")) tone = "warning";
-  else if (n.includes("azul")) tone = "info";
-  else if (n.includes("vermelha")) tone = "destructive";
-  else if (n.includes("laranja")) tone = "primary";
+
+  // Cores específicas para prints — por tier
+  if (cat === "prints" || /print|esquema|blueprint/.test(n)) {
+    if (n.includes("laranja") || n.includes("orange")) tone = "orange";
+    else if (n.includes("vermelha") || n.includes("red")) tone = "destructive";
+    else if (n.includes("azul") || n.includes("blue")) tone = "info";
+    else if (n.includes("amarela") || n.includes("yellow")) tone = "warning";
+    else tone = "destructive"; // default: red
+  }
+
+  // Corpos — red
+  if (cat === "corpos" || /corpo|chassi/.test(n)) {
+    tone = "destructive";
+  }
+
+  // Cores específicas para carregadores — usar displayCat também
+  if (displayCat === "carregadores_orange" || displayCat === "carregadores_red" || displayCat === "carregadores_especial" || cat === "carregadores" || n.includes("carregador")) {
+    if (displayCat === "carregadores_orange" || n.includes("orange")) tone = "orange";
+    else if (displayCat === "carregadores_red" || n.includes("red")) tone = "destructive";
+    else if (displayCat === "carregadores_especial" || n.includes("especial")) tone = "warning";
+    else tone = "destructive"; // default
+  }
 
   if (withPuck) {
     const puck = TONE_PUCK[tone] ?? TONE_PUCK.muted;

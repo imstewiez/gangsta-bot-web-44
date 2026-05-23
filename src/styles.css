@@ -352,6 +352,15 @@
   background: color-mix(in oklab, var(--border) 90%, transparent);
 }
 
+/* Ensure dropdowns / popovers / select viewports are scrollable on touch devices */
+[data-radix-popper-content-wrapper],
+[data-radix-popover-content],
+[data-radix-select-viewport],
+[data-radix-dropdown-menu-content] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 /* ───────── Interactive hover utilities ───────── */
 
 /* Card that lifts + glows purple on hover */

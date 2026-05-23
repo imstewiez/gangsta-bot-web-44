@@ -5,19 +5,22 @@ import { useMemo, useState } from "react";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { listRecipes, type RecipeRow } from "@/lib/recipes.functions";
 import { updateItemPrice } from "@/lib/recipes.admin.functions";
+import { fixItems } from "@/lib/fix-items.functions";
 import {
-  tierMargin,
   TIER_LABELS,
+  itemPoints,
   type CatalogItem,
+  type CurrentMember,
 } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { fmtNum } from "@/lib/domain";
+import { fmtNum, fmtPrice } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
+import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import {
   Tags,
   Pencil,
@@ -26,14 +29,21 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
+  Star,
 } from "lucide-react";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
-  pricingDisplayCategory,
+  itemDisplayCategory,
+  isAllowedRedWeapon,
+  isAllowedOrangeWeapon,
 } from "@/lib/armory.catalog";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/precario")({
+  head: () => ({
+    meta: [{ title: "Preçário | Ballas Gang" }],
+  }),
   component: Page,
 });
 
@@ -44,10 +54,34 @@ const COMPRA_GROUPS: { key: string; label: string }[] = [
   { key: "minerios", label: "Minérios" },
   { key: "corpos", label: "Corpos" },
   { key: "prints", label: "Prints" },
+  { key: "materiais_craft", label: "Materiais de Craft" },
   { key: "drogas", label: "Drogas" },
 ];
 
+function FixItemsButton() {
+  const fn = useAuthedServerFn(fixItems);
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: () => fn(),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["catalog"] });
+      alert(`Atualizado! ${data.updated} itens:\n${data.items.join("\n")}`);
+    },
+    onError: (err) => {
+      alert("Erro: " + (err instanceof Error ? err.message : String(err)));
+    },
+  });
+  return (
+    <Button size="sm" variant="destructive" onClick={() => m.mutate()} disabled={m.isPending}>
+      {m.isPending ? "A atualizar..." : "FIX ITENS"}
+    </Button>
+  );
+}
+
 function Page() {
+  useRealtimeSync([
+    { table: "items", queryKeys: [["catalog"]] },
+  ]);
   const qc = useQueryClient();
   const catFn = useAuthedServerFn(getCatalog);
   const meFn = useAuthedServerFn(getCurrentMember);
@@ -61,10 +95,10 @@ function Page() {
 
   const grouped = useMemo(() => {
     const out: Record<string, CatalogItem[]> = {};
-    (cat.data ?? []).forEach((it) => {
-      const k = it.subcategory ?? "outros";
+    for (const it of cat.data ?? []) {
+      const k = itemDisplayCategory(it.name, it.category, it.subcategory);
       (out[k] ||= []).push(it);
-    });
+    }
     return out;
   }, [cat.data]);
 
@@ -76,11 +110,10 @@ function Page() {
     return map;
   }, [recipes.data]);
 
-  const myMargin = tierMargin(me.data?.tier);
   const isManager = me.data?.is_manager ?? false;
 
   const updatePrice = useMutation({
-    mutationFn: (v: { item_id: number; purchase_price?: number; min_sale_price?: number }) =>
+    mutationFn: (v: { item_id: number; purchase_price?: number; min_sale_price?: number; xp_points?: number }) =>
       updateFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["catalog"] });
@@ -90,11 +123,17 @@ function Page() {
   });
 
   function vendaItemsForGroup(catKey: string): CatalogItem[] {
-    const items: CatalogItem[] = [];
-    for (const [sub, list] of Object.entries(grouped)) {
-      if (pricingDisplayCategory(sub) === catKey) items.push(...list);
-    }
-    return items;
+    return (cat.data ?? []).filter((it) => {
+      const c = itemDisplayCategory(it.name, it.category, it.subcategory);
+      // Esconder categorias não usadas na venda
+      if (c === "outros" || c === "armas_brancas") return false;
+      // Sem MK2 em lado nenhum
+      if (/mk2/i.test(it.name)) return false;
+      // Apenas armas permitidas em Red / Orange
+      if (c === "armas_red" && !isAllowedRedWeapon(it.name)) return false;
+      if (c === "armas_orange" && !isAllowedOrangeWeapon(it.name)) return false;
+      return c === catKey && (it.min_sale_price ?? 0) > 0;
+    });
   }
 
   return (
@@ -105,13 +144,14 @@ function Page() {
         icon={Tags}
         description={
           me.data
-            ? `Vês os preços ajustados ao teu escalão — ${TIER_LABELS[me.data.tier ?? ""] ?? "—"}${myMargin > 0 ? ` (margem +${(myMargin * 100).toFixed(1)}%)` : ""}.`
+            ? `Preços de venda da firma.`
             : "Tabela de compra e venda da firma."
         }
       />
 
       {isManager && (
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex justify-end gap-2">
+          <FixItemsButton />
           <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
             <Pencil className="mr-1 h-3.5 w-3.5" />
             {editMode ? "Concluir" : "Editar preços"}
@@ -137,6 +177,7 @@ function Page() {
               items={grouped[g.key] ?? []}
               editMode={editMode && isManager}
               onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, purchase_price: val })}
+              onUpdatePoints={(id, val) => updatePrice.mutate({ item_id: id, xp_points: val })}
               pending={updatePrice.isPending}
             />
           ))}
@@ -152,8 +193,8 @@ function Page() {
               catKey={key}
               title={ARMORY_CAT_CONFIG[key].label}
               items={vendaItemsForGroup(key)}
-              myMargin={myMargin}
               recipeMap={recipeMap}
+              isManager={isManager}
               editMode={editMode && isManager}
               onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, min_sale_price: val })}
               pending={updatePrice.isPending}
@@ -171,6 +212,7 @@ function BuyTable({
   catKey,
   editMode,
   onUpdatePrice,
+  onUpdatePoints,
   pending,
 }: {
   title: string;
@@ -178,22 +220,23 @@ function BuyTable({
   catKey: string;
   editMode: boolean;
   onUpdatePrice: (id: number, val: number) => void;
+  onUpdatePoints: (id: number, val: number) => void;
   pending: boolean;
 }) {
   if (!items.length) return null;
   const isDrogas = items[0]?.subcategory === "drogas";
-  const sorted = [...items].sort((a, b) => (b.purchase_price ?? 0) - (a.purchase_price ?? 0));
+  const sorted = [...items].sort((a, b) => (a.purchase_price ?? 0) - (b.purchase_price ?? 0));
   return (
     <section>
-      <h2 className="mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest text-muted-foreground">
-        <CategoryIcon category={catKey} size={16} />
-        {title}
-      </h2>
+      <div className="mb-2">
+        <CategoryHeader category={catKey} label={title} />
+      </div>
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-secondary text-display text-xs">
+          <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2 text-left">Item</th>
+              <th className="px-3 py-2 text-center">Pontos</th>
               {isDrogas ? (
                 <><th className="px-3 py-2 text-right">Morador</th><th className="px-3 py-2 text-right">Civil</th></>
               ) : (
@@ -203,7 +246,7 @@ function BuyTable({
           </thead>
           <tbody>
             {sorted.map((it) => (
-              <PriceRow key={it.id} it={it} catKey={catKey} editMode={editMode} onUpdatePrice={onUpdatePrice} pending={pending} isDrogas={isDrogas} />
+              <PriceRow key={it.id} it={it} catKey={catKey} editMode={editMode} onUpdatePrice={onUpdatePrice} onUpdatePoints={onUpdatePoints} pending={pending} isDrogas={isDrogas} />
             ))}
           </tbody>
         </table>
@@ -215,44 +258,42 @@ function BuyTable({
 function SellTable({
   title,
   items,
-  myMargin,
   catKey,
   recipeMap,
+  isManager,
   editMode,
   onUpdatePrice,
   pending,
 }: {
   title: string;
   items: CatalogItem[];
-  myMargin: number;
   catKey: string;
   recipeMap: Map<number, RecipeRow>;
+  isManager: boolean;
   editMode: boolean;
   onUpdatePrice: (id: number, val: number) => void;
   pending: boolean;
 }) {
   if (!items.length) return null;
-  const sorted = [...items].sort((a, b) => (b.min_sale_price ?? 0) - (a.min_sale_price ?? 0));
+  const sorted = [...items].sort((a, b) => (a.min_sale_price ?? 0) - (b.min_sale_price ?? 0));
   const cfg = (ARMORY_CAT_CONFIG as any)[catKey];
   return (
     <section>
-      <h2 className={cn("mb-2 flex items-center gap-2 text-display text-sm uppercase tracking-widest", cfg?.headerColor ?? "text-muted-foreground")}>
-        {cfg && <cfg.icon className="h-4 w-4" />}
-        {title}
-      </h2>
+      <div className="mb-2">
+        <CategoryHeader category={catKey} label={title} />
+      </div>
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-secondary text-display text-xs">
+          <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2 text-left">Item</th>
-              <th className="px-3 py-2 text-right">Base</th>
-              <th className="px-3 py-2 text-right">Para ti</th>
+              <th className="px-3 py-2 text-right">Preço</th>
               <th className="px-3 py-2 text-center w-10"></th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((it) => (
-              <SellRow key={it.id} it={it} catKey={catKey} myMargin={myMargin} recipe={recipeMap.get(it.id) ?? null} editMode={editMode} onUpdatePrice={onUpdatePrice} pending={pending} />
+              <SellRow key={it.id} it={it} catKey={catKey} recipe={recipeMap.get(it.id) ?? null} isManager={isManager} editMode={editMode} onUpdatePrice={onUpdatePrice} pending={pending} />
             ))}
           </tbody>
         </table>
@@ -262,25 +303,49 @@ function SellTable({
 }
 
 function PriceRow({
-  it, catKey, editMode, onUpdatePrice, pending, isDrogas,
+  it, catKey, editMode, onUpdatePrice, onUpdatePoints, pending, isDrogas,
 }: {
-  it: CatalogItem; catKey: string; editMode: boolean; onUpdatePrice: (id: number, val: number) => void; pending: boolean; isDrogas: boolean;
+  it: CatalogItem; catKey: string; editMode: boolean; onUpdatePrice: (id: number, val: number) => void; onUpdatePoints: (id: number, val: number) => void; pending: boolean; isDrogas: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(String(it.purchase_price ?? 0));
+  const [editingPoints, setEditingPoints] = useState(false);
+  const [ptsVal, setPtsVal] = useState(String(itemPoints(it.name, it.category, it.xp_points)));
 
   return (
     <tr className="border-t border-border">
       <td className="px-3 py-2">
         <span className="inline-flex items-center gap-2 font-medium">
-          <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
+          <ItemIcon name={it.name} category={catKey} size={14} />
           {it.name}
         </span>
       </td>
+      <td className="px-3 py-2 text-center">
+        {editMode ? (
+          editingPoints ? (
+            <div className="flex items-center justify-center gap-1">
+              <Input type="number" min={0} className="h-5 w-14 text-center text-xs px-1" value={ptsVal} onChange={(e) => setPtsVal(e.target.value)} autoFocus />
+              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePoints(it.id, Number(ptsVal)); setEditingPoints(false); }}><Check className="h-3 w-3" /></button>
+              <button className="text-muted-foreground" onClick={() => { setPtsVal(String(itemPoints(it.name, it.category, it.xp_points))); setEditingPoints(false); }}><X className="h-3 w-3" /></button>
+            </div>
+          ) : (
+            <button className="inline-flex items-center justify-center gap-1 rounded-sm bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400" onClick={() => setEditingPoints(true)}>
+              <Star className="h-2.5 w-2.5" />
+              {itemPoints(it.name, it.category, it.xp_points)}
+              <Pencil className="h-2.5 w-2.5 text-amber-200/70" />
+            </button>
+          )
+        ) : (
+          <span className="inline-flex items-center justify-center gap-1 rounded-sm bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400">
+            <Star className="h-2.5 w-2.5" />
+            {itemPoints(it.name, it.category, it.xp_points)}
+          </span>
+        )}
+      </td>
       {isDrogas ? (
         <>
-          <td className="px-3 py-2 text-right font-mono text-success">{fmtNum(it.morador_purchase_price ?? 0)}</td>
-          <td className="px-3 py-2 text-right font-mono">{fmtNum(it.purchase_price ?? 0)}</td>
+          <td className="px-3 py-2 text-right font-mono text-success">{fmtPrice(it.morador_purchase_price)}</td>
+          <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.purchase_price)}</td>
         </>
       ) : (
         <td className="px-3 py-2 text-right font-mono">
@@ -293,11 +358,11 @@ function PriceRow({
               </div>
             ) : (
               <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditing(true)}>
-                {fmtNum(it.purchase_price ?? 0)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                {fmtPrice(it.purchase_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
               </button>
             )
           ) : (
-            fmtNum(it.purchase_price ?? 0)
+            fmtPrice(it.purchase_price)
           )}
         </td>
       )}
@@ -306,44 +371,43 @@ function PriceRow({
 }
 
 function SellRow({
-  it, catKey, myMargin, recipe, editMode, onUpdatePrice, pending,
+  it, catKey, recipe, isManager, editMode, onUpdatePrice, pending,
 }: {
-  it: CatalogItem; catKey: string; myMargin: number; recipe: RecipeRow | null;
+  it: CatalogItem; catKey: string; recipe: RecipeRow | null;
+  isManager: boolean;
   editMode: boolean; onUpdatePrice: (id: number, val: number) => void; pending: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editingBase, setEditingBase] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [val, setVal] = useState(String(it.min_sale_price ?? 0));
-  const base = it.min_sale_price ?? 0;
-  const paraTi = Math.round(base * (1 + myMargin));
+  const [baseVal, setBaseVal] = useState(String(it.min_sale_price ?? 0));
+  const finalPrice = it.min_sale_price ?? 0;
 
   return (
     <>
       <tr className="border-t border-border">
         <td className="px-3 py-2">
           <span className="inline-flex items-center gap-2 font-medium">
-            <ItemIcon name={it.name} category={it.subcategory ?? catKey} size={14} />
+            <ItemIcon name={it.name} category={catKey} size={14} />
             {it.name}
           </span>
         </td>
-        <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-          {editMode ? (
-            editing ? (
+        <td className="px-3 py-2 text-right font-mono">
+          {isManager && editMode ? (
+            editingBase ? (
               <div className="flex items-center justify-end gap-1">
-                <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={val} onChange={(e) => setVal(e.target.value)} autoFocus />
-                <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, Number(val)); setEditing(false); }}><Check className="h-3 w-3" /></button>
-                <button className="text-muted-foreground" onClick={() => { setVal(String(it.min_sale_price ?? 0)); setEditing(false); }}><X className="h-3 w-3" /></button>
+                <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={baseVal} onChange={(e) => setBaseVal(e.target.value)} autoFocus />
+                <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, Number(baseVal)); setEditingBase(false); }}><Check className="h-3 w-3" /></button>
+                <button className="text-muted-foreground" onClick={() => { setBaseVal(String(it.min_sale_price ?? 0)); setEditingBase(false); }}><X className="h-3 w-3" /></button>
               </div>
             ) : (
-              <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditing(true)}>
-                {fmtNum(base)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+              <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingBase(true)}>
+                {fmtPrice(it.min_sale_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
               </button>
             )
           ) : (
-            fmtNum(base)
+            <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span>
           )}
         </td>
-        <td className="px-3 py-2 text-right font-mono text-primary font-semibold">{fmtNum(paraTi)}</td>
         <td className="px-3 py-2 text-center">
           {recipe && recipe.ingredients.length > 0 && (
             <button onClick={() => setExpanded((v) => !v)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -354,7 +418,7 @@ function SellRow({
       </tr>
       {expanded && recipe && recipe.ingredients.length > 0 && (
         <tr>
-          <td colSpan={4} className="px-3 py-2 bg-muted/20 border-t border-border/50">
+          <td colSpan={3} className="px-3 py-2 bg-muted/20 border-t border-border/50">
             <div className="text-xs space-y-1">
               <div className="text-muted-foreground font-medium mb-1.5 flex items-center gap-1.5">
                 <Package className="h-3 w-3" />
@@ -363,13 +427,21 @@ function SellRow({
               {recipe.ingredients.map((ing) => (
                 <div key={ing.item_id} className="flex justify-between gap-4">
                   <span className="text-muted-foreground">{ing.name}</span>
-                  <span className="font-mono text-muted-foreground/80">{ing.quantity} × {fmtNum(ing.unit_cost)} = {fmtNum(Math.round(ing.line_cost))} €</span>
+                  <span className="font-mono text-muted-foreground/80">{ing.quantity} unidades</span>
                 </div>
               ))}
-              <div className="pt-1 border-t border-border/30 flex justify-between gap-4 text-muted-foreground/60">
-                <span>Custo estimado</span>
-                <span className="font-mono">{fmtNum(Math.round(recipe.total_cost))} €</span>
-              </div>
+              {isManager && (
+                <>
+                  <div className="pt-1 border-t border-border/30 flex justify-between gap-4 text-muted-foreground/60">
+                    <span>Custo estimado</span>
+                    <span className="font-mono">{fmtPrice(Math.round(recipe.total_cost))}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 text-muted-foreground/60">
+                    <span>Margem</span>
+                    <span className="font-mono">{recipe.margin_pct != null ? Math.round(recipe.margin_pct) : 0}%</span>
+                  </div>
+                </>
+              )}
             </div>
           </td>
         </tr>

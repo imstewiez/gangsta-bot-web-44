@@ -4,8 +4,10 @@ import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { getMember } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
+import { getMemberXP } from "@/lib/xp.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { fmtNum, fmtDate, ROLE_LABELS, POSITION_LABELS, TIER_ORDER } from "@/lib/domain";
 import { MemberIdentity } from "@/components/domain/RoleBadge";
 import { MemberAdminPanel } from "@/components/domain/MemberAdminPanel";
@@ -18,18 +20,29 @@ import {
   Package,
   Sword,
   ArrowDownUp,
+  Zap,
+  TrendingUp,
+  Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({
+  head: () => ({
+    meta: [{ title: "Membro | Ballas Gang" }],
+  }),
   component: Page,
 });
 
 function Page() {
-  useRealtimeSync(["members"]);
   const { id } = Route.useParams();
+  useRealtimeSync([
+    "members",
+    { table: "inventory_movements", queryKeys: [["member", id], ["member-xp", id]] },
+    { table: "all_time_stats", queryKeys: [["member", id]] },
+  ]);
   const fn = useAuthedServerFn(getMember);
   const meFn = useAuthedServerFn(getCurrentMember);
+  const xpFn = useAuthedServerFn(getMemberXP);
   const { data, isLoading } = useQuery({
     queryKey: ["member", id],
     queryFn: () => fn({ data: { id: Number(id) } }),
@@ -39,15 +52,31 @@ function Page() {
     queryFn: () => meFn(),
     staleTime: 60_000,
   });
-  if (isLoading) return <p className="text-muted-foreground">A carregar</p>;
+  const xp = useQuery({
+    queryKey: ["member-xp", id],
+    queryFn: () => xpFn({ data: { member_id: Number(id) } }),
+    enabled: !isLoading && !!data?.member,
+  });
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   if (!data?.member)
     return (
-      <p>
-        Membro não encontrado.{" "}
+      <div className="p-6 space-y-4">
+        <p className="text-destructive font-semibold">Membro não encontrado.</p>
+        <div className="bg-muted/40 rounded-lg p-4 text-xs font-mono space-y-1">
+          <p><strong>URL id:</strong> {id}</p>
+          <p><strong>Number(id):</strong> {String(Number(id))}</p>
+          <p><strong>data:</strong> {JSON.stringify(data, null, 2)}</p>
+          <p><strong>_debug:</strong> {JSON.stringify(data?._debug, null, 2)}</p>
+        </div>
         <Link to="/membros" className="text-primary interactive-link cursor-pointer">
           Voltar
         </Link>
-      </p>
+      </div>
     );
   const m = data.member;
   const isChefia = me.data?.is_manager ?? false;
@@ -68,8 +97,68 @@ function Page() {
         action={<MemberIdentity tier={m.tier} size="md" />}
       />
 
+      {/* XP Progress Card */}
+      {xp.data && !xp.data.maxedOut && (
+        <Card className="mt-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-sm bg-primary/15 p-1.5">
+                  <Zap className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <div className="text-display text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Progresso de bairrista
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {xp.data.currentTierName} → {xp.data.nextTierName}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold tabular-nums">{fmtNum(xp.data.totalPoints)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">XP total</div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Progress value={xp.data.progress} className="h-2.5" />
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>0</span>
+                <span>
+                  {xp.data.progress.toFixed(1)}% — faltam {fmtNum(xp.data.remaining)} XP
+                </span>
+                <span>{fmtNum(xp.data.threshold ?? 0)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {xp.data && xp.data.maxedOut && (
+        <Card className="mt-4 border-amber-400/30 bg-gradient-to-br from-amber-400/5 to-transparent">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <div className="rounded-sm bg-amber-400/15 p-1.5">
+                <TrendingUp className="h-4 w-4 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-display text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Progresso de bairrista
+                </div>
+                <div className="text-sm font-semibold">
+                  {xp.data.currentTierName} — Máximo atingido
+                </div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-2xl font-bold tabular-nums">{fmtNum(xp.data.totalPoints)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">XP total</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4">
         <StatCard icon={Sword} label="Kills" value={data.kills} tone="primary" />
         <StatCard icon={Skull} label="Mortes" value={data.deaths} tone="destructive" />
         <StatCard icon={Crosshair} label="Saídas" value={data.saidas} tone="info" />

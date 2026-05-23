@@ -11,22 +11,6 @@ export const TIER_LABELS: Record<string, string> = {
   manda_chuva: "Manda-Chuva",
 };
 
-const TIER_MARGIN: Record<string, number> = {
-  young_blood: 0.015,
-  o_gunao: 0.01,
-  gangster_fodido: 0.005,
-  patrao_di_zona: 0,
-  real_gangster: 0,
-  og: 0,
-  kingpin: 0,
-  manda_chuva: 0,
-};
-
-export function tierMargin(tier: string | null | undefined): number {
-  if (!tier) return 0;
-  return TIER_MARGIN[tier] ?? 0;
-}
-
 const MANAGER_TIERS = new Set(["patrao_di_zona", "kingpin", "manda_chuva"]);
 const INVENTORY_TIERS = new Set([
   "patrao_di_zona",
@@ -40,7 +24,7 @@ export function isManager(
 ): boolean {
   if (!member) return false;
   if (member.tier && MANAGER_TIERS.has(member.tier)) return true;
-  if (member.role_label === "chefia" || member.role_label === "manda_chuva")
+  if (member.role_label === "chefia" || member.role_label === "manda_chuva" || member.role_label === "admin")
     return true;
   return false;
 }
@@ -63,6 +47,7 @@ export type CurrentMember = {
   role_label: string | null;
   is_manager: boolean;
   can_see_inventory: boolean;
+  is_morador: boolean;
 };
 
 export type CatalogItem = {
@@ -74,4 +59,51 @@ export type CatalogItem = {
   purchase_price: number | null;
   morador_purchase_price: number | null;
   min_sale_price: number | null;
+  xp_points: number;
 };
+
+// ── Pontos por item (espelho do real-gangsta-bot) ───────────────────────────
+const ITEM_POINTS = new Map<string, number>([
+  // 4 pontos
+  ["print", 4],
+  ["prints", 4],
+  ["peças", 4],
+  ["pecas", 4],
+  ["molde de arma", 4],
+  ["moldes", 4],
+  ["corpo", 4],
+  ["corpos", 4],
+  // 3 pontos
+  ["cobre", 3],
+  ["serradura", 3],
+  ["pólvora", 3],
+  ["polvora", 3],
+  ["peças estragadas", 3],
+  ["pecas estragadas", 3],
+  // 2 pontos
+  ["lixo eletrónico", 2],
+  ["lixo eletronico", 2],
+  ["sucata", 2],
+  ["plástico reciclado", 2],
+  ["plastico reciclado", 2],
+  ["telemóvel estragado", 2],
+  ["telemovel estragado", 2],
+  ["rádio estragado", 2],
+  ["radio estragado", 2],
+  ["plástico velho", 2],
+  ["plastico velho", 2],
+]);
+
+const ZERO_POINT_CATEGORIES = new Set(["quimicos_droga", "dinheiro"]);
+
+export function itemPoints(name: string, category: string | null, xpPoints?: number | null): number {
+  if (xpPoints != null) return xpPoints;
+  if (category && ZERO_POINT_CATEGORIES.has(category.toLowerCase())) return 0;
+  return ITEM_POINTS.get(name.toLowerCase().trim()) ?? 1;
+}
+
+export function getFinalPrice(itemName: string, dbPrice?: number | null): number {
+  return dbPrice ?? 0;
+}
+
+

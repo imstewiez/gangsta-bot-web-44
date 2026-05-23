@@ -77,15 +77,11 @@ export function SaidaStats({ saidas }: { saidas: SaidaRow[] }) {
   const totalSaidas = fightSaidas.length;
   const thisWeekCount = thisWeek.length;
 
-  // Win rate: saídas concluídas ou canceladas com fight
+  // Win rate: saídas concluídas com was_profitable = true
   const withResult = fightSaidas.filter(
-    (s) => s.status === "concluida" || s.status === "cancelada",
+    (s) => s.status === "concluida",
   );
-  const wins = withResult.filter(
-    (s) =>
-      (s.our_kills ?? 0) > 0 &&
-      (s.enemy_count == null || (s.our_kills ?? 0) >= (s.enemy_count ?? 0)),
-  ).length;
+  const wins = withResult.filter((s) => s.was_profitable === true).length;
   const winRate = withResult.length > 0 ? Math.round((wins / withResult.length) * 100) : 0;
 
   // Kills per saída (média)

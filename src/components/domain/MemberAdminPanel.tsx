@@ -15,7 +15,22 @@ import {
   TIER_LIST,
 } from "@/lib/member-admin.functions";
 import { TIER_LABELS } from "@/lib/domain";
-import { Pencil, Crown, UserMinus, Activity } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Pencil,
+  Crown,
+  UserMinus,
+  Activity,
+  Skull,
+  Swords,
+  TrendingUp,
+  Package,
+  Coins,
+  ShoppingBag,
+  X,
+  Save,
+  ChevronDown,
+} from "lucide-react";
 
 type Member = {
   id: number;
@@ -32,6 +47,57 @@ type Stats = {
   vendas: number;
   orders: number;
 };
+
+const STAT_META: {
+  key: keyof Stats;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+}[] = [
+  {
+    key: "kills",
+    label: "Kills",
+    icon: Swords,
+    color: "text-emerald-400",
+    bg: "bg-emerald-400/10 border-emerald-400/20",
+  },
+  {
+    key: "deaths",
+    label: "Mortes",
+    icon: Skull,
+    color: "text-rose-400",
+    bg: "bg-rose-400/10 border-rose-400/20",
+  },
+  {
+    key: "saidas",
+    label: "Saídas",
+    icon: TrendingUp,
+    color: "text-amber-400",
+    bg: "bg-amber-400/10 border-amber-400/20",
+  },
+  {
+    key: "deliveries",
+    label: "Entregas",
+    icon: Package,
+    color: "text-sky-400",
+    bg: "bg-sky-400/10 border-sky-400/20",
+  },
+  {
+    key: "vendas",
+    label: "Vendas",
+    icon: Coins,
+    color: "text-violet-400",
+    bg: "bg-violet-400/10 border-violet-400/20",
+  },
+  {
+    key: "orders",
+    label: "Encomendas",
+    icon: ShoppingBag,
+    color: "text-orange-400",
+    bg: "bg-orange-400/10 border-orange-400/20",
+  },
+];
 
 export function MemberAdminPanel({
   member,
@@ -57,6 +123,7 @@ export function MemberAdminPanel({
   const [tier, setTier] = useState<string>(member.tier ?? "young_blood");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [editingStats, setEditingStats] = useState(false);
 
   // Delta inputs (all start at "0")
   const [killsDelta, setKillsDelta] = useState("0");
@@ -88,13 +155,25 @@ export function MemberAdminPanel({
     Number(vendasDelta) !== 0 ||
     Number(ordersDelta) !== 0;
 
+  function resetDeltas() {
+    setKillsDelta("0");
+    setDeathsDelta("0");
+    setSaidasDelta("0");
+    setDeliveriesDelta("0");
+    setVendasDelta("0");
+    setOrdersDelta("0");
+    setReason("");
+  }
+
   return (
     <Card className="border-primary/40">
       <CardHeader>
         <CardTitle className="text-display text-sm flex items-center gap-2">
           <Crown className="h-4 w-4 text-primary" /> Painel de Chefia
           {!canManage && (
-            <span className="ml-auto text-[10px] text-muted-foreground">Só leitura — mesmo cargo ou superior</span>
+            <span className="ml-auto text-[10px] text-muted-foreground">
+              Só leitura — mesmo cargo ou superior
+            </span>
           )}
         </CardTitle>
       </CardHeader>
@@ -182,110 +261,176 @@ export function MemberAdminPanel({
           )}
         </section>
 
-        {/* Ajustar estatísticas */}
+        {/* Estatísticas — Visual */}
         <section className="space-y-3 border-t border-border pt-4">
-          <div className="flex items-center gap-2 text-display text-xs text-muted-foreground">
-            <Activity className="h-3.5 w-3.5" /> Ajustar stats
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-display text-xs text-muted-foreground">
+              <Activity className="h-3.5 w-3.5" /> Estatísticas
+            </div>
+            {canManage && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs gap-1"
+                onClick={() => {
+                  if (editingStats) {
+                    setEditingStats(false);
+                    resetDeltas();
+                  } else {
+                    setEditingStats(true);
+                  }
+                }}
+              >
+                {editingStats ? (
+                  <>
+                    <X className="h-3 w-3" /> Cancelar
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-3 w-3" /> Editar
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Kills */}
-            <div className="space-y-1">
-              <Label className="text-xs">Kills (atual: {stats.kills})</Label>
-              <Input
-                type="number"
-                value={killsDelta}
-                onChange={(e) => setKillsDelta(e.target.value)}
-                placeholder="+/-"
-              />
-            </div>
-            {/* Deaths */}
-            <div className="space-y-1">
-              <Label className="text-xs">Mortes (atual: {stats.deaths})</Label>
-              <Input
-                type="number"
-                value={deathsDelta}
-                onChange={(e) => setDeathsDelta(e.target.value)}
-                placeholder="+/-"
-              />
-            </div>
-            {/* Saídas */}
-            <div className="space-y-1">
-              <Label className="text-xs">Saídas (atual: {stats.saidas})</Label>
-              <Input
-                type="number"
-                value={saidasDelta}
-                onChange={(e) => setSaidasDelta(e.target.value)}
-                placeholder="+/-"
-              />
-            </div>
-            {/* Entregas */}
-            <div className="space-y-1">
-              <Label className="text-xs">Entregas (atual: {stats.deliveries})</Label>
-              <Input
-                type="number"
-                value={deliveriesDelta}
-                onChange={(e) => setDeliveriesDelta(e.target.value)}
-                placeholder="+/-"
-              />
-            </div>
-            {/* Vendas */}
-            <div className="space-y-1">
-              <Label className="text-xs">Vendas (atual: {stats.vendas})</Label>
-              <Input
-                type="number"
-                value={vendasDelta}
-                onChange={(e) => setVendasDelta(e.target.value)}
-                placeholder="+/-"
-              />
-            </div>
-            {/* Encomendas */}
-            <div className="space-y-1">
-              <Label className="text-xs">Encomendas (atual: {stats.orders})</Label>
-              <Input
-                type="number"
-                value={ordersDelta}
-                onChange={(e) => setOrdersDelta(e.target.value)}
-                placeholder="+/-"
-              />
-            </div>
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {STAT_META.map((s) => {
+              const Icon = s.icon;
+              const value = stats[s.key];
+              const delta =
+                s.key === "kills"
+                  ? killsDelta
+                  : s.key === "deaths"
+                    ? deathsDelta
+                    : s.key === "saidas"
+                      ? saidasDelta
+                      : s.key === "deliveries"
+                        ? deliveriesDelta
+                        : s.key === "vendas"
+                          ? vendasDelta
+                          : ordersDelta;
+              const setDelta =
+                s.key === "kills"
+                  ? setKillsDelta
+                  : s.key === "deaths"
+                    ? setDeathsDelta
+                    : s.key === "saidas"
+                      ? setSaidasDelta
+                      : s.key === "deliveries"
+                        ? setDeliveriesDelta
+                        : s.key === "vendas"
+                          ? setVendasDelta
+                          : setOrdersDelta;
+              const deltaNum = Number(delta) || 0;
+              const preview = value + deltaNum;
+              const isPositive = deltaNum > 0;
+              const isNegative = deltaNum < 0;
+
+              return (
+                <div
+                  key={s.key}
+                  className={cn(
+                    "relative rounded-md border p-3 transition-colors",
+                    s.bg,
+                    editingStats && "ring-1 ring-primary/30",
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon className={cn("h-3.5 w-3.5", s.color)} />
+                    <span className={cn("text-[10px] font-medium uppercase tracking-wider", s.color)}>
+                      {s.label}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-bold tabular-nums text-foreground">
+                      {editingStats ? preview : value}
+                    </span>
+                    {editingStats && deltaNum !== 0 && (
+                      <span
+                        className={cn(
+                          "text-xs font-semibold tabular-nums",
+                          isPositive ? "text-emerald-400" : "text-rose-400",
+                        )}
+                      >
+                        {isPositive ? "+" : ""}
+                        {deltaNum}
+                      </span>
+                    )}
+                  </div>
+                  {editingStats && (
+                    <div className="mt-2">
+                      <Input
+                        type="number"
+                        value={delta}
+                        onChange={(e) => setDelta(e.target.value)}
+                        placeholder="+/-"
+                        className="h-7 text-xs bg-background/60 border-border/60"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          <div>
-            <Label className="text-xs">Motivo</Label>
-            <Input
-              placeholder="ex: corrigir bug"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy !== null || !hasAnyDelta}
-            onClick={() =>
-              run(
-                "adjust",
-                () =>
-                  adjustFn({
-                    data: {
-                      id: member.id,
-                      kills_delta: Number(killsDelta) || undefined,
-                      deaths_delta: Number(deathsDelta) || undefined,
-                      saidas_delta: Number(saidasDelta) || undefined,
-                      deliveries_delta: Number(deliveriesDelta) || undefined,
-                      sales_delta: Number(vendasDelta) || undefined,
-                      orders_delta: Number(ordersDelta) || undefined,
-                      reason: reason || undefined,
-                    },
-                  }),
-                "Estatísticas ajustadas",
-              )
-            }
-          >
-            Aplicar ajuste
-          </Button>
+          {/* Edit mode controls */}
+          {editingStats && (
+            <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
+              <div>
+                <Label className="text-xs">Motivo</Label>
+                <Input
+                  placeholder="ex: corrigir bug"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy !== null || !hasAnyDelta}
+                  onClick={() =>
+                    run(
+                      "adjust",
+                      () =>
+                        adjustFn({
+                          data: {
+                            id: member.id,
+                            kills_delta: Number(killsDelta) || undefined,
+                            deaths_delta: Number(deathsDelta) || undefined,
+                            saidas_delta: Number(saidasDelta) || undefined,
+                            deliveries_delta: Number(deliveriesDelta) || undefined,
+                            sales_delta: Number(vendasDelta) || undefined,
+                            orders_delta: Number(ordersDelta) || undefined,
+                            reason: reason || undefined,
+                          },
+                        }),
+                      "Estatísticas ajustadas",
+                    ).then(() => {
+                      setEditingStats(false);
+                      resetDeltas();
+                    })
+                  }
+                >
+                  <Save className="mr-1 h-3 w-3" />
+                  Aplicar ajuste
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingStats(false);
+                    resetDeltas();
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Kick */}
@@ -326,3 +471,4 @@ export function MemberAdminPanel({
     </Card>
   );
 }
+

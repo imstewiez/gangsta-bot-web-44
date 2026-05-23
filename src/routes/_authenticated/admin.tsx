@@ -3,13 +3,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
+import { checkManagerAccess } from "@/lib/access-check.functions";
 import { listAppUsers, setUserRole } from "@/lib/admin.functions";
+import { adminRecalcAllTimeStats, adminImportMissingMembers } from "@/lib/member-admin.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Shield, ShieldOff } from "lucide-react";
+import { Shield, ShieldOff, Calculator, Users } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
@@ -19,27 +21,43 @@ export const Route = createFileRoute("/_authenticated/admin")({
   errorComponent: PageErrorBoundary,
   beforeLoad: async () => {
     if (isServer()) return;
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw redirect({ to: "/login" });
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-    const MANAGER_ROLES = new Set(["patrao_di_zona", "real_gangster", "og", "kingpin", "manda_chuva", "admin"]);
-    if (!(roles ?? []).some((r: { role: string }) => MANAGER_ROLES.has(r.role))) {
-      throw redirect({ to: "/dashboard" });
-    }
   },
+  head: () => ({
+    meta: [{ title: "Definições | Ballas Gang" }],
+  }),
   component: AdminPage,
 });
 
 function AdminPage() {
+  const managerFn = useAuthedServerFn(checkManagerAccess);
+  const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
   const listFn = useAuthedServerFn(listAppUsers);
   const setFn = useAuthedServerFn(setUserRole);
+  const recalcFn = useAuthedServerFn(adminRecalcAllTimeStats);
+  const importFn = useAuthedServerFn(adminImportMissingMembers);
   const qc = useQueryClient();
   const users = useQuery({ queryKey: ["appUsers"], queryFn: () => listFn() });
+  const recalcM = useMutation({
+    mutationFn: () => recalcFn(),
+    onSuccess: (res) => {
+      toast.success(`all_time_stats recalculado — ${res.rows_updated} membros atualizados`);
+      qc.invalidateQueries({ queryKey: ["membersWithStats"] });
+      qc.invalidateQueries({ queryKey: ["member"] });
+      qc.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const importM = useMutation({
+    mutationFn: () => importFn(),
+    onSuccess: (res) => {
+      toast.success(`${res.created} membros importados (${res.totalMissing} em falta)`);
+      qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["appUsers"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const m = useMutation({
     mutationFn: (v: {
       user_id: string;
@@ -67,13 +85,65 @@ function AdminPage() {
       toast.success("Atualizado");
     },
   });
+
+  if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (!managerCheck.data?.allowed) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-semibold">Acesso restrito</p>
+          <p className="text-sm text-muted-foreground">Só a direção pode aceder a esta página.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <>
       <PageHeader
         eyebrow="Direção"
         title="Definições"
-        description="Gerir permissões"
+        description="Gerir permissões e sincronizar dados"
       />
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-display text-sm">
+            Sincronização de dados
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Recalcula <code className="text-xs bg-muted px-1 rounded">all_time_stats</code> a partir das tabelas fonte
+              (kill_logs, operations, inventory_movements, orders). Use isto se os kills ou stats de um membro
+              parecerem desactualizados no perfil vs leaderboard.
+            </p>
+            <ButtonLoading
+              size="sm"
+              loading={recalcM.isPending}
+              onClick={() => recalcM.mutate()}
+            >
+              <Calculator className="mr-1 h-3 w-3" />
+              Recalcular all_time_stats
+            </ButtonLoading>
+          </div>
+          <div className="border-t border-border pt-4">
+            <p className="text-sm text-muted-foreground mb-3">
+              Importa membros que fizeram login na app (têm perfil Discord) mas ainda não têm registo na tabela
+              <code className="text-xs bg-muted px-1 rounded">members</code>. Isto acontece quando alguém entra no
+              Discord e faz login na app antes de ser aprovado no onboarding.
+            </p>
+            <ButtonLoading
+              size="sm"
+              loading={importM.isPending}
+              onClick={() => importM.mutate()}
+            >
+              <Users className="mr-1 h-3 w-3" />
+              Importar membros em falta
+            </ButtonLoading>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-display text-sm">

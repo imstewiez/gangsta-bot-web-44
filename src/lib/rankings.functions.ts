@@ -61,17 +61,33 @@ export const recomputeWeek = createServerFn({ method: "POST" })
         // Aggregate per member
         const agg = await c.query(
           `with bounds as (select $1::date as ws, ($1::date + interval '6 days') as we),
-            kills as (
+            kills_logs as (
               select killer_id as member_id, count(*)::int as kills_count
                 from kill_logs, bounds
                where date between bounds.ws and bounds.we and killer_id is not null
                group by killer_id
             ),
+            kills_ops as (
+              select p.member_id, sum(p.kills)::int as kills_count
+                from operation_participants p
+                join operations o on o.id = p.operation_id and o.deleted_at is null
+                cross join bounds
+               where o.status = 'concluida'
+                 and coalesce(o.end_time, o.start_time, o.date::timestamp) between bounds.ws and bounds.we + interval '1 day'
+                 and p.kills > 0
+               group by p.member_id
+            ),
+            kills as (
+              select coalesce(l.member_id, o.member_id) as member_id,
+                     coalesce(l.kills_count, 0) + coalesce(o.kills_count, 0) as kills_count
+                from kills_logs l
+                full outer join kills_ops o on l.member_id = o.member_id
+            ),
             ops as (
               select p.member_id,
                      count(*)::int as operations_count,
-                     count(*) filter (where o.was_profitable) ::int as wins_count,
-                     count(*) filter (where o.was_profitable = false) ::int as loss_count,
+                     count(*) filter (where o.was_profitable = true) ::int as wins_count,
+                     count(*) filter (where o.was_profitable = false or o.was_profitable is null) ::int as loss_count,
                      count(*) filter (where p.died) ::int as deaths_in_ops,
                      count(*) filter (where p.survived) ::int as survived_in_ops,
                      coalesce(sum(p.net_material_delta),0)::numeric as net_profit_generated
@@ -86,7 +102,7 @@ export const recomputeWeek = createServerFn({ method: "POST" })
               select member_id, count(*)::int as deliveries
                 from inventory_movements, bounds
                where created_at between bounds.ws and bounds.we + interval '1 day'
-                 and movement_type in ('entrada','delivery')
+                 and movement_type in ('entrega_bairrista','entrega_oficial')
                  and member_id is not null
                group by member_id
             ),
@@ -94,9 +110,31 @@ export const recomputeWeek = createServerFn({ method: "POST" })
               select member_id, count(*)::int as sales
                 from inventory_movements, bounds
                where created_at between bounds.ws and bounds.we + interval '1 day'
-                 and movement_type in ('saida','venda','sale')
+                 and movement_type in ('venda_bairrista')
                  and member_id is not null
                group by member_id
+            ),
+            mat_pts as (
+              select im.member_id,
+                     coalesce(sum(abs(im.quantity) * coalesce(i.xp_points, 1)), 0)::int as material_points
+                from inventory_movements im
+                join items i on i.id = im.item_id
+                cross join bounds
+               where im.created_at between bounds.ws and bounds.we + interval '1 day'
+                 and im.movement_type in ('entrega_bairrista','entrega_oficial')
+                 and im.member_id is not null
+               group by im.member_id
+            ),
+            sale_pts as (
+              select im.member_id,
+                     coalesce(sum(abs(im.quantity) * coalesce(i.xp_points, 1)), 0)::int as sales_points
+                from inventory_movements im
+                join items i on i.id = im.item_id
+                cross join bounds
+               where im.created_at between bounds.ws and bounds.we + interval '1 day'
+                 and im.movement_type = 'venda_bairrista'
+                 and im.member_id is not null
+               group by im.member_id
             )
             select m.id as member_id,
                    coalesce(k.kills_count,0) as kills_count,
@@ -107,14 +145,18 @@ export const recomputeWeek = createServerFn({ method: "POST" })
                    coalesce(o.survived_in_ops,0) as survived_in_ops,
                    coalesce(o.net_profit_generated,0) as net_profit_generated,
                    coalesce(d.deliveries,0) as deliveries,
-                   coalesce(s.sales,0) as sales
+                   coalesce(s.sales,0) as sales,
+                   coalesce(mp.material_points,0) as material_points,
+                   coalesce(sp.sales_points,0) as sales_points
               from members m
               left join kills k on k.member_id = m.id
               left join ops o on o.member_id = m.id
               left join inv d on d.member_id = m.id
               left join sales s on s.member_id = m.id
+              left join mat_pts mp on mp.member_id = m.id
+              left join sale_pts sp on sp.member_id = m.id
              where m.deleted_at is null
-               and (m.status = 'ativo' or m.status is null and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted'))
+               and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
                and (coalesce(k.kills_count,0) + coalesce(o.operations_count,0) + coalesce(d.deliveries,0) + coalesce(s.sales,0) > 0)`,
           [ws],
         );
@@ -129,9 +171,13 @@ export const recomputeWeek = createServerFn({ method: "POST" })
           const net = Number(r.net_profit_generated);
           const performance = kills + wins * 2 - deaths * 0.5;
           const hybrid = performance + survival * 50 + net * 0.001;
-          return { ...r, survival, performance, hybrid };
+          const material_points = Number(r.material_points);
+          const sales_points = Number(r.sales_points);
+          const ops_points = ops * 5 + wins * 10 + kills * 3 - deaths * 5;
+          const total_score = material_points + sales_points + ops_points;
+          return { ...r, survival, performance, hybrid, material_points, sales_points, ops_points, total_score };
         });
-        rows.sort((a, b) => b.hybrid - a.hybrid);
+        rows.sort((a, b) => b.total_score - a.total_score);
 
         let pos = 0;
         for (const r of rows) {
@@ -140,8 +186,9 @@ export const recomputeWeek = createServerFn({ method: "POST" })
             `insert into weekly_rankings
               (member_id, week_start, week_end, deliveries, sales, operations_count, weighted_value,
                return_rate, rank_position, kills_count, wins_count, loss_count,
-               net_profit_generated, survival_rate, performance_score, hybrid_score, normalized_score, created_at)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())`,
+               net_profit_generated, survival_rate, performance_score, hybrid_score, normalized_score,
+               material_points, sales_points, ops_points, total_score, created_at)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, now())`,
             [
               r.member_id,
               ws,
@@ -162,6 +209,10 @@ export const recomputeWeek = createServerFn({ method: "POST" })
               rows.length > 0
                 ? r.hybrid / Math.max(...rows.map((x) => x.hybrid || 1))
                 : 0,
+              r.material_points,
+              r.sales_points,
+              r.ops_points,
+              r.total_score,
             ],
           );
         }

@@ -54,7 +54,7 @@ export async function notifyUsers(
 ) {
   if (!discordIds.length) return;
   const rows = await pgQuery<{ user_id: string | null; discord_id: string }>(
-    `select p.user_id, m.discord_id
+    `select distinct p.user_id, m.discord_id
      from members m
      left join profiles p on p.discord_id = m.discord_id
      where m.discord_id = any($1::text[])`,
@@ -77,9 +77,9 @@ export async function notifyManagers(
   n: NotifPayload,
 ) {
   const managers = await pgQuery<{ discord_id: string }>(
-    `select discord_id from members
+    `select distinct discord_id from members
      where deleted_at is null
-       and (status = 'ativo' or status is null and coalesce(lifecycle_state::text, 'active') = 'active')
+       and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')
        and discord_id is not null
        and (tier in ('patrao_di_zona','kingpin','manda_chuva') or role in ('chefia','manda_chuva','kingpin'))`,
   );

@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne, withClient } from "./pg.server";
+import { resolveCurrentMember } from "./pricing.server";
+import { enqueueNotification } from "./notifier.server";
 
 export type ParticipantStat = {
   member_id: number;
@@ -27,6 +29,7 @@ export type SaidaRow = {
   deaths: number | null;
   survivors: number | null;
   had_fight: boolean | null;
+  was_profitable: boolean | null;
   result_notes: string | null;
   participants_json: ParticipantStat[];
 };
@@ -68,6 +71,7 @@ export const listSaidas = createServerFn({ method: "GET" })
               o.deaths,
               o.survivors,
               o.had_fight,
+              o.was_profitable,
               o.result_notes,
               coalesce((
                 select jsonb_agg(jsonb_build_object(
@@ -159,6 +163,12 @@ export const addKill = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    // Security: only managers can add kills on behalf of others
+    if (data.killer_id !== me.id && !me.is_manager) {
+      throw new Error("Apenas podes registar kills para ti mesmo.");
+    }
     const row = await pgOne<{ id: number }>(
       `insert into kill_logs (killer_id, victim_name, spot, notes, date, created_by, created_at)
        values ($1, $2, $3, $4, current_date, $5, now())
@@ -170,6 +180,13 @@ export const addKill = createServerFn({ method: "POST" })
         data.notes ?? null,
         `web:${context.userId}`,
       ],
+    );
+    // Keep all_time_stats in sync so profile / member list show the same kills as leaderboard
+    await pgQuery(
+      `insert into all_time_stats (member_id, kills_total, updated_at)
+       values ($1, 1, now())
+       on conflict (member_id) do update set kills_total = all_time_stats.kills_total + 1, updated_at = now()`,
+      [data.killer_id],
     );
     return { id: row?.id ?? null };
   });
@@ -260,4 +277,182 @@ export const createOperationWithParticipants = createServerFn({ method: "POST" }
 
       return { id: opId };
     });
+  });
+
+// ---------- Cancel operation ----------
+export const cancelOperation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: number }) => {
+    if (!Number.isFinite(d.id)) throw new Error("id inválido");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    const op = await pgOne<{ id: number; leader_id: number | null; status: string; operation_type: string | null; spot: string | null }>(
+      `select id, leader_id, status, operation_type, spot from operations where id = $1 and deleted_at is null`,
+      [data.id],
+    );
+    if (!op) throw new Error("Saída não encontrada");
+    if (op.status === "concluida" || op.status === "cancelada") throw new Error("Saída já está fechada");
+    const isLeader = op.leader_id === me?.id;
+    const isManager = me?.is_manager ?? false;
+    if (!isLeader && !isManager) throw new Error("Apenas o líder ou direção pode cancelar.");
+
+    await pgQuery(
+      `update operations set status = 'cancelada', end_time = now(), updated_at = now() where id = $1`,
+      [data.id],
+    );
+
+    // Notify participants
+    const participants = await pgQuery<{ member_id: number }>(
+      `select member_id from operation_participants where operation_id = $1`,
+      [data.id],
+    );
+    const names = await pgOne<{ display_name: string }>(
+      `select display_name from members where id = $1`,
+      [me?.id ?? 0],
+    );
+    for (const p of participants) {
+      if (p.member_id === me?.id) continue;
+      await enqueueNotification({
+        embed: {
+          title: "Saída cancelada",
+          description: `${names?.display_name ?? "Direção"} cancelou a ${op.operation_type ?? "saída"} · ${op.spot ?? "#" + op.id}`,
+          color: 0xef4444,
+        },
+      });
+    }
+    return { ok: true };
+  });
+
+// ---------- Kick participant ----------
+export const kickParticipant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { operation_id: number; member_id: number }) => {
+    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
+    if (!Number.isFinite(d.member_id)) throw new Error("member_id inválido");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    const op = await pgOne<{ id: number; leader_id: number | null; status: string }>(
+      `select id, leader_id, status from operations where id = $1 and deleted_at is null`,
+      [data.operation_id],
+    );
+    if (!op) throw new Error("Saída não encontrada");
+    if (op.status === "concluida" || op.status === "cancelada") throw new Error("Saída já está fechada");
+    const isLeader = op.leader_id === me?.id;
+    const isManager = me?.is_manager ?? false;
+    if (!isLeader && !isManager) throw new Error("Apenas o líder ou direção pode remover membros.");
+    if (data.member_id === me?.id) throw new Error("Não te podes remover a ti mesmo.");
+
+    await pgQuery(
+      `delete from operation_participants where operation_id = $1 and member_id = $2`,
+      [data.operation_id, data.member_id],
+    );
+    return { ok: true };
+  });
+
+// ---------- Invite members ----------
+export const inviteMembers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { operation_id: number; member_ids?: number[]; role?: string }) => {
+    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    const op = await pgOne<{ id: number; leader_id: number | null; status: string; operation_type: string | null; spot: string | null }>(
+      `select id, leader_id, status, operation_type, spot from operations where id = $1 and deleted_at is null`,
+      [data.operation_id],
+    );
+    if (!op) throw new Error("Saída não encontrada");
+    if (op.status === "concluida" || op.status === "cancelada") throw new Error("Saída já está fechada");
+    const isLeader = op.leader_id === me?.id;
+    const isManager = me?.is_manager ?? false;
+    if (!isLeader && !isManager) throw new Error("Apenas o líder ou direção pode convidar.");
+
+    let targetIds: number[] = [];
+    if (data.member_ids && data.member_ids.length > 0) {
+      targetIds = data.member_ids;
+    } else if (data.role) {
+      const rows = await pgQuery<{ id: number }>(
+        `select id from members where role = $1 and deleted_at is null and lifecycle_state = 'active'`,
+        [data.role],
+      );
+      targetIds = rows.map((r) => r.id);
+    }
+
+    if (targetIds.length === 0) throw new Error("Nenhum membro para convidar.");
+
+    // Exclude existing participants
+    const existing = await pgQuery<{ member_id: number }>(
+      `select member_id from operation_participants where operation_id = $1`,
+      [data.operation_id],
+    );
+    const existingSet = new Set(existing.map((e) => e.member_id));
+    const newIds = targetIds.filter((id) => !existingSet.has(id));
+
+    for (const memberId of newIds) {
+      await pgQuery(
+        `insert into operation_participants (operation_id, member_id, participant_type, role_in_op) values ($1, $2, 'pending', 'membro')`,
+        [data.operation_id, memberId],
+      );
+    }
+
+    // Notify invited members
+    for (const memberId of newIds) {
+      await enqueueNotification({
+        embed: {
+          title: "Convite para saída",
+          description: `Foste convidado para ${op.operation_type ?? "saída"} · ${op.spot ?? "#" + op.id}`,
+          color: 0xa855f7,
+        },
+      });
+    }
+
+    return { invited: newIds.length };
+  });
+
+// ---------- Accept / Decline invite ----------
+export const acceptInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { operation_id: number }) => {
+    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    await pgQuery(
+      `update operation_participants set participant_type = 'caracterizado' where operation_id = $1 and member_id = $2 and participant_type = 'pending'`,
+      [data.operation_id, me.id],
+    );
+    return { ok: true };
+  });
+
+export const declineInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { operation_id: number }) => {
+    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    await pgQuery(
+      `delete from operation_participants where operation_id = $1 and member_id = $2 and participant_type = 'pending'`,
+      [data.operation_id, me.id],
+    );
+    return { ok: true };
+  });
+
+// ---------- List roles for invite by tag ----------
+export const listRoles = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const rows = await pgQuery<{ role: string; count: number }>(
+      `select role, count(*)::int as count from members where deleted_at is null and lifecycle_state = 'active' group by role order by count desc`,
+    );
+    return rows;
   });

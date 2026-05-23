@@ -82,8 +82,9 @@ async function normalizeCatastrophicSsrResponse(
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url);
-    if (url.hostname === "ballasgang.pt") {
-      url.hostname = "www.ballasgang.pt";
+    // Redirect old domain to new domain
+    if (url.hostname === "ballasgang.pt" || url.hostname === "www.ballasgang.pt") {
+      url.hostname = "ballasgang.eu";
       url.protocol = "https:";
       return Response.redirect(url.toString(), 308);
     }

@@ -29,9 +29,13 @@ export type ArmoryCategory =
   | "armas_red"
   | "armas_brancas"
   | "carregadores"
+  | "carregadores_orange"
+  | "carregadores_red"
+  | "carregadores_especial"
   | "acessorios"
   | "acessorios_armas"
   | "coletes"
+  | "extras"
   | "drogas"
   | "craft_armas"
   | "craft_carregadores"
@@ -47,7 +51,9 @@ export type ArmoryCategory =
 export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
   "armas_orange",
   "armas_red",
-  "carregadores",
+  "carregadores_orange",
+  "carregadores_red",
+  "carregadores_especial",
   "acessorios",
   "acessorios_armas",
   "coletes",
@@ -62,6 +68,7 @@ export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
   "corpos",
   "prints",
   "armas_brancas",
+  "extras",
   "outros",
 ];
 
@@ -105,13 +112,40 @@ export const ARMORY_CAT_CONFIG: Record<
     tone: "info",
   },
   carregadores: {
-    label: "Craft Carregadores",
+    label: "Carregadores",
     icon: Cylinder,
     color: "text-blue-400",
     bg: "bg-blue-500/10",
     border: "border-blue-500/30",
     headerColor: "text-blue-400",
     tone: "primary",
+  },
+  carregadores_orange: {
+    label: "Carregadores Orange",
+    icon: Cylinder,
+    color: "text-orange-400",
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/30",
+    headerColor: "text-orange-400",
+    tone: "warning",
+  },
+  carregadores_red: {
+    label: "Carregadores Red",
+    icon: Cylinder,
+    color: "text-red-400",
+    bg: "bg-red-500/10",
+    border: "border-red-500/30",
+    headerColor: "text-red-400",
+    tone: "destructive",
+  },
+  carregadores_especial: {
+    label: "Carregadores Especial",
+    icon: Cylinder,
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10",
+    border: "border-yellow-500/30",
+    headerColor: "text-yellow-400",
+    tone: "warning",
   },
   acessorios: {
     label: "Acessórios",
@@ -230,6 +264,15 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-primary",
     tone: "primary",
   },
+  extras: {
+    label: "Extras",
+    icon: Package,
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10",
+    border: "border-yellow-500/30",
+    headerColor: "text-yellow-400",
+    tone: "info",
+  },
   outros: {
     label: "Outros",
     icon: Package,
@@ -260,20 +303,38 @@ export const PRINT_BADGE_CLASS: Record<string, string> = {
   red: "bg-red-500/15 text-red-400 border-red-500/40",
 };
 
-// Weapons that are Orange regardless of their print tier
-const ORANGE_WEAPON_NAMES = [
-  "AP Pistol",
-  "Machine Pistol",
-  "Micro SMG",
+// ── Armas permitidas por categoria ──────────────────────────────────────────
+// Apenas estas armas aparecem nas secções Red / Orange. Tudo o resto é escondido.
+
+export const RED_WEAPON_NAMES = [
+  "Heavy Pistol",
+  "Pistol .50",
+  "Combat PDW",
+  "P90",
+  "Bullpup Rifle",
+  "Carabina Rifle",
+];
+
+export const ORANGE_WEAPON_NAMES = [
   "Mini SMG",
   "Pistol XM3",
+  "Micro SMG",
+  "TEC 9",
   "TEC Pistol",
-  "Compact Rifle",
-  "Assault Shotgun",
-  "Gusenberg",
-  "Heavy Shotgun",
-  "SNS Pistol",
+  "AP Pistol",
 ];
+
+export function isAllowedRedWeapon(name: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return RED_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
+}
+
+export function isAllowedOrangeWeapon(name: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return ORANGE_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
+}
 
 export function isOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
@@ -281,33 +342,125 @@ export function isOrangeWeapon(name: string | null): boolean {
   return ORANGE_WEAPON_NAMES.some((o) => n.includes(o.toLowerCase()));
 }
 
-// Map DB tier → display category for weapons
-export function weaponDisplayCategory(
-  recipeCat: string | null,
-  tier: string | null,
-  itemName: string | null,
-): ArmoryCategory | null {
-  if (recipeCat === "craft_carregadores") return "carregadores";
-  if (recipeCat === "craft_weapons") {
-    if (tier === "orange") return "armas_orange";
+export function isAllowedWeapon(name: string | null): boolean {
+  return isAllowedRedWeapon(name) || isAllowedOrangeWeapon(name);
+}
+
+// ── Classificação UNIFICADA para TODAS as páginas ──────────────────────────
+// Usar esta função em vez de lógicas ad-hoc. Garante consistência entre
+// armazém, preçário, encomendas, receitas, etc.
+export function itemDisplayCategory(
+  itemName: string,
+  category: string | null,
+  subcategory: string | null,
+): ArmoryCategory {
+  const name = itemName.toLowerCase();
+  const sub = subcategory;
+  const cat = category;
+
+  // 1. Carregadores FIRST (têm "carregador" no nome)
+  if (
+    sub === "carregadores" ||
+    sub === "municoes" ||
+    cat === "municoes" ||
+    sub === "craft_carregadores" ||
+    name.includes("carregador")
+  ) {
+    if (name.includes("especial")) return "carregadores_especial";
+    if (
+      name.includes("red") ||
+      /carregador.*(ak|m4|g36|scar|fal|sniper|barrett|kar98|awp)/.test(name)
+    )
+      return "carregadores_red";
+    if (
+      name.includes("orange") ||
+      /carregador.*(ap pistol|mini smg|micro smg|tec|uzi|pistol xm3)/.test(name)
+    )
+      return "carregadores_orange";
+    return "carregadores";
+  }
+
+  // 2. Armas (ANTES de corpos/prints — algumas armas têm category="prints" na DB)
+  if (sub === "armas_orange" || cat === "armas_orange") return "armas_orange";
+  if (sub === "armas_red" || cat === "armas_red") {
     if (isOrangeWeapon(itemName)) return "armas_orange";
     return "armas_red";
   }
-  return null;
-}
-
-// Map item subcategory → display category for catalog/pricing
-export function pricingDisplayCategory(
-  sub: string | null,
-  itemName?: string | null,
-): ArmoryCategory | null {
-  if (sub === "armas_orange") return "armas_orange";
-  if (sub === "armas_red" || sub === "azul" || sub === "vermelha" || sub === "amarela") {
-    if (isOrangeWeapon(itemName ?? null)) return "armas_orange";
+  if (sub === "azul" || sub === "vermelha" || sub === "amarela") {
+    if (isOrangeWeapon(itemName)) return "armas_orange";
     return "armas_red";
   }
-  if (sub === "carregadores") return "carregadores";
-  return null;
+  if (sub === "craft_weapons" || cat === "craft_weapons") {
+    if (isOrangeWeapon(itemName)) return "armas_orange";
+    return "armas_red";
+  }
+
+  // Fallback: detectar armas pelo nome
+  const isWeaponByName =
+    !name.includes("print") &&
+    !name.includes("corpo") &&
+    !name.includes("carregador") &&
+    /\b(carabina|combat|p90|\.50|smg|rifle|shotgun|sniper|fuzil|ak\b|m4|g36|scar|barrett|awp|deagle|glock|tec|uzi|mp5|mp7|vector|compact|assault|heavy|mini|micro|machine|ap\s|sns\s|revolver)\b/.test(
+      name,
+    );
+  if (isWeaponByName) {
+    if (isOrangeWeapon(itemName)) return "armas_orange";
+    return "armas_red";
+  }
+
+  // 3. Corpos
+  if (cat === "corpos" || sub === "corpos" || /corpo|chassi/.test(name))
+    return "corpos";
+
+  // 4. Prints (só se NÃO for arma — já verificado acima)
+  if (cat === "prints" || sub === "prints" || /print|esquema|blueprint/.test(name))
+    return "prints";
+
+  // 5. Materiais de craft / minérios / matérias-primas / madeiras / lixo
+  if (
+    cat === "materiais" ||
+    cat === "materias_primas" ||
+    cat === "componentes" ||
+    cat === "minerios" ||
+    cat === "madeiras" ||
+    cat === "lixo"
+  ) {
+    if (name.includes("carvão") || name.includes("carvao")) return "materiais_craft";
+    if (sub === "lixo") return "lixo";
+    if (sub === "madeiras") return "madeiras";
+    if (sub === "materias_primas") return "materias_primas";
+    if (sub === "minerios") return "minerios";
+    if (sub === "materiais_craft") return "materiais_craft";
+    if (cat === "lixo") return "lixo";
+    if (cat === "madeiras") return "madeiras";
+    if (cat === "minerios") return "minerios";
+    if (cat === "materias_primas") return "materias_primas";
+    return "materiais_craft";
+  }
+
+  // 6. Drogas
+  if (cat === "drogas" || sub === "drogas") return "drogas";
+
+  // 7. Lixo / Madeiras / Matérias-primas / Minérios / Materiais craft (subcategory direta)
+  if (sub === "lixo") return "lixo";
+  if (sub === "madeiras") return "madeiras";
+  if (sub === "materias_primas") return "materias_primas";
+  if (sub === "minerios") return "minerios";
+  if (sub === "materiais_craft") return "materiais_craft";
+
+  // 8. Acessórios / coletes / armas brancas
+  if (
+    sub === "acessorios" ||
+    sub === "acessorios_armas" ||
+    cat === "acessorios" ||
+    cat === "acessorios_armas"
+  )
+    return "acessorios";
+  if (sub === "coletes" || cat === "coletes") return "coletes";
+  if (sub === "armas_brancas" || cat === "armas_brancas") return "armas_brancas";
+
+  // 9. Outros
+  return "outros";
 }
 
 // Subcategory label override — replace ugly raw names

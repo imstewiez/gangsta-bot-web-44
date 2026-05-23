@@ -62,6 +62,7 @@ export const createDelivery = createServerFn({ method: "POST" })
       lines: { item_id: number; qty: number }[];
       notes?: string | null;
       tipo?: "entrega" | "venda";
+      responsavel_member_id?: number | null;
     }) => {
       if (!Array.isArray(d.lines) || d.lines.length === 0)
         throw new Error("Sem linhas");
@@ -73,12 +74,16 @@ export const createDelivery = createServerFn({ method: "POST" })
         )
           throw new Error("Linha inválida");
       }
+      if (d.responsavel_member_id != null && (!Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0)) {
+        throw new Error("Responsável inválido");
+      }
       return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
     },
   )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
+    if (!Number.isFinite(me.id) || me.id <= 0) throw new Error("ID de membro inválido");
     if (!me.discord_id) throw new Error("Membro sem Discord ID");
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
@@ -109,8 +114,8 @@ export const createDelivery = createServerFn({ method: "POST" })
     });
     const row = await pgOne<{ id: string }>(
       `insert into inventory_delivery_requests
-         (id, requester_member_id, requester_discord_id, status, lines, notes, total_qty, total_value, created_by, tipo)
-       values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, $8)
+         (id, requester_member_id, requester_discord_id, status, lines, notes, total_qty, total_value, created_by, tipo, responsavel_member_id)
+       values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, $8, $9)
        returning id`,
       [
         me.id,
@@ -121,6 +126,7 @@ export const createDelivery = createServerFn({ method: "POST" })
         totalValue,
         `web:${context.userId}`,
         data.tipo,
+        data.responsavel_member_id ?? null,
       ],
     );
     const verb = data.tipo === "venda" ? "quer vender" : "vai entregar";
@@ -134,6 +140,25 @@ export const createDelivery = createServerFn({ method: "POST" })
     return { id: row?.id };
   });
 
+export const fixMissingDeliveryMemberIds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Sem permissão");
+    // Fix inventory_movements linked to web deliveries where member_id is null
+    const fixed = await pgQuery<{ movement_id: number; requester_member_id: number }>(
+      `update inventory_movements im
+       set member_id = r.requester_member_id
+       from inventory_delivery_requests r
+       where im.notes like 'delivery:%'
+         and r.id = substring(im.notes from 10)::uuid
+         and im.member_id is null
+         and r.requester_member_id is not null
+       returning im.id as movement_id, r.requester_member_id`,
+    );
+    return { rows_fixed: fixed.length };
+  });
+
 export const decideDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -144,11 +169,13 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (!me?.is_manager) throw new Error("Sem permissão");
     const status = data.approve ? "approved" : "rejected";
     const before = await pgOne<{
+      requester_member_id: number;
       requester_discord_id: string;
+      tipo: string;
       lines: DeliveryLine[];
       status: string;
     }>(
-      `select requester_discord_id, lines, status from inventory_delivery_requests where id = $1`,
+      `select requester_member_id, requester_discord_id, tipo, lines, status from inventory_delivery_requests where id = $1`,
       [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
@@ -176,12 +203,20 @@ export const decideDelivery = createServerFn({ method: "POST" })
           [
             l.item_id,
             l.qty,
-            null,
+            before.requester_member_id,
             `delivery:${data.id}`,
             `web:${context.userId}`,
           ],
         );
       }
+      // Update all_time_stats so profile shows correct counts
+      const statColumn = before.tipo === 'venda' ? 'sales' : 'deliveries';
+      await pgQuery(
+        `insert into all_time_stats (member_id, ${statColumn}, updated_at)
+         values ($1, 1, now())
+         on conflict (member_id) do update set ${statColumn} = all_time_stats.${statColumn} + 1, updated_at = now()`,
+        [before.requester_member_id],
+      );
     }
     await notifyUsers(context.supabase, [before.requester_discord_id], {
       type: "delivery_update",

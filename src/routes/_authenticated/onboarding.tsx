@@ -28,21 +28,15 @@ import { Check, X } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {
     if (isServer()) return;
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw redirect({ to: "/login" });
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-    if (!(roles ?? []).some((r: { role: string }) => r.role === "admin"))
-      throw redirect({ to: "/dashboard" });
   },
   component: Page,
 });
 
 function Page() {
+  const managerFn = useAuthedServerFn(checkManagerAccess);
+  const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
   useRealtimeSync([{ table: "tag_requests", queryKeys: [["tagRequests"]] }]);
   const [tab, setTab] = useState("pending");
   const fn = useAuthedServerFn(listTagRequests);
@@ -73,6 +67,17 @@ function Page() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (!managerCheck.data?.allowed) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-semibold">Acesso restrito</p>
+          <p className="text-sm text-muted-foreground">Só a direção pode aceder a esta página.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <>
       <PageHeader

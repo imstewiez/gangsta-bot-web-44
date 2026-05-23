@@ -24,9 +24,14 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Loader2,
 } from "lucide-react";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/tops")({
+  head: () => ({
+    meta: [{ title: "Leaderboard | Ballas Gang" }],
+  }),
   component: Page,
 });
 
@@ -53,6 +58,10 @@ const COLUMNS: {
 ];
 
 function Page() {
+  useRealtimeSync([
+    { table: "all_time_stats", queryKeys: [["leaderboard"]] },
+    { table: "kill_logs", queryKeys: [["leaderboard"]] },
+  ]);
   const fn = useAuthedServerFn(getLeaderboard);
   const [period, setPeriod] = useState<LeaderboardPeriod>("week");
   const [sortBy, setSortBy] = useState<LeaderboardSortBy>("score");
@@ -103,7 +112,7 @@ function Page() {
       />
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-secondary text-display text-[11px] uppercase tracking-widest text-muted-foreground">
+          <thead className="bg-secondary text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="px-3 py-2 text-left">#</th>
               <th className="px-3 py-2 text-left">Membro</th>
@@ -129,9 +138,11 @@ function Page() {
               <tr>
                 <td
                   colSpan={10}
-                  className="p-6 text-center text-muted-foreground"
+                  className="p-6 text-center"
                 >
-                  A carregar
+                  <div className="flex items-center justify-center h-32">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
                 </td>
               </tr>
             )}

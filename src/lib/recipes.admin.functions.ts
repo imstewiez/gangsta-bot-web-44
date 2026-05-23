@@ -8,6 +8,8 @@ export type AdminRecipeRow = {
   item_id: number;
   item_name: string;
   category: string | null;
+  subcategory: string | null;
+  recipe_category: string | null;
   tier: string | null;
   ingredients: Array<{
     item_id: number;
@@ -21,6 +23,7 @@ export type AdminItemRow = {
   id: number;
   name: string;
   category: string | null;
+  subcategory: string | null;
   estimated_value: number | null;
   purchase_price: number | null;
   unit: string | null;
@@ -37,13 +40,15 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
       item_id: number;
       item_name: string;
       category: string | null;
+      subcategory: string | null;
+      recipe_category: string | null;
       tier: string | null;
       ing_item_id: number | null;
       ing_name: string | null;
       quantity: number | null;
       unit_cost: string | null;
     }>(
-      `select r.id as recipe_id, r.item_id, i.name as item_name, r.category, r.tier,
+      `select r.id as recipe_id, r.item_id, i.name as item_name, i.category, i.subcategory, r.category as recipe_category, r.tier,
               ri.ingredient_item_id as ing_item_id,
               ii.name as ing_name,
               ri.quantity,
@@ -65,6 +70,8 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
           item_id: r.item_id,
           item_name: r.item_name,
           category: r.category,
+          subcategory: r.subcategory,
+          recipe_category: r.recipe_category,
           tier: r.tier,
           ingredients: [],
         };
@@ -114,7 +121,7 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
     return pgQuery<AdminItemRow>(
-      `select id, name, category,
+      `select id, name, category, subcategory,
               estimated_value::float as estimated_value,
               purchase_price::float as purchase_price,
               unit
@@ -126,12 +133,16 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
 
 export const updateItemPrice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { item_id: number; estimated_value?: number; purchase_price?: number }) => {
+  .inputValidator((d: { item_id: number; estimated_value?: number; purchase_price?: number; min_sale_price?: number; xp_points?: number }) => {
     if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
     if (d.estimated_value !== undefined && (!Number.isFinite(d.estimated_value) || d.estimated_value < 0))
       throw new Error("estimated_value inválida");
     if (d.purchase_price !== undefined && (!Number.isFinite(d.purchase_price) || d.purchase_price < 0))
       throw new Error("purchase_price inválida");
+    if (d.min_sale_price !== undefined && (!Number.isFinite(d.min_sale_price) || d.min_sale_price < 0))
+      throw new Error("min_sale_price inválida");
+    if (d.xp_points !== undefined && (!Number.isFinite(d.xp_points) || d.xp_points < 0))
+      throw new Error("xp_points inválido");
     return d;
   })
   .handler(async ({ context, data }): Promise<void> => {
@@ -148,6 +159,14 @@ export const updateItemPrice = createServerFn({ method: "POST" })
     if (data.purchase_price !== undefined) {
       sets.push(`purchase_price = $${sets.length + 1}`);
       vals.push(data.purchase_price);
+    }
+    if (data.min_sale_price !== undefined) {
+      sets.push(`min_sale_price = $${sets.length + 1}`);
+      vals.push(data.min_sale_price);
+    }
+    if (data.xp_points !== undefined) {
+      sets.push(`xp_points = $${sets.length + 1}`);
+      vals.push(data.xp_points);
     }
     if (sets.length === 0) return;
 

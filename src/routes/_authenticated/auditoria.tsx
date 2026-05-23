@@ -1,9 +1,12 @@
+import { useState, useMemo } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { listAuditLogs } from "@/lib/ops.functions";
+import { checkManagerAccess } from "@/lib/access-check.functions";
+import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { fmtDate } from "@/lib/domain";
 import { Input } from "@/components/ui/input";
@@ -15,6 +18,7 @@ import {
   Shield, Ban, MessageSquare, HandCoins, Search, Filter, X,
   type LucideIcon,
 } from "lucide-react";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 /* ────────────── ACTION META ────────────── */
 const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: string; category: string }> = {
@@ -144,16 +148,18 @@ export const Route = createFileRoute("/_authenticated/auditoria")({
     if (isServer()) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw redirect({ to: "/login" });
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-    const MANAGER_ROLES = new Set(["patrao_di_zona", "real_gangster", "og", "kingpin", "manda_chuva", "admin"]);
-    if (!(roles ?? []).some((r: { role: string }) => MANAGER_ROLES.has(r.role)))
-      throw redirect({ to: "/dashboard" });
   },
+  head: () => ({
+    meta: [{ title: "Auditoria | Ballas Gang" }],
+  }),
   component: Page,
 });
 
 /* ────────────── PAGE ────────────── */
 function Page() {
+  useRealtimeSync([
+    { table: "audit_logs", queryKeys: [["auditLogs"]] },
+  ]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("todos");
   const fn = useAuthedServerFn(listAuditLogs);

@@ -1,86 +1,83 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { getStock, getLedger } from "@/lib/inventory.functions";
+import { getStock, getLedger, adjustStock, type StockRow as StockRowType } from "@/lib/inventory.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
+import { updateItemPrice } from "@/lib/recipes.admin.functions";
 import { PageHeader } from "@/components/layout/AppShell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { fmtNum, fmtDate } from "@/lib/domain";
+import { fmtNum, fmtDate, fmtPrice } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, Crosshair } from "lucide-react";
+import { Package, History, Pencil, Check, X, Loader2 } from "lucide-react";
+import { AccessDenied } from "@/components/domain/AccessDenied";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
-import { ARMORY_CAT_CONFIG } from "@/lib/armory.catalog";
+import { CategoryHeader } from "@/components/domain/CategoryHeader";
+import {
+  ARMORY_CAT_ORDER,
+  ARMORY_CAT_CONFIG,
+  itemDisplayCategory,
+  isAllowedRedWeapon,
+  isAllowedOrangeWeapon,
+} from "@/lib/armory.catalog";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
+  head: () => ({
+    meta: [{ title: "Inventário | Ballas Gang" }],
+  }),
   component: Page,
 });
 
 
 
-function normalizeName(n: string): string {
-  return n
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+// Materiais que NÃO usamos nos crafts — esconder do stock
+const EXCLUDED_ITEMS = [
+  "nylon",
+  "embalagem",
+  "borracha",
+  "tecido",
+  "papel",
+  "kevlar",
+  "couro",
+  "cana de pesca",
+  "carreto",
+  "saco",
+  "lixo eletrónico",
+  "lixo eletronico",
+  "plástico velho",
+  "plastico velho",
+  "telemóvel estragado",
+  "telemovel estragado",
+  "rádio estragado",
+  "radio estragado",
+];
 
-function classifyRow(r: { category: string | null; item_name: string }): string | null {
-  const c = (r.category ?? "").toLowerCase();
-  const n = normalizeName(r.item_name);
+function classifyRow(r: { category: string | null; subcategory: string | null; item_name: string }): string | null {
+  const name = r.item_name.toLowerCase();
 
-  // === 1. EXCLUIR ===
-  if (c === "armas_brancas") return null;
-  if (n.includes("estragad")) return null;
-  if (c === "coletes" || n.includes("colete")) return null;
-  if (n.includes("gusenberg") && n.includes("sweeper")) return null;
+  // Esconder materiais que não usamos
+  if (EXCLUDED_ITEMS.some((h) => name.includes(h))) return null;
 
-  // === 2. MATERIAIS DE CRAFT (primeiro para não serem confundidos com armas) ===
-  if (/\bcorpo\b|\bcorpos\b|\bprint\b|\bprints\b|\ba[çc]o\b|\bpe[çc]as\b|\bcobre\b|\bp[oó]lvora\b/.test(n)) {
-    return "materiais_craft";
-  }
+  // Forçar cobre, peças estragadas e sucata para materiais craft
+  if (/\bcobre\b/.test(name)) return "materiais_craft";
+  if (/peças estragadas|pecas estragadas/.test(name)) return "materiais_craft";
+  if (/\bsucata\b/.test(name)) return "materiais_craft";
 
-  // === 3. CARREGADORES ===
-  if (/\bcarregador\b/.test(n)) {
-    return "carregadores";
-  }
+  // Usar classificação unificada (fonte de verdade)
+  const cat = itemDisplayCategory(r.item_name, r.category, r.subcategory);
 
-  // === 4. ACESSÓRIOS ===
-  if (
-    /\bsilenciador\b|\bmira\b|\bgrip\b|\blanterna\b|\bmuzzle\b|\bbarrel\b|\bextensivo\b|\bmag\b/.test(n)
-  ) {
-    return "acessorios_armas";
-  }
+  // Esconder categorias não usadas no armazém
+  if (cat === "outros" || cat === "armas_brancas") return null;
 
-  // === 5. DROGAS ===
-  if (
-    /\bcabe[çc]os\b|\bhaxixe\b|\berva\b|\bmeth\b|\bmeta\b|\bmetanfetamina\b|\bmaconha\b|\bcoca[ií]na\b|\bop[ií]o\b/.test(n)
-  ) {
-    return "drogas";
-  }
+  // Apenas armas permitidas aparecem em Red / Orange (sem MK2)
+  if (cat === "armas_red" && (!isAllowedRedWeapon(r.item_name) || /mk2/.test(name))) return null;
+  if (cat === "armas_orange" && (!isAllowedOrangeWeapon(r.item_name) || /mk2/.test(name))) return null;
 
-  // === 6. ARMAS ORANGE (só se não for nada acima) ===
-  if (
-    /\bsns\b|\bxm3\b|\bmini\s*smg\b|\bmicro\s*smg\b|\bmachine\s*pistol\b|\btec\s*pistol\b|\bap\s*pistol\b|\bassault\s*shotgun\b|\bheavy\s*shotgun\b|\bcompact\s*rifle\b|\bgusenberg\b/.test(n)
-  ) {
-    return "armas_orange";
-  }
-
-  // === 7. ARMAS RED ===
-  if (
-    /\bheavy\s*pistol\b|\bp90\b|\bcombat\s*pdw\b|\bbullpup\s*rifle\b|\bbullpup\b|\bcarabina\b|\brevolver\b|\bgadget\s*pistol\b|\bpdw\b/.test(n)
-  ) {
-    return "armas_red";
-  }
-
-  return null;
-}
-
-function catBg(cat: string): string {
-  const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
-  if (!cfg) return "bg-muted/40 border-border text-muted-foreground";
-  return `${cfg.bg} ${cfg.border} ${cfg.color}`;
+  return cat;
 }
 
 const MOV_LABEL: Record<string, string> = {
@@ -98,25 +95,35 @@ const MOV_LABEL: Record<string, string> = {
 };
 
 function Page() {
+  const qc = useQueryClient();
   useRealtimeSync([{ table: "inventory", queryKeys: [["stock"], ["ledger"]] }]);
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
+  const [editMode, setEditMode] = useState(false);
+  const isManager = me.data?.is_manager ?? false;
+
+  const adjustFn = useAuthedServerFn(adjustStock);
+  const updatePriceFn = useAuthedServerFn(updateItemPrice);
+
+  const adjustMutation = useMutation({
+    mutationFn: (v: { item_id: number; new_qty: number }) => adjustFn({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["stock"] }),
+  });
+
+  const priceMutation = useMutation({
+    mutationFn: (v: { item_id: number; purchase_price?: number }) => updatePriceFn({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["stock"] }),
+  });
 
   if (me.isLoading) {
-    return <p className="text-muted-foreground">A carregar inventário</p>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
   if (!me.data?.can_see_inventory) {
-    return (
-      <Card className="p-8 text-center">
-        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-destructive/10">
-          <Crosshair className="h-5 w-5 text-destructive" />
-        </div>
-        <h2 className="text-display text-lg">Sem chave para esta porta.</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          O armazém é assunto da chefia e do Patrão di Zona.
-        </p>
-      </Card>
-    );
+    return <AccessDenied />;
   }
 
   return (
@@ -127,6 +134,16 @@ function Page() {
         description="Stock da firma"
         icon={Package}
       />
+
+      {isManager && (
+        <div className="mb-4 flex justify-end">
+          <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
+            <Pencil className="mr-1 h-3.5 w-3.5" />
+            {editMode ? "Concluir" : "Editar stock/preços"}
+          </Button>
+        </div>
+      )}
+
       <Tabs defaultValue="stock">
         <TabsList>
           <TabsTrigger value="stock" className="interactive-tab">
@@ -138,7 +155,12 @@ function Page() {
         </TabsList>
 
         <TabsContent value="stock" className="mt-4">
-          <StockTable />
+          <StockTable
+            editMode={editMode && isManager}
+            onAdjustStock={(id, qty) => adjustMutation.mutate({ item_id: id, new_qty: qty })}
+            onUpdatePrice={(id, price) => priceMutation.mutate({ item_id: id, purchase_price: price })}
+            pending={adjustMutation.isPending || priceMutation.isPending}
+          />
         </TabsContent>
         <TabsContent value="ledger" className="mt-4">
           <LedgerTable />
@@ -148,7 +170,17 @@ function Page() {
   );
 }
 
-function StockTable() {
+function StockTable({
+  editMode,
+  onAdjustStock,
+  onUpdatePrice,
+  pending,
+}: {
+  editMode: boolean;
+  onAdjustStock: (item_id: number, new_qty: number) => void;
+  onUpdatePrice: (item_id: number, price: number) => void;
+  pending: boolean;
+}) {
   const fn = useAuthedServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
@@ -159,22 +191,28 @@ function StockTable() {
     (acc[k] ||= []).push(r);
     return acc;
   }, {});
-  const total = Object.values(groups).reduce((s, arr) => s + arr.length, 0);
 
-  if (q.isLoading) return <p className="text-muted-foreground">A carregar</p>;
+  // Build ordered list following ARMORY_CAT_ORDER
+  const ordered: [string, typeof rows][] = [];
+  for (const cat of ARMORY_CAT_ORDER) {
+    const list = groups[cat];
+    if (list && list.length > 0) ordered.push([cat, list]);
+  }
+
+  const total = ordered.reduce((s, [, arr]) => s + arr.length, 0);
+
+  if (q.isLoading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   if (!total)
     return (
       <Card className="p-8 text-center text-muted-foreground">
         Armazém vazio. Mete-te a trabalhar.
       </Card>
     );
-
-  // Ordena categorias por valor total decrescente
-  const ordered = Object.entries(groups).sort((a, b) => {
-    const valA = a[1].reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
-    const valB = b[1].reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
-    return valB - valA;
-  });
 
   return (
     <div className="space-y-6">
@@ -191,26 +229,16 @@ function StockTable() {
             key={cat}
             className="overflow-hidden rounded-sm border border-border bg-card"
           >
-            <header
-              className={
-                "flex items-center justify-between gap-3 border-b px-4 py-2.5 " +
-                catBg(cat)
-              }
-            >
-              <div className="flex items-center gap-2">
-                <CategoryIcon category={cat} size={18} />
-                <h2 className="text-display text-sm uppercase tracking-widest">
-                  {meta.label}
-                </h2>
-              </div>
-              <span className="text-display text-[11px] tracking-wider opacity-90">
-                {items.length} refs · {fmtNum(totalQty)} em casa ·{" "}
-                {fmtNum(Math.round(value))} €
-              </span>
-            </header>
+            <div className="border-b">
+              <CategoryHeader
+                category={cat}
+                className="rounded-none border-x-0 border-t-0"
+                right={`${items.length} refs · ${fmtNum(totalQty)} em casa · ${fmtPrice(Math.round(value))}`}
+              />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-secondary/50 text-display text-[11px] uppercase tracking-wider text-muted-foreground">
+                <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-left">Item</th>
                     <th className="px-3 py-2 text-right">Em casa</th>
@@ -220,43 +248,18 @@ function StockTable() {
                 <tbody>
                   {items
                     .slice()
-                    .sort((a, b) => (b.unit_price ?? 0) - (a.unit_price ?? 0))
-                    .map((r) => {
-                      const low = r.qty <= 0;
-                      const warn = r.qty > 0 && r.qty < 5;
-                      return (
-                        <tr
-                          key={r.item_id}
-                          className="border-t border-border interactive-row"
-                        >
-                          <td className="px-3 py-2 font-medium">
-                            <span className="inline-flex items-center gap-2">
-                              <ItemIcon
-                                name={r.item_name}
-                                category={r.subcategory ?? cat}
-                                size={14}
-                              />
-                              {r.item_name}
-                            </span>
-                          </td>
-                          <td
-                            className={
-                              "px-3 py-2 text-right font-mono " +
-                              (low
-                                ? "text-destructive"
-                                : warn
-                                  ? "text-warning"
-                                  : "")
-                            }
-                          >
-                            {fmtNum(r.qty)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                            {r.unit_price != null ? fmtNum(r.unit_price) : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    .sort((a, b) => (a.unit_price ?? 0) - (b.unit_price ?? 0))
+                    .map((r) => (
+                      <StockRow
+                        key={r.item_id}
+                        r={r}
+                        cat={cat}
+                        editMode={editMode}
+                        onAdjustStock={onAdjustStock}
+                        onUpdatePrice={onUpdatePrice}
+                        pending={pending}
+                      />
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -264,6 +267,74 @@ function StockTable() {
         );
       })}
     </div>
+  );
+}
+
+function StockRow({
+  r,
+  cat,
+  editMode,
+  onAdjustStock,
+  onUpdatePrice,
+  pending,
+}: {
+  r: StockRowType;
+  cat: string;
+  editMode: boolean;
+  onAdjustStock: (item_id: number, new_qty: number) => void;
+  onUpdatePrice: (item_id: number, price: number) => void;
+  pending: boolean;
+}) {
+  const [editingQty, setEditingQty] = useState(false);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [qtyVal, setQtyVal] = useState(String(r.qty));
+  const [priceVal, setPriceVal] = useState(String(r.unit_price ?? 0));
+  const low = r.qty <= 0;
+  const warn = r.qty > 0 && r.qty < 5;
+
+  return (
+    <tr className="border-t border-border interactive-row">
+      <td className="px-3 py-2 font-medium">
+        <span className="inline-flex items-center gap-2">
+          <ItemIcon name={r.item_name} category={r.subcategory ?? cat} size={14} />
+          {r.item_name}
+        </span>
+      </td>
+      <td className={"px-3 py-2 text-right font-mono " + (low ? "text-destructive" : warn ? "text-warning" : "")}>
+        {editMode ? (
+          editingQty ? (
+            <div className="flex items-center justify-end gap-1">
+              <Input type="number" min={0} className="h-5 w-16 text-right text-xs px-1" value={qtyVal} onChange={(e) => setQtyVal(e.target.value)} autoFocus />
+              <button className="text-emerald-400" disabled={pending} onClick={() => { onAdjustStock(r.item_id, Number(qtyVal)); setEditingQty(false); }}><Check className="h-3 w-3" /></button>
+              <button className="text-muted-foreground" onClick={() => { setQtyVal(String(r.qty)); setEditingQty(false); }}><X className="h-3 w-3" /></button>
+            </div>
+          ) : (
+            <button className="flex items-center gap-1 justify-end w-full" onClick={() => { setQtyVal(String(r.qty)); setEditingQty(true); }}>
+              {fmtNum(r.qty)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          )
+        ) : (
+          fmtNum(r.qty)
+        )}
+      </td>
+      <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+        {editMode ? (
+          editingPrice ? (
+            <div className="flex items-center justify-end gap-1">
+              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={priceVal} onChange={(e) => setPriceVal(e.target.value)} autoFocus />
+              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(r.item_id, Number(priceVal)); setEditingPrice(false); }}><Check className="h-3 w-3" /></button>
+              <button className="text-muted-foreground" onClick={() => { setPriceVal(String(r.unit_price ?? 0)); setEditingPrice(false); }}><X className="h-3 w-3" /></button>
+            </div>
+          ) : (
+            <button className="flex items-center gap-1 justify-end w-full" onClick={() => { setPriceVal(String(r.unit_price ?? 0)); setEditingPrice(true); }}>
+              {r.unit_price != null ? fmtPrice(r.unit_price) : "—"} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          )
+        ) : (
+          r.unit_price != null ? fmtPrice(r.unit_price) : "—"
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -275,7 +346,12 @@ function LedgerTable() {
   });
   const rows = q.data ?? [];
 
-  if (q.isLoading) return <p className="text-muted-foreground">A carregar</p>;
+  if (q.isLoading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   if (!rows.length)
     return (
       <Card className="p-8 text-center text-muted-foreground">
@@ -286,7 +362,7 @@ function LedgerTable() {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-secondary/50 text-display text-[11px] uppercase tracking-wider text-muted-foreground">
+        <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="px-3 py-2 text-left">Data</th>
             <th className="px-3 py-2 text-left">Tipo</th>

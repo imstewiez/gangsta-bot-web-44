@@ -32,9 +32,13 @@ export async function pgQuery<T = any>(
   try {
     let query = text;
     // Replace placeholders from highest index to lowest to avoid $10 becoming $1
+    // Use split/join instead of replace() to avoid $& / $$ interpretation in replacement strings
     for (let i = params.length - 1; i >= 0; i--) {
       const val = escapeSqlParam(params[i]);
-      query = query.replace(new RegExp(`\\$${i + 1}\\b`, "g"), val);
+      const placeholder = `$${i + 1}`;
+      // Only replace whole placeholders (not partial matches like $12 when looking for $1)
+      // We process from highest to lowest, so $10 is replaced before $1
+      query = query.split(placeholder).join(val);
     }
 
     // Safety: reject multi-statement queries at runtime

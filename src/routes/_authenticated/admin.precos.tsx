@@ -1,6 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
+import { isServer } from "@/lib/auth-helpers";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { checkManagerAccess } from "@/lib/access-check.functions";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 
 import {
   listItemsAdmin,
@@ -14,13 +18,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Save, Pencil, X, Check } from "lucide-react";
 import { useState } from "react";
-import { fmtNum } from "@/lib/domain";
+import { fmtNum, fmtPrice } from "@/lib/domain";
+import { CategoryHeader } from "@/components/domain/CategoryHeader";
+import { itemDisplayCategory } from "@/lib/armory.catalog";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/admin/precos")({
+  beforeLoad: async () => {
+    if (isServer()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/login" });
+  },
+  head: () => ({
+    meta: [{ title: "Editar Preços | Ballas Gang" }],
+  }),
   component: Page,
 });
 
 function Page() {
+  const managerFn = useAuthedServerFn(checkManagerAccess);
+  const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
+  useRealtimeSync([
+    { table: "items", queryKeys: [["adminItems"]] },
+  ]);
   const fn = useAuthedServerFn(listItemsAdmin);
   const updateFn = useAuthedServerFn(updateItemPrice);
   const qc = useQueryClient();
@@ -51,10 +71,25 @@ function Page() {
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(i);
     }
+    for (const list of map.values()) {
+      list.sort((a, b) => (a.min_sale_price ?? a.purchase_price ?? 0) - (b.min_sale_price ?? b.purchase_price ?? 0));
+    }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   };
 
-  const groups = groupBy((i) => i.category ?? "outros");
+  const groups = groupBy((i) => itemDisplayCategory(i.name, i.category, i.subcategory));
+
+  if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (!managerCheck.data?.allowed) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-semibold">Acesso restrito</p>
+          <p className="text-sm text-muted-foreground">Só a direção pode aceder a esta página.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -75,9 +110,9 @@ function Page() {
       <div className="space-y-6">
         {groups.map(([cat, list]) => (
           <section key={cat}>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {cat}
-            </h2>
+            <div className="mb-2">
+              <CategoryHeader category={cat} />
+            </div>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {list.map((item) => (
                 <PriceCard
@@ -171,7 +206,7 @@ function PriceCard({
               className="flex items-center gap-1 rounded-sm px-2 py-1 text-sm hover:bg-muted transition-colors"
               onClick={() => setEditing((prev) => new Map(prev).set(evKey, String(item.estimated_value ?? 0)))}
             >
-              <span className="font-mono">{fmtNum(item.estimated_value)} €</span>
+              <span className="font-mono">{fmtPrice(item.estimated_value)}</span>
               <Pencil className="h-3 w-3 text-muted-foreground" />
             </button>
           )}
@@ -227,7 +262,7 @@ function PriceCard({
               className="flex items-center gap-1 rounded-sm px-2 py-1 text-sm hover:bg-muted transition-colors"
               onClick={() => setEditing((prev) => new Map(prev).set(ppKey, String(item.purchase_price ?? 0)))}
             >
-              <span className="font-mono">{fmtNum(item.purchase_price)} €</span>
+              <span className="font-mono">{fmtPrice(item.purchase_price)}</span>
               <Pencil className="h-3 w-3 text-muted-foreground" />
             </button>
           )}

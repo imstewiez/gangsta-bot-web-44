@@ -80,9 +80,9 @@ function Landing() {
             className="max-w-3xl text-display text-6xl font-bold leading-[1.02] md:text-8xl md:leading-[1.0] text-glow animate-rise delay-200"
             style={parallax(-4)}
           >
-            <span className="block">O bairro</span>
+            <span className="block">O BAIRRO</span>
             <span className="block bg-gradient-to-br from-primary via-primary/90 to-blood bg-clip-text text-transparent pt-2 md:pt-3">
-              é nosso.
+              É NOSSO.
             </span>
           </h1>
 

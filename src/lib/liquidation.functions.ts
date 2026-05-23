@@ -44,6 +44,13 @@ export type SaidaDetail = {
     consumed_value: number;
     gross_value: number;
     net_value: number;
+    was_profitable: boolean | null;
+    enemy_name: string | null;
+    enemy_faction: string | null;
+    had_fight: boolean | null;
+    survivors: number | null;
+    deaths: number | null;
+    our_kills: number | null;
   };
   participants: Array<{
     id: number;
@@ -52,11 +59,14 @@ export type SaidaDetail = {
     role_in_op: string | null;
     kills: number;
     deaths_count: number;
+    survived: boolean;
+    died: boolean;
     issued_value: number;
     returned_value: number;
     lost_value: number;
     net_material_delta: number;
     settled: boolean;
+    participant_type: string;
   }>;
   materials: Array<{
     id: number;
@@ -84,7 +94,14 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
               coalesce(o.lost_value,0)::float as lost_value,
               coalesce(o.consumed_value,0)::float as consumed_value,
               coalesce(o.gross_value,0)::float as gross_value,
-              coalesce(o.net_value,0)::float as net_value
+              coalesce(o.net_value,0)::float as net_value,
+              o.was_profitable,
+              o.enemy_name,
+              o.enemy_faction,
+              o.had_fight,
+              o.survivors,
+              o.deaths,
+              o.our_kills
          from operations o
         where o.id = $1 and o.deleted_at is null`,
       [data.id],
@@ -93,11 +110,13 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
     const participants = await pgQuery<SaidaDetail["participants"][number]>(
       `select p.id, p.member_id, m.display_name as member_name, p.role_in_op,
               coalesce(p.kills,0) as kills, coalesce(p.deaths_count,0) as deaths_count,
+              coalesce(p.survived, false) as survived, coalesce(p.died, false) as died,
               coalesce(p.issued_value,0)::float as issued_value,
               coalesce(p.returned_value,0)::float as returned_value,
               coalesce(p.lost_value,0)::float as lost_value,
               coalesce(p.net_material_delta,0)::float as net_material_delta,
-              coalesce(p.settled, false) as settled
+              coalesce(p.settled, false) as settled,
+              coalesce(p.participant_type, 'caracterizado') as participant_type
          from operation_participants p
          left join members m on m.id = p.member_id
         where p.operation_id = $1
@@ -147,10 +166,10 @@ export const liquidateSaida = createServerFn({ method: "POST" })
         // Aggregate per participant from operation_materials, joining unit price from items
         const perPart = await c.query(
           `select om.member_id,
-                  sum(case when om.direction in ('issued','out') then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as issued_v,
-                  sum(case when om.direction in ('returned','in') then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as returned_v,
-                  sum(case when om.direction = 'lost' then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as lost_v,
-                  sum(case when om.direction = 'consumed' then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as consumed_v
+                  sum(case when om.direction in ('fornecido') then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as issued_v,
+                  sum(case when om.direction in ('devolvido') then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as returned_v,
+                  sum(case when om.direction = 'perdido' then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as lost_v,
+                  sum(case when om.direction = 'consumido' then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as consumed_v
              from operation_materials om
              left join items i on i.id = om.item_id
             where om.operation_id = $1 and om.member_id is not null
@@ -198,7 +217,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
         const lostT = Number(tot.rows[0].lost);
         const consumedT = Number(tot.rows[0].consumed);
         const gross = returnedT;
-        const net = returnedT - supplied - lostT - consumedT;
+        const net = returnedT - lostT - consumedT;
 
         await c.query(
           `update operations
@@ -212,6 +231,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
                   gross_value = $5,
                   net_value = $6,
                   was_profitable = ($6 > 0),
+                  result = case when ($6 > 0) then 'vitoria' else 'derrota' end,
                   updated_at = now()
             where id = $7`,
           [supplied, returnedT, lostT, consumedT, gross, net, data.id],

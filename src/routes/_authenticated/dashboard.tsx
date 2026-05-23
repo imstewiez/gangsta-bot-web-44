@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { getHomeKpis } from "@/lib/dashboard.functions";
+import { getCurrentMemberXP } from "@/lib/xp.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
 import {
@@ -23,21 +25,33 @@ import {
   Swords,
   Clock,
   MapPin,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
 function Dashboard() {
+  useRealtimeSync([
+    { table: "inventory_movements", queryKeys: [["my-xp"], ["home-kpis"]] },
+    { table: "members", queryKeys: [["me"], ["home-kpis"]] },
+  ]);
   const fn = useAuthedServerFn(getHomeKpis);
+  const xpFn = useAuthedServerFn(getCurrentMemberXP);
   const { profile } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["home-kpis"],
     queryFn: () => fn(),
+  });
+  const myXP = useQuery({
+    queryKey: ["my-xp"],
+    queryFn: () => xpFn(),
+    staleTime: 5_000,
   });
 
   const h = new Date().getHours();
@@ -102,27 +116,64 @@ function Dashboard() {
         />
       </div>
 
-      {/* Next saida + Top ops participants */}
-      {(data?.nextSaida || (data?.topOpsParticipants && data.topOpsParticipants.length > 0)) && (
+      {/* My XP Progress */}
+      {myXP.data && !myXP.data.maxedOut && (
+        <Card className="mt-6 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-primary/20 ring-1 ring-primary/40">
+                  <Zap className="h-5 w-5 text-primary" />
+                </span>
+                <div>
+                  <div className="text-display text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+                    Progresso de bairrista
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {myXP.data.currentTierName} → {myXP.data.nextTierName}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-bold tabular-nums">{fmtNum(myXP.data.totalPoints)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">XP total</div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Progress value={myXP.data.progress} className="h-2" />
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>0</span>
+                <span>
+                  {myXP.data.progress.toFixed(1)}% — faltam {fmtNum(myXP.data.remaining)} XP
+                </span>
+                <span>{fmtNum(myXP.data.threshold ?? 0)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Last saida + Top ops participants */}
+      {(data?.lastSaida || (data?.topOpsParticipants && data.topOpsParticipants.length > 0)) && (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          {data?.nextSaida && (
-            <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 via-card to-card">
-              <CardContent className="flex items-center gap-4 p-5">
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-amber-500/20 ring-1 ring-amber-500/40">
-                  <Clock className="h-6 w-6 text-amber-400" />
+          {data?.lastSaida && (
+            <Card className={data.lastSaida.was_profitable ? "border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-card to-card" : "border-destructive/20 bg-gradient-to-br from-destructive/5 via-card to-card"}>
+              <CardContent className="flex items-start gap-4 p-5">
+                <span className={data.lastSaida.was_profitable ? "grid h-12 w-12 place-items-center rounded-full bg-emerald-500/20 ring-1 ring-emerald-500/40 shrink-0" : "grid h-12 w-12 place-items-center rounded-full bg-destructive/20 ring-1 ring-destructive/40 shrink-0"}>
+                  {data.lastSaida.was_profitable ? <Trophy className="h-6 w-6 text-emerald-400" /> : <Skull className="h-6 w-6 text-destructive" />}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-display text-[11px] tracking-[0.3em] text-amber-400 uppercase">
-                    Próxima saída
+                  <div className={data.lastSaida.was_profitable ? "text-display text-[11px] tracking-[0.3em] text-emerald-400 uppercase" : "text-display text-[11px] tracking-[0.3em] text-destructive uppercase"}>
+                    Última saída · {data.lastSaida.was_profitable ? "Vitória" : "Derrota"}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="truncate">{data.nextSaida.spot ?? "Spot não definido"}</span>
+                    <span className="truncate">{data.lastSaida.spot ?? "Spot não definido"}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {data.nextSaida.tipo ?? "Saída"} ·{" "}
-                    {data.nextSaida.scheduled_at
-                      ? new Date(data.nextSaida.scheduled_at).toLocaleString("pt-PT", {
+                    {data.lastSaida.tipo ?? "Saída"} ·{" "}
+                    {data.lastSaida.scheduled_at
+                      ? new Date(data.lastSaida.scheduled_at).toLocaleString("pt-PT", {
                           day: "2-digit",
                           month: "short",
                           hour: "2-digit",
@@ -130,10 +181,33 @@ function Dashboard() {
                         })
                       : "Data por definir"}
                   </div>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                    <span className="inline-flex items-center gap-1 text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      {data.lastSaida.survivors} sobrevivente{data.lastSaida.survivors !== 1 ? "s" : ""}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-destructive">
+                      <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                      {data.lastSaida.deaths} morto{data.lastSaida.deaths !== 1 ? "s" : ""}
+                    </span>
+                    {data.lastSaida.our_kills != null && (
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Crosshair className="h-3 w-3" />
+                        {data.lastSaida.our_kills} kill{data.lastSaida.our_kills !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {data.lastSaida.mvp_name && (
+                      <span className="inline-flex items-center gap-1 text-warning">
+                        <Sparkles className="h-3 w-3" />
+                        MVP: {data.lastSaida.mvp_name} ({data.lastSaida.mvp_kills})
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Link
                   to="/operacoes"
-                  className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-amber-400 interactive-link"
+                  className="text-display cursor-pointer text-[10px] tracking-[0.2em] interactive-link shrink-0"
+                  style={{ color: data.lastSaida.was_profitable ? undefined : undefined }}
                 >
                   VER SAÍDAS →
                 </Link>
@@ -205,13 +279,13 @@ function Dashboard() {
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-display text-sm flex items-center gap-2">
               <Users className="h-4 w-4 text-primary" />
               Hierarquia do bairro
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {(() => {
               const rows = data?.byTier ?? [];
               const max = Math.max(1, ...rows.map((r) => Number(r.count) || 0));
@@ -219,39 +293,59 @@ function Dashboard() {
                 (a, b) =>
                   TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier),
               );
+              const total = sorted.reduce((sum, t) => sum + Number(t.count), 0);
               return (
-                <ul className="space-y-3">
-                  {sorted.map((t) => {
-                    const n = Number(t.count) || 0;
-                    const pct = Math.max(4, Math.round((n / max) * 100));
-                    return (
-                      <li key={t.tier} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2">
-                            <TierIcon tier={t.tier} size="sm" />
-                            <span className="font-medium">
-                              {TIER_LABELS[t.tier] ?? t.tier}
+                <>
+                  <div className="mb-3 text-[11px] text-muted-foreground">
+                    {fmtNum(total)} membros ativos no total
+                  </div>
+                  <ul className="space-y-3">
+                    {sorted.map((t) => {
+                      const n = Number(t.count) || 0;
+                      const pct = Math.max(4, Math.round((n / max) * 100));
+                      const pctOfTotal = total > 0 ? Math.round((n / total) * 100) : 0;
+                      const topMembers = (data?.topByTier ?? [])
+                        .filter((m) => m.tier === t.tier)
+                        .slice(0, 3);
+                      return (
+                        <li key={t.tier}>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2">
+                              <TierIcon tier={t.tier} size="sm" />
+                              <span className="font-medium">
+                                {TIER_LABELS[t.tier] ?? t.tier}
+                              </span>
                             </span>
-                          </span>
-                          <span className="text-display tabular-nums">
-                            {fmtNum(n)}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full bg-primary/70"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
+                            <span className="text-display tabular-nums text-xs">
+                              {fmtNum(n)} <span className="text-muted-foreground/60">({pctOfTotal}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted mt-1">
+                            <div
+                              className="h-full bg-primary/70"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          {topMembers.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {topMembers.map((m, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 rounded-sm bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  <span className="truncate max-w-[80px]">{m.name ?? "—"}</span>
+                                  <span className="font-mono text-[9px] opacity-60">{fmtNum(Math.round(m.score))} pts</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                    {!sorted.length && !isLoading && (
+                      <li className="text-sm text-muted-foreground">
+                        Sem dados.
                       </li>
-                    );
-                  })}
-                  {!sorted.length && !isLoading && (
-                    <li className="text-sm text-muted-foreground">
-                      Sem dados.
-                    </li>
-                  )}
-                </ul>
+                    )}
+                  </ul>
+                </>
               );
             })()}
           </CardContent>
@@ -308,6 +402,11 @@ type RankRow = {
   deliveries: number;
   sales: number;
   ops: number;
+  material_points: number;
+  sales_points: number;
+  ops_points: number;
+  kills_count: number;
+  wins_count: number;
 };
 
 const MEDAL_ICONS = [
@@ -348,9 +447,11 @@ function TopList({
         {(rows ?? []).map((m, i) => {
           const name = m.display_name ?? m.nick ?? "Anónimo";
           const bits: string[] = [];
-          if (m.deliveries) bits.push(`${m.deliveries} entregas`);
-          if (m.sales) bits.push(`${m.sales} vendas`);
-          if (m.ops) bits.push(`${m.ops} saídas`);
+          if (m.ops) bits.push(`${m.ops} saída${m.ops > 1 ? "s" : ""}`);
+          if (m.kills_count) bits.push(`${m.kills_count} kill${m.kills_count > 1 ? "s" : ""}`);
+          if (m.wins_count) bits.push(`${m.wins_count} win${m.wins_count > 1 ? "s" : ""}`);
+          if (m.material_points) bits.push(`${fmtNum(m.material_points)} mat`);
+          if (m.sales_points) bits.push(`${fmtNum(m.sales_points)} vendas`);
           const medal = MEDAL_ICONS[i];
           return (
             <li

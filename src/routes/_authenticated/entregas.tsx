@@ -7,8 +7,10 @@ import {
   listDeliveries,
   createDelivery,
   decideDelivery,
+  fixMissingDeliveryMemberIds,
 } from "@/lib/deliveries.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
+import { listManagers } from "@/lib/members.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
+import {
+  ARMORY_CAT_ORDER,
+  ARMORY_CAT_CONFIG,
+  itemDisplayCategory,
+} from "@/lib/armory.catalog";
 import { toast } from "sonner";
 import {
   Plus,
@@ -42,10 +49,12 @@ import {
   PackageOpen,
   Package,
   Coins,
+  Wrench,
 } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
 import { FadeIn } from "@/components/layout/FadeIn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export const Route = createFileRoute("/_authenticated/entregas")({
   component: Page,
@@ -119,6 +128,7 @@ function Page() {
         </TabsContent>
         {isManager && (
           <TabsContent value="manage" className="mt-4">
+            <FixDeliveriesButton />
             <DelList scope="manage" canDecide />
           </TabsContent>
         )}
@@ -161,6 +171,8 @@ function DelList({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["my-xp"] });
+      qc.invalidateQueries({ queryKey: ["home-kpis"] });
       toast.success("Guardado");
     },
   });
@@ -185,17 +197,17 @@ function DelList({
         const tipoMeta = TIPO_META[d.tipo] ?? TIPO_META.entrega;
         const st = statusMeta(d.tipo, d.status);
         return (
-          <Card key={d.id} className="p-4">
+          <Card key={d.id} className={`p-4 border-l-4 ${d.tipo === "venda" ? "border-l-warning" : "border-l-info"}`}>
             <div className="flex items-start gap-4">
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={
-                      "inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " +
+                      "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider " +
                       tipoMeta.tone
                     }
                   >
-                    <tipoMeta.Icon className="h-3 w-3" /> {tipoMeta.label}
+                    <tipoMeta.Icon className="h-3.5 w-3.5" /> {tipoMeta.label}
                   </span>
                   <span className="font-semibold">
                     {d.requester_name ?? "—"}
@@ -238,7 +250,8 @@ function DelList({
                   ) : (
                     <span />
                   )}
-                  <span className="font-mono text-base font-semibold">
+                  <span className="inline-flex items-center gap-1.5 font-mono text-base font-semibold">
+                    {d.tipo === "venda" ? <Coins className="h-4 w-4 text-warning" /> : <Package className="h-4 w-4 text-info" />}
                     {fmtPrice(d.total_value)}
                   </span>
                 </div>
@@ -292,6 +305,13 @@ function NewDelivery() {
   ]);
   const [notes, setNotes] = useState("");
   const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
+  const [responsavel, setResponsavel] = useState("");
+  const managersFn = useAuthedServerFn(listManagers);
+  const managers = useQuery({
+    queryKey: ["managers"],
+    queryFn: () => managersFn(),
+    enabled: open,
+  });
   const m = useMutation({
     mutationFn: () =>
       createFn({
@@ -301,6 +321,7 @@ function NewDelivery() {
             .map((l) => ({ item_id: Number(l.item_id), qty: Number(l.qty) })),
           notes: notes || null,
           tipo,
+          responsavel_member_id: responsavel ? Number(responsavel) : null,
         },
       }),
     onSuccess: () => {
@@ -314,6 +335,7 @@ function NewDelivery() {
       setLines([{ item_id: "", qty: "1" }]);
       setNotes("");
       setTipo("entrega");
+      setResponsavel("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -327,12 +349,32 @@ function NewDelivery() {
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Registar nova entrega</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {tipo === "venda" ? <Coins className="h-5 w-5 text-warning" /> : <Package className="h-5 w-5 text-info" />}
+            {tipo === "venda" ? "Registar nova aquisição" : "Registar nova entrega"}
+          </DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">
-              É para
+              Responsável
+            </label>
+            <Select value={responsavel} onValueChange={setResponsavel}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleciona quem gere isto" />
+              </SelectTrigger>
+              <SelectContent>
+                {(managers.data ?? []).map((mgr) => (
+                  <SelectItem key={mgr.id} value={String(mgr.id)}>
+                    {mgr.display_name ?? mgr.nick ?? `Membro #${mgr.id}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Tipo
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -371,52 +413,64 @@ function NewDelivery() {
               </button>
             </div>
           </div>
-          {lines.map((l, idx) => (
-            <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
-              <Select
-                value={l.item_id}
-                onValueChange={(v) =>
-                  setLines(
-                    lines.map((x, i) => (i === idx ? { ...x, item_id: v } : x)),
-                  )
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((i) => (
-                    <SelectItem key={i.id} value={String(i.id)}>
-                      {i.name}{" "}
-                      <span className="text-muted-foreground">
-                        · {fmtCategoryLabel(i.subcategory)}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min={1}
-                value={l.qty}
-                onChange={(e) =>
-                  setLines(
-                    lines.map((x, i) =>
-                      i === idx ? { ...x, qty: e.target.value } : x,
-                    ),
-                  )
-                }
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setLines(lines.filter((_, i) => i !== idx))}
-                disabled={lines.length === 1}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+          {lines.map((l, idx) => {
+            const groups = new Map<string, typeof items>();
+            for (const i of items) {
+              const cat = itemDisplayCategory(i.name, i.category, i.subcategory);
+              if (!groups.has(cat)) groups.set(cat, []);
+              groups.get(cat)!.push(i);
+            }
+            const deliveryOptions: { value: string; label: string; group: string; groupColor?: string }[] = [];
+            for (const cat of ARMORY_CAT_ORDER) {
+              const list = groups.get(cat);
+              if (!list) continue;
+              const cfg = ARMORY_CAT_CONFIG[cat];
+              deliveryOptions.push(
+                ...list.map((i) => ({
+                  value: String(i.id),
+                  label: `${i.name} · ${cfg?.label ?? fmtCategoryLabel(cat)}`,
+                  group: cfg?.label ?? fmtCategoryLabel(cat),
+                  groupColor: cfg?.headerColor,
+                })),
+              );
+            }
+            return (
+              <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
+                <SearchableSelect
+                  value={l.item_id}
+                  onChange={(v) =>
+                    setLines(
+                      lines.map((x, i) => (i === idx ? { ...x, item_id: v } : x)),
+                    )
+                  }
+                  options={deliveryOptions}
+                  placeholder="Item"
+                  searchPlaceholder="Procurar item..."
+                  emptyText="Nenhum item encontrado."
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  value={l.qty}
+                  onChange={(e) =>
+                    setLines(
+                      lines.map((x, i) =>
+                        i === idx ? { ...x, qty: e.target.value } : x,
+                      ),
+                    )
+                  }
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setLines(lines.filter((_, i) => i !== idx))}
+                  disabled={lines.length === 1}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            );
+          })}
           <Button
             size="sm"
             variant="outline"
@@ -427,7 +481,7 @@ function NewDelivery() {
           </Button>
           <div>
             <label className="text-xs text-muted-foreground">
-              Recado (opcional)
+              Notas (opcional)
             </label>
             <Textarea
               value={notes}
@@ -446,5 +500,31 @@ function NewDelivery() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function FixDeliveriesButton() {
+  const fixFn = useAuthedServerFn(fixMissingDeliveryMemberIds);
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: () => fixFn(),
+    onSuccess: (res) => {
+      toast.success(`Corrigidas ${res.rows_fixed} entregas antigas`);
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["member"] });
+      qc.invalidateQueries({ queryKey: ["my-xp"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="mb-4">
+      <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
+        <Wrench className="mr-1 h-3.5 w-3.5" />
+        {m.isPending ? "A corrigir..." : "Corrigir entregas antigas"}
+      </Button>
+      <p className="mt-1 text-[10px] text-muted-foreground">
+        Corrige entregas aprovadas antes da atualização que não tinham membro associado.
+      </p>
+    </div>
   );
 }

@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   listOrders,
   createOrder,
   transitionOrder,
 } from "@/lib/orders.functions";
-import { computeCraftFeasibilityByItemId } from "@/lib/recipes.functions";
+import { computeCraftFeasibilityBatch } from "@/lib/recipes.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
-import type { CatalogItem } from "@/lib/pricing.shared";
+import { listManagers } from "@/lib/members.functions";
+import { type CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { ButtonLoading } from "@/components/ui/ButtonLoading";
@@ -35,16 +36,27 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
+import {
+  ARMORY_CAT_ORDER,
+  ARMORY_CAT_CONFIG,
+  itemDisplayCategory,
+  isAllowedWeapon,
+} from "@/lib/armory.catalog";
 import { toast } from "sonner";
-import { Plus, ShoppingBag, Swords, Skull, Cylinder, Crosshair, FlaskConical, Wrench, Shield, Trash2, TreePine, Gem, Pickaxe, Package, FileText, Truck, DollarSign } from "lucide-react";
+import { Plus, ShoppingBag, Trash2, Package, Banknote } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { FadeIn } from "@/components/layout/FadeIn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({
   errorComponent: PageErrorBoundary,
+  head: () => ({
+    meta: [{ title: "Encomendas | Ballas Gang" }],
+  }),
   component: Page,
 });
 
@@ -85,6 +97,9 @@ const NEXT_STATES: Record<
 };
 
 function Page() {
+  useRealtimeSync([
+    { table: "orders", queryKeys: [["orders"], ["stock"], ["my-xp"]] },
+  ]);
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;
@@ -173,8 +188,28 @@ function OrdersList({
     },
   });
 
+  // Agrupar por batch_id (fallback para id único se não tiver batch)
+  const batches = useMemo(() => {
+    if (!orders.data) return [];
+    const map = new Map<string, typeof orders.data>();
+    for (const o of orders.data) {
+      const key = o.batch_id ?? `single-${o.id}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    }
+    return Array.from(map.entries()).sort((a, b) => {
+      const ta = a[1][0]?.created_at ?? "";
+      const tb = b[1][0]?.created_at ?? "";
+      return tb.localeCompare(ta);
+    });
+  }, [orders.data]);
+
   if (orders.isLoading)
-    return <p className="text-muted-foreground">A carregar pedidos</p>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   if (!orders.data?.length)
     return (
       <Card className="p-10 text-center">
@@ -189,47 +224,124 @@ function OrdersList({
 
   return (
     <div className="grid gap-3">
-      {orders.data.map((o) => {
-        const next = canManage ? NEXT_STATES[o.status] : null;
+      {batches.map(([batchId, lines]) => {
+        const first = lines[0];
+        const next = canManage ? NEXT_STATES[first.status] : null;
+        const minId = Math.min(...lines.map((l) => l.id));
+        const totalBatch = lines.reduce((s, l) => s + (l.total_price ?? 0), 0);
+        const totalDirtyMoney = lines.reduce((s, l) => s + (l.dirty_money ?? 0), 0);
+
+        // Agregar materiais de todas as linhas
+        const agg = new Map<string, number>();
+        for (const l of lines) {
+          for (const ing of l.ingredients_json ?? []) {
+            agg.set(ing.name, (agg.get(ing.name) ?? 0) + ing.needed);
+          }
+        }
+        const aggregatedIngredients = Array.from(agg.entries()).map(([name, needed]) => ({ name, needed }));
+
+        const handleTransition = async (to: string) => {
+          await Promise.all(lines.map((l) => m.mutateAsync({ id: l.id, to })));
+        };
+
         return (
-          <Card key={o.id} className="p-4">
+          <Card key={batchId} className={`p-4 ${first.payment_mode === "money_only" ? "border-amber-500/30 bg-amber-500/[0.02]" : ""}`}>
             <div className="flex flex-wrap items-start gap-4">
               <div className="flex-1 min-w-[200px]">
                 <div className="flex items-center gap-2">
                   <span className="text-display text-xs text-muted-foreground">
-                    #{o.id}
+                    #{minId}
                   </span>
                   <span
                     className={
                       "rounded-sm border px-2 py-0.5 text-display text-[10px] uppercase tracking-wider " +
-                      (STATUS_COLOR[o.status] ?? "")
+                      (STATUS_COLOR[first.status] ?? "")
                     }
                   >
-                    {STATUS_LABEL[o.status] ?? o.status}
+                    {STATUS_LABEL[first.status] ?? first.status}
                   </span>
+                  {first.payment_mode === "money_only" ? (
+                    <span className="inline-flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                      <Banknote className="h-3 w-3" /> Sem materiais
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-sm border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                      <Package className="h-3 w-3" /> Com materiais
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
-                    {fmtDate(o.created_at)}
+                    {fmtDate(first.created_at)}
                   </span>
                 </div>
-                <div className="mt-1.5 text-base font-semibold">
-                  {o.quantity}× {o.item_name ?? "—"}
+
+                {/* Lista de itens do batch */}
+                <div className="mt-2 space-y-1">
+                  {lines.map((l) => (
+                    <div key={l.id} className="flex justify-between items-center text-sm">
+                      <span className="font-semibold">{l.quantity}× {l.item_name ?? "—"}</span>
+                      <span className="text-muted-foreground font-mono text-xs">{l.total_price != null ? fmtPrice(l.total_price) : "—"}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-sm text-muted-foreground">
+
+                <div className="text-sm text-muted-foreground mt-1.5">
                   Para{" "}
                   <span className="text-foreground">
-                    {o.member_name ?? "—"}
+                    {first.member_name ?? "—"}
                   </span>
-                  {o.notes && (
-                    <span className="block mt-1 italic">"{o.notes}"</span>
+                  {first.responsavel_name && (
+                    <span className="block mt-0.5">
+                      Responsável:{" "}
+                      <span className="text-foreground font-medium">{first.responsavel_name}</span>
+                    </span>
+                  )}
+                  {first.notes && (
+                    <span className="block mt-1 italic">"{first.notes}"</span>
+                  )}
+                </div>
+
+                {/* Materiais agregados + dirty money */}
+                <div className={`mt-2 rounded-sm border p-2 text-xs space-y-1.5 ${first.payment_mode === "money_only" ? "border-amber-500/20 bg-amber-500/5" : "border-border bg-muted/30"}`}>
+                  {first.payment_mode === "money_only" ? (
+                    <div className="flex items-center gap-1.5 text-amber-400">
+                      <Banknote className="h-3.5 w-3.5" />
+                      <span className="font-semibold">Pagamento integral em dinheiro</span>
+                      <span className="text-muted-foreground">— sem materiais a entregar</span>
+                    </div>
+                  ) : (
+                    <>
+                      {aggregatedIngredients.length > 0 && (
+                        <>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Materiais a entregar</div>
+                          <ul className="space-y-0.5">
+                            {aggregatedIngredients.map((ing, idx) => (
+                              <li key={idx} className="flex justify-between items-center">
+                                <span className="text-foreground">{ing.name}</span>
+                                <span className="text-muted-foreground font-mono">{fmtNum(ing.needed)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                      {totalDirtyMoney > 0 && (
+                        <div className="border-t border-border pt-1.5 flex justify-between items-center font-semibold">
+                          <span className="text-emerald-400">Dinheiro sujo:</span>
+                          <span className="text-emerald-400 font-mono">{fmtPrice(Math.round(totalDirtyMoney))}</span>
+                        </div>
+                      )}
+                      {aggregatedIngredients.length === 0 && totalDirtyMoney === 0 && (
+                        <div className="text-muted-foreground">Não requer materiais</div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
               <div className="text-right">
                 <div className="font-mono text-lg font-semibold">
-                  {o.total_price != null ? fmtPrice(o.total_price) : "—"}
+                  {fmtPrice(totalBatch)}
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">
-                  {o.unit_price != null ? `${fmtPrice(o.unit_price)}/un` : ""}
+                  {lines.length} artigo{lines.length !== 1 ? "s" : ""}
                 </div>
               </div>
               {next && (
@@ -242,7 +354,7 @@ function OrdersList({
                         s.variant === "destructive" ? "outline" : "default"
                       }
                       loading={m.isPending}
-                      onClick={() => m.mutate({ id: o.id, to: s.to })}
+                      onClick={() => handleTransition(s.to)}
                     >
                       {s.label}
                     </ButtonLoading>
@@ -259,158 +371,382 @@ function OrdersList({
 
 function NewOrder() {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"select" | "checkout">("select");
   const catFn = useAuthedServerFn(getCatalog);
   const createFn = useAuthedServerFn(createOrder);
-  const simFn = useAuthedServerFn(computeCraftFeasibilityByItemId);
+  const simFn = useAuthedServerFn(computeCraftFeasibilityBatch);
   const qc = useQueryClient();
   const cat = useQuery({
     queryKey: ["catalog"],
     queryFn: () => catFn(),
     enabled: open,
   });
-  const items = (cat.data ?? []).filter(
-    (i: CatalogItem) => i.side === "venda" && i.subcategory !== "armas_brancas",
-  );
-  const [item, setItem] = useState("");
-  const [qty, setQty] = useState("1");
-  const [notes, setNotes] = useState("");
-  const sim = useQuery({
-    queryKey: ["order-sim", item, qty],
-    queryFn: () => simFn({ data: { item_id: Number(item), quantity: Number(qty) || 1 } }),
-    enabled: open && !!item && Number(qty) > 0,
+  const items = (cat.data ?? []).filter((i: CatalogItem) => {
+    if (/mk2/i.test(i.name)) return false;
+    // Corpos sempre permitidos
+    if (i.category === "corpos") return true;
+    // Prints: apenas as de cores válidas (filtrar "Revolver" classificado como print na DB)
+    if (i.category === "prints") {
+      const n = i.name.toLowerCase();
+      return /print/.test(n) && /laranja|azul|vermelh|amarel|dourad/.test(n);
+    }
+    if (i.side !== "venda") return false;
+    if (i.subcategory === "armas_brancas") return false;
+    if (i.subcategory === "armas_red" || i.subcategory === "armas_orange") {
+      return isAllowedWeapon(i.name);
+    }
+    // Carregadores
+    if (i.subcategory === "carregadores" || i.subcategory === "municoes") return true;
+    // Coletes e acessórios (vão para o grupo Extras)
+    if (i.category === "coletes" || i.subcategory === "coletes") return true;
+    if (i.category === "acessorios" || i.category === "acessorios_armas" || i.subcategory === "acessorios" || i.subcategory === "acessorios_armas") return true;
+    return false;
   });
+  const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([
+    { item_id: "", qty: "1" },
+  ]);
+  const [notes, setNotes] = useState("");
+  const [responsavel, setResponsavel] = useState("");
+  const [paymentMode, setPaymentMode] = useState<"materials_money" | "money_only">("materials_money");
+  const managersFn = useAuthedServerFn(listManagers);
+  const managers = useQuery({
+    queryKey: ["managers"],
+    queryFn: () => managersFn(),
+    enabled: open,
+  });
+
+  const validLines = lines.filter((l) => l.item_id && Number(l.qty) > 0);
+  const sim = useQuery({
+    queryKey: ["order-sim-batch", validLines.map((l) => `${l.item_id}:${l.qty}`).join(",")],
+    queryFn: () =>
+      simFn({
+        data: {
+          lines: validLines.map((l) => ({
+            item_id: Number(l.item_id),
+            quantity: Number(l.qty),
+          })),
+        },
+      }),
+    enabled: open && validLines.length > 0,
+  });
+
   const m = useMutation({
     mutationFn: () =>
       createFn({
         data: {
-          item_id: Number(item),
-          quantity: Number(qty),
+          lines: validLines.map((l) => ({
+            item_id: Number(l.item_id),
+            quantity: Number(l.qty),
+          })),
           notes: notes || null,
+          responsavel_member_id: responsavel ? Number(responsavel) : null,
+          payment_mode: paymentMode,
         },
       }),
     onSuccess: () => {
       toast.success("Encomenda registada");
       qc.invalidateQueries({ queryKey: ["orders"] });
       setOpen(false);
-      setItem("");
-      setQty("1");
+      setStep("select");
+      setLines([{ item_id: "", qty: "1" }]);
       setNotes("");
+      setResponsavel("");
+      setPaymentMode("materials_money");
+    },
+    onError: (e: Error) => {
+      toast.error(e.message || "Erro ao registar encomenda");
     },
   });
+
+  const groups = new Map<string, typeof items>();
+  for (const i of items) {
+    let cat: string;
+    if (i.category === "prints") cat = "prints";
+    else if (i.category === "corpos") cat = "corpos";
+    else cat = itemDisplayCategory(i.name, i.category, i.subcategory);
+    // Unificar carregadores e extras no dropdown de encomendas
+    if (cat === "carregadores_orange" || cat === "carregadores_red" || cat === "carregadores_especial") cat = "carregadores";
+    if (cat === "acessorios" || cat === "acessorios_armas" || cat === "coletes") cat = "extras";
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat)!.push(i);
+  }
+  const ORDER_ENCOMENDAS: string[] = [
+    "armas_orange",
+    "armas_red",
+    "carregadores",
+    "prints",
+    "corpos",
+    "extras",
+  ];
+  const options: { value: string; label: string; group: string; groupColor?: string }[] = [];
+  for (const cat of ORDER_ENCOMENDAS) {
+    const list = groups.get(cat);
+    if (!list) continue;
+    const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
+    options.push(
+      ...list.map((i) => ({
+        value: String(i.id),
+        label: i.name,
+        group: cfg?.label ?? fmtCategoryLabel(cat),
+        groupColor: cfg?.headerColor,
+      })),
+    );
+  }
+
+  const selectedManager = (managers.data ?? []).find((m) => String(m.id) === responsavel);
+
+  const handleClose = () => {
+    setOpen(false);
+    setStep("select");
+    setLines([{ item_id: "", qty: "1" }]);
+    setNotes("");
+    setResponsavel("");
+    setPaymentMode("materials_money");
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); setOpen(v); }}>
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="mr-1 h-4 w-4" />
           Encomendar
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>O que precisas?</DialogTitle>
+          <DialogTitle>
+            {step === "select" ? "O que precisas?" : "Confirma a tua encomenda"}
+          </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground">Item</label>
-            <Select value={item} onValueChange={setItem}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleciona" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[60vh]">
-                {(() => {
-                  const ICONS: Record<string, React.ElementType> = {
-                    armas_orange: Swords, armas_red: Skull, carregadores: Cylinder,
-                    acessorios_armas: Crosshair, drogas: FlaskConical, materiais_craft: Wrench,
-                    coletes: Shield, lixo: Trash2, madeiras: TreePine, materias_primas: Gem,
-                    minerios: Pickaxe, corpos: Package, prints: FileText,
-                    entrega_bairrista: Truck, venda_bairrista: DollarSign,
-                  };
-                  const groups = new Map<string, typeof items>();
-                  for (const i of items) {
-                    const key = i.subcategory || "outros";
-                    if (!groups.has(key)) groups.set(key, []);
-                    groups.get(key)!.push(i);
-                  }
-                  const sorted = Array.from(groups.entries()).sort((a, b) =>
-                    fmtCategoryLabel(a[0]).localeCompare(fmtCategoryLabel(b[0]))
-                  );
-                  return sorted.map(([sub, list]) => {
-                    const Icon = ICONS[sub];
-                    return (
-                      <SelectGroup key={sub}>
-                        <SelectLabel className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary/80 px-2 py-1.5 border-b border-border/50 mb-1">
-                          {Icon && <Icon className="h-3.5 w-3.5" />}
-                          {fmtCategoryLabel(sub)}
-                        </SelectLabel>
-                        {list.map((i) => (
-                          <SelectItem key={i.id} value={String(i.id)} className="text-sm py-1.5">
-                            {i.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    );
-                  });
-                })()}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Quantidade</label>
-            <Input
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-            />
-          </div>
 
-          {/* Simulação de materiais */}
-          {sim.data && (
-            <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Materiais necessários</div>
-              <ul className="space-y-1">
-                {sim.data.ingredients.map((ing) => (
-                  <li key={ing.name} className="flex justify-between items-center">
-                    <span className="text-foreground">{ing.name}</span>
-                    <span className="text-muted-foreground">
-                      {ing.needed}× = {fmtNum(Math.round(ing.line_cost))} €
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-border pt-2 flex justify-between items-center font-semibold text-sm">
-                <span>Dinheiro sujo a dar:</span>
-                <span className="text-emerald-400">{fmtNum(Math.round(sim.data.dirty_money))} €</span>
+        {step === "select" ? (
+          <>
+            <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {lines.map((l, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
+                  <SearchableSelect
+                    value={l.item_id}
+                    onChange={(v) =>
+                      setLines(lines.map((x, i) => (i === idx ? { ...x, item_id: v } : x)))
+                    }
+                    options={options}
+                    placeholder="Item"
+                    searchPlaceholder="Procurar item..."
+                    emptyText="Nenhum item encontrado."
+                  />
+                  <Input
+                    type="number"
+                    min={1}
+                    value={l.qty}
+                    onChange={(e) =>
+                      setLines(lines.map((x, i) => (i === idx ? { ...x, qty: e.target.value } : x)))
+                    }
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setLines(lines.filter((_, i) => i !== idx))}
+                    disabled={lines.length === 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLines([...lines, { item_id: "", qty: "1" }])}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Mais uma linha
+              </Button>
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">
+                  Modo de encomenda
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode("materials_money")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      paymentMode === "materials_money"
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-muted/30 hover:bg-muted/50"
+                    }`}
+                  >
+                    <Package className={`mb-1.5 h-5 w-5 ${paymentMode === "materials_money" ? "text-primary" : "text-muted-foreground"}`} />
+                    <div className={`text-xs font-semibold ${paymentMode === "materials_money" ? "text-primary" : "text-foreground"}`}>
+                      Com materiais
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                      Entrego materiais + dinheiro sujo
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode("money_only")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      paymentMode === "money_only"
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-muted/30 hover:bg-muted/50"
+                    }`}
+                  >
+                    <Banknote className={`mb-1.5 h-5 w-5 ${paymentMode === "money_only" ? "text-primary" : "text-muted-foreground"}`} />
+                    <div className={`text-xs font-semibold ${paymentMode === "money_only" ? "text-primary" : "text-foreground"}`}>
+                      Sem materiais
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                      Pago tudo em dinheiro
+                    </div>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">
+                  Responsável
+                </label>
+                <Select value={responsavel} onValueChange={setResponsavel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleciona quem gere isto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(managers.data ?? []).map((mgr) => (
+                      <SelectItem key={mgr.id} value={String(mgr.id)}>
+                        {mgr.display_name ?? mgr.nick ?? `Membro #${mgr.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">
+                  Notas (opcional)
+                </label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Notas"
+                />
               </div>
             </div>
-          )}
-          {sim.isLoading && item && (
-            <div className="text-xs text-muted-foreground">A calcular materiais...</div>
-          )}
+            <DialogFooter>
+              <Button variant="ghost" onClick={handleClose}>
+                Deixa lá
+              </Button>
+              <Button
+                disabled={validLines.length === 0 || !responsavel || sim.isLoading}
+                onClick={() => setStep("checkout")}
+              >
+                Rever encomenda →
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {/* Modo de pagamento */}
+              <div className={`rounded-sm border p-2 text-xs flex items-center gap-2 ${paymentMode === 'money_only' ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-blue-500/30 bg-blue-500/10 text-blue-400'}`}>
+                {paymentMode === 'money_only' ? <Banknote className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
+                <span className="font-medium">{paymentMode === 'money_only' ? 'Só dinheiro (sem materiais)' : 'Materiais + dinheiro sujo'}</span>
+              </div>
 
-          <div>
-            <label className="text-xs text-muted-foreground">
-              Recado (opcional)
-            </label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Notas"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            Deixa lá
-          </Button>
-          <Button
-            disabled={!item || !qty || m.isPending}
-            onClick={() => m.mutate()}
-          >
-            {m.isPending ? "A processar" : "Pedir"}
-          </Button>
-        </DialogFooter>
+              {/* Items */}
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Items</div>
+                <ul className="space-y-0.5 text-sm">
+                  {validLines.map((l, idx) => {
+                    const item = items.find((i) => String(i.id) === l.item_id);
+                    return (
+                      <li key={idx} className="flex justify-between items-center">
+                        <span className="font-medium">{l.qty}× {item?.name ?? "—"}</span>
+                        {item != null && (
+                          <span className="text-muted-foreground font-mono text-xs">{fmtPrice((item.min_sale_price ?? 0) * Number(l.qty))}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              {/* Total */}
+              <div className="rounded-sm border border-border bg-muted/30 p-3">
+                <div className="flex justify-between items-center font-semibold text-sm">
+                  <span>Total a pagar:</span>
+                  <span className="font-mono">{fmtPrice((() => {
+                    const baseTotal = validLines.reduce((s, l) => {
+                      const item = items.find((i) => String(i.id) === l.item_id);
+                      return s + (item?.min_sale_price ?? 0) * Number(l.qty);
+                    }, 0);
+                    if (paymentMode === 'money_only') {
+                      return Math.round(baseTotal + (sim.data?.full_material_cost ?? 0) + baseTotal * 0.20);
+                    }
+                    return baseTotal;
+                  })())}</span>
+                </div>
+                {paymentMode === 'money_only' && sim.data && (
+                  <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
+                    <div className="flex justify-between"><span>Base:</span><span className="font-mono">{fmtPrice(Math.round(sim.data.dirty_money))}</span></div>
+                    <div className="flex justify-between"><span>Material:</span><span className="font-mono">{fmtPrice(Math.round(sim.data.full_material_cost))}</span></div>
+                    <div className="flex justify-between"><span>Taxa (20%):</span><span className="font-mono">{fmtPrice(Math.round(sim.data.dirty_money * 0.20))}</span></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Materiais */}
+              {paymentMode === 'materials_money' && (
+                <>
+                  {sim.isLoading ? (
+                    <div className="text-xs text-muted-foreground">A calcular materiais...</div>
+                  ) : sim.error ? (
+                    <div className="text-xs text-destructive">Erro ao calcular materiais.</div>
+                  ) : sim.data && sim.data.ingredients.length > 0 ? (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Materiais a entregar</div>
+                      <ul className="space-y-0.5 text-xs">
+                        {sim.data.ingredients.map((ing) => (
+                          <li key={ing.name} className="flex justify-between items-center">
+                            <span>{ing.name}</span>
+                            <span className="font-mono text-muted-foreground">{fmtNum(ing.needed)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : sim.data ? (
+                    <div className="text-xs text-muted-foreground">Não requer materiais.</div>
+                  ) : null}
+                </>
+              )}
+
+              {/* Info extra */}
+              <div className="text-xs space-y-1 text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Responsável:</span>
+                  <span className="text-foreground font-medium">{selectedManager?.display_name ?? selectedManager?.nick ?? "—"}</span>
+                </div>
+                {notes && (
+                  <div className="flex justify-between">
+                    <span>Notas:</span>
+                    <span className="italic text-right">"{notes}"</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setStep("select")}>
+                ← Voltar
+              </Button>
+              <ButtonLoading
+                loading={m.isPending}
+                disabled={m.isPending}
+                onClick={() => m.mutate()}
+              >
+                {m.isPending ? "A processar" : "Confirmar encomenda"}
+              </ButtonLoading>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

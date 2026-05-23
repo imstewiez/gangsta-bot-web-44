@@ -5,8 +5,18 @@ import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import { getSaidaDetail, liquidateSaida } from "@/lib/liquidation.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
+import {
+  cancelOperation,
+  kickParticipant,
+  inviteMembers,
+  acceptInvite,
+  declineInvite,
+  listRoles,
+} from "@/lib/operations.functions";
+import { listMembersWithStats } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -18,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { SaidaStatusBadge } from "@/components/operations/SaidaStatusBadge";
 import { SaidaTimeline } from "@/components/operations/SaidaTimeline";
-import { fmtDate, fmtNum, fmtPrice } from "@/lib/domain";
+import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -31,12 +41,17 @@ import {
   Swords,
   CheckCircle2,
   FileText,
-  Package,
   AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  User,
+  Trophy,
+  ShieldAlert,
   Shield,
+  UserMinus,
+  UserPlus,
+  X,
+  Check,
+  Search,
+  Truck,
+  Package,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/operacoes/$id")({
@@ -63,6 +78,9 @@ function Page() {
   const qc = useQueryClient();
 
   const [confirmLiq, setConfirmLiq] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [kickTarget, setKickTarget] = useState<{ member_id: number; name: string } | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const detail = useQuery({
     queryKey: ["saida", saidaId],
@@ -80,8 +98,30 @@ function Page() {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["saida", saidaId] });
       qc.invalidateQueries({ queryKey: ["saidas"] });
-      toast.success(`Saída liquidada · Net ${fmtPrice(r.net)}`);
+      toast.success(`Saída liquidada · Net ${r.net.toFixed(0)} €`);
       setConfirmLiq(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const cancelM = useMutation({
+    mutationFn: () => cancelOperation({ data: { id: saidaId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["saida", saidaId] });
+      qc.invalidateQueries({ queryKey: ["saidas"] });
+      toast.success("Saída cancelada");
+      setConfirmCancel(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const kickM = useMutation({
+    mutationFn: (vars: { operation_id: number; member_id: number }) => kickParticipant({ data: vars }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["saida", saidaId] });
+      qc.invalidateQueries({ queryKey: ["saidas"] });
+      toast.success("Membro removido");
+      setKickTarget(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -117,17 +157,20 @@ function Page() {
 
   const op = detail.data.operation;
   const participants = detail.data.participants;
-  const materials = detail.data.materials;
   const isManager = me.data?.is_manager ?? false;
+  const isLeader = op.leader_id === me.data?.id;
+  const canManage = isManager || isLeader;
   const canLiquidate =
-    isManager &&
-    (op.status === "concluida" || op.status === "em_liquidacao");
+    isManager && (op.status === "concluida" || op.status === "em_liquidacao");
   const isFinalized = op.status === "concluida" || op.status === "cancelada";
   const typeStyle = TYPE_CONFIG[(op.operation_type ?? "outro").toLowerCase()] ?? TYPE_CONFIG.outro;
 
-  const totalKills = participants.reduce((s, p) => s + p.kills, 0);
-  const totalDeaths = participants.reduce((s, p) => s + p.deaths_count, 0);
-  const settledCount = participants.filter((p) => p.settled).length;
+  const activeParticipants = participants.filter((p) => p.participant_type !== "pending");
+  const pendingParticipants = participants.filter((p) => p.participant_type === "pending");
+  const totalKills = activeParticipants.reduce((s, p) => s + p.kills, 0);
+  const totalDeaths = activeParticipants.reduce((s, p) => s + p.deaths_count, 0);
+  const myParticipant = participants.find((p) => p.member_id === me.data?.id);
+  const isPending = myParticipant?.participant_type === "pending";
 
   return (
     <div className="animate-rise">
@@ -173,6 +216,24 @@ function Page() {
                   {op.operation_type ?? "Outro"}
                 </span>
                 <SaidaStatusBadge status={op.status} pulse={op.status === "em_curso"} />
+                {isFinalized && (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                      op.was_profitable === true && "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+                      op.was_profitable === false && "border-red-500/30 bg-red-500/10 text-red-400",
+                      op.was_profitable === null && "border-border bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {op.was_profitable === true ? (
+                      <><Trophy className="h-3 w-3" /> Vitória</>
+                    ) : op.was_profitable === false ? (
+                      <><ShieldAlert className="h-3 w-3" /> Derrota</>
+                    ) : (
+                      <><Shield className="h-3 w-3" /> Sem resultado</>
+                    )}
+                  </span>
+                )}
               </div>
               <h1 className="text-3xl font-bold font-display">
                 {op.spot ?? "Spot por definir"}
@@ -184,22 +245,36 @@ function Page() {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5" />
-                  {participants.length} participantes
+                  {activeParticipants.length} participantes
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Swords className="h-3.5 w-3.5" />
                   {totalKills}K / {totalDeaths}D
                 </span>
-                {isFinalized && settledCount === participants.length && (
-                  <span className="flex items-center gap-1.5 text-emerald-400">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Liquidada
-                  </span>
-                )}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {isPending && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => declineInvite({ data: { operation_id: saidaId } }).then(() => { qc.invalidateQueries({ queryKey: ["saida", saidaId] }); toast.success("Convite recusado"); })}>
+                    <X className="mr-1 h-4 w-4" /> Recusar
+                  </Button>
+                  <Button size="sm" onClick={() => acceptInvite({ data: { operation_id: saidaId } }).then(() => { qc.invalidateQueries({ queryKey: ["saida", saidaId] }); toast.success("Convite aceite"); })}>
+                    <Check className="mr-1 h-4 w-4" /> Aceitar
+                  </Button>
+                </>
+              )}
+              {canManage && !isFinalized && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)}>
+                    <UserPlus className="mr-1 h-4 w-4" /> Convidar
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setConfirmCancel(true)}>
+                    Cancelar
+                  </Button>
+                </>
+              )}
               {canLiquidate && (
                 <Button
                   onClick={() => setConfirmLiq(true)}
@@ -210,34 +285,6 @@ function Page() {
                 </Button>
               )}
             </div>
-          </div>
-
-          {/* Quick stats grid */}
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <QuickStat
-              label="Fornecido"
-              value={fmtPrice(op.supplied_value)}
-              icon={Package}
-              accent="warning"
-            />
-            <QuickStat
-              label="Retornado"
-              value={fmtPrice(op.returned_value)}
-              icon={TrendingUp}
-              accent="success"
-            />
-            <QuickStat
-              label="Perdido"
-              value={fmtPrice(op.lost_value)}
-              icon={TrendingDown}
-              accent="destructive"
-            />
-            <QuickStat
-              label="Net"
-              value={fmtPrice(op.net_value)}
-              icon={op.net_value >= 0 ? TrendingUp : TrendingDown}
-              accent={op.net_value >= 0 ? "success" : "destructive"}
-            />
           </div>
         </div>
       </div>
@@ -268,11 +315,7 @@ function Page() {
             <TabsList className="w-full justify-start">
               <TabsTrigger value="equipa" className="gap-1.5 interactive-tab">
                 <Users className="h-3.5 w-3.5" />
-                Equipa ({participants.length})
-              </TabsTrigger>
-              <TabsTrigger value="materiais" className="gap-1.5 interactive-tab">
-                <Package className="h-3.5 w-3.5" />
-                Materiais ({materials.length})
+                Equipa ({activeParticipants.length})
               </TabsTrigger>
               <TabsTrigger value="resultado" className="gap-1.5 interactive-tab">
                 <Skull className="h-3.5 w-3.5" />
@@ -280,12 +323,37 @@ function Page() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="equipa" className="mt-4">
+            <TabsContent value="equipa" className="mt-4 space-y-4">
+              {/* Pending invites */}
+              {pendingParticipants.length > 0 && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-400">
+                    Pendentes ({pendingParticipants.length})
+                  </h4>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {pendingParticipants.map((p) => (
+                      <ParticipantRow
+                        key={p.id}
+                        p={p}
+                        canKick={canManage}
+                        onKick={() => setKickTarget({ member_id: p.member_id, name: p.member_name ?? `M#${p.member_id}` })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Active participants */}
               <div className="grid gap-3 sm:grid-cols-2">
-                {participants.map((p) => (
-                  <ParticipantRow key={p.id} p={p} />
+                {activeParticipants.map((p) => (
+                  <ParticipantRow
+                    key={p.id}
+                    p={p}
+                    canKick={canManage && !isFinalized}
+                    onKick={() => setKickTarget({ member_id: p.member_id, name: p.member_name ?? `M#${p.member_id}` })}
+                  />
                 ))}
-                {participants.length === 0 && (
+                {activeParticipants.length === 0 && (
                   <div className="col-span-full rounded-xl border border-dashed border-border/50 bg-card/30 py-10 text-center">
                     <Users className="mx-auto h-8 w-8 text-muted-foreground/30" />
                     <p className="mt-2 text-sm text-muted-foreground">Sem participantes registados</p>
@@ -294,22 +362,11 @@ function Page() {
               </div>
             </TabsContent>
 
-            <TabsContent value="materiais" className="mt-4">
-              <div className="space-y-2">
-                {materials.map((m) => (
-                  <MaterialRow key={m.id} m={m} />
-                ))}
-                {materials.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-10 text-center">
-                    <Package className="mx-auto h-8 w-8 text-muted-foreground/30" />
-                    <p className="mt-2 text-sm text-muted-foreground">Sem materiais registados</p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
             <TabsContent value="resultado" className="mt-4">
-              <ResultTab participants={participants} />
+              <ResultTab
+                operation={op}
+                participants={activeParticipants}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -328,28 +385,6 @@ function Page() {
               Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
-
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Fornecido</span>
-              <span>{fmtPrice(op.supplied_value)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Retornado</span>
-              <span className="text-emerald-400">{fmtPrice(op.returned_value)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Perdido</span>
-              <span className="text-destructive">{fmtPrice(op.lost_value)}</span>
-            </div>
-            <div className="hairline-top pt-2 flex justify-between font-semibold">
-              <span>Net estimado</span>
-              <span className={op.net_value >= 0 ? "text-emerald-400" : "text-destructive"}>
-                {fmtPrice(op.net_value)}
-              </span>
-            </div>
-          </div>
-
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmLiq(false)}>
               Cancelar
@@ -364,40 +399,76 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
 
-function QuickStat({
-  label,
-  value,
-  icon: Icon,
-  accent,
-}: {
-  label: string;
-  value: string;
-  icon: React.ComponentType<{ className?: string }>;
-  accent: "warning" | "success" | "destructive" | "muted";
-}) {
-  const colors = {
-    warning: "text-amber-400",
-    success: "text-emerald-400",
-    destructive: "text-destructive",
-    muted: "text-muted-foreground",
-  };
-  return (
-    <div className="rounded-lg bg-muted/30 p-2.5">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/60">
-        <Icon className="h-3 w-3" />
-        {label}
-      </div>
-      <div className={cn("mt-0.5 text-sm font-bold font-mono", colors[accent])}>{value}</div>
+      {/* Cancel confirmation dialog */}
+      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Cancelar saída
+            </DialogTitle>
+            <DialogDescription>
+              Tens a certeza que queres cancelar a saída #{saidaId}? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmCancel(false)}>
+              Deixa lá
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelM.mutate()}
+              disabled={cancelM.isPending}
+            >
+              {cancelM.isPending ? "A processar" : "Cancelar saída"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Kick confirmation dialog */}
+      <Dialog open={!!kickTarget} onOpenChange={() => setKickTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserMinus className="h-5 w-5 text-destructive" />
+              Remover membro
+            </DialogTitle>
+            <DialogDescription>
+              Tens a certeza que queres remover {kickTarget?.name} da saída?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setKickTarget(null)}>
+              Deixa lá
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => kickTarget && kickM.mutate({ operation_id: saidaId, member_id: kickTarget.member_id })}
+              disabled={kickM.isPending}
+            >
+              {kickM.isPending ? "A processar" : "Remover"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite dialog */}
+      {inviteOpen && (
+        <InviteDialog
+          operationId={saidaId}
+          onClose={() => setInviteOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
 function ParticipantRow({
   p,
+  canKick,
+  onKick,
 }: {
   p: {
     id: number;
@@ -406,18 +477,23 @@ function ParticipantRow({
     role_in_op: string | null;
     kills: number;
     deaths_count: number;
-    net_material_delta: number;
+    survived: boolean;
+    died: boolean;
     settled: boolean;
+    participant_type: string;
   };
+  canKick?: boolean;
+  onKick?: () => void;
 }) {
   const kd = p.deaths_count === 0 ? p.kills : (p.kills / p.deaths_count).toFixed(2);
-  const positive = p.net_material_delta >= 0;
+  const isPending = p.participant_type === "pending";
 
   return (
     <div
       className={cn(
         "flex items-center gap-3 rounded-xl border p-3 transition-all hover:bg-card/80",
         p.settled ? "border-emerald-500/20 bg-emerald-500/5" : "border-border/60 bg-card/40",
+        isPending && "border-amber-500/20 bg-amber-500/5",
       )}
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
@@ -436,20 +512,34 @@ function ParticipantRow({
               {p.role_in_op}
             </span>
           )}
+          {isPending && (
+            <span className="rounded bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-400">
+              Pendente
+            </span>
+          )}
         </div>
         <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Skull className="h-3 w-3" />
+            <Swords className="h-3 w-3" />
             {p.kills}K/{p.deaths_count}D
           </span>
-          <span className="flex items-center gap-1">
-            <TrendingUp className="h-3 w-3" />
-            <span className={positive ? "text-emerald-400" : "text-destructive"}>
-              {fmtPrice(p.net_material_delta)}
+          {p.died && (
+            <span className="flex items-center gap-1 text-red-400">
+              <Skull className="h-3 w-3" /> Morreu
             </span>
-          </span>
+          )}
+          {p.survived && !p.died && (
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Shield className="h-3 w-3" /> Sobreviveu
+            </span>
+          )}
         </div>
       </div>
+      {canKick && onKick && (
+        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={(e) => { e.stopPropagation(); onKick(); }}>
+          <UserMinus className="h-4 w-4" />
+        </Button>
+      )}
       {p.settled ? (
         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
       ) : (
@@ -459,58 +549,26 @@ function ParticipantRow({
   );
 }
 
-function MaterialRow({
-  m,
-}: {
-  m: {
-    id: number;
-    item_id: number;
-    item_name: string | null;
-    direction: string;
-    quantity: number;
-  };
-}) {
-  const isOut = m.direction === "out" || m.direction === "issued";
-  const isLost = m.direction === "lost";
-
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-border/40 bg-card/30 px-3 py-2">
-      <div className="flex items-center gap-2">
-        <div
-          className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-md",
-            isOut && "bg-amber-500/10 text-amber-400",
-            isLost && "bg-destructive/10 text-destructive",
-            !isOut && !isLost && "bg-emerald-500/10 text-emerald-400",
-          )}
-        >
-          <Package className="h-3.5 w-3.5" />
-        </div>
-        <span className="text-sm">{m.item_name ?? `Item #${m.item_id}`}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <span
-          className={cn(
-            "text-[10px] uppercase tracking-wider font-medium",
-            isOut && "text-amber-400",
-            isLost && "text-destructive",
-            !isOut && !isLost && "text-emerald-400",
-          )}
-        >
-          {m.direction}
-        </span>
-        <span className="text-sm font-mono font-medium">×{fmtNum(m.quantity)}</span>
-      </div>
-    </div>
-  );
-}
-
 function ResultTab({
+  operation,
   participants,
 }: {
+  operation: {
+    was_profitable: boolean | null;
+    enemy_name: string | null;
+    enemy_faction: string | null;
+    had_fight: boolean | null;
+    survivors: number | null;
+    deaths: number | null;
+    our_kills: number | null;
+  };
   participants: Array<{
+    member_name: string | null;
+    member_id: number;
     kills: number;
     deaths_count: number;
+    survived: boolean;
+    died: boolean;
   }>;
 }) {
   const totalKills = participants.reduce((s, p) => s + p.kills, 0);
@@ -519,21 +577,65 @@ function ResultTab({
 
   return (
     <div className="space-y-4">
+      {/* Result card */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className={cn(
+          "rounded-xl border p-4 text-center",
+          operation.was_profitable === true && "border-emerald-500/30 bg-emerald-500/5",
+          operation.was_profitable === false && "border-red-500/30 bg-red-500/5",
+          operation.was_profitable === null && "border-border bg-card/40",
+        )}>
+          {operation.was_profitable === true ? (
+            <Trophy className="mx-auto h-6 w-6 text-emerald-400" />
+          ) : operation.was_profitable === false ? (
+            <ShieldAlert className="mx-auto h-6 w-6 text-red-400" />
+          ) : (
+            <Shield className="mx-auto h-6 w-6 text-muted-foreground" />
+          )}
+          <div className={cn(
+            "mt-1 text-xl font-bold font-display",
+            operation.was_profitable === true && "text-emerald-400",
+            operation.was_profitable === false && "text-red-400",
+            operation.was_profitable === null && "text-muted-foreground",
+          )}>
+            {operation.was_profitable === true ? "Vitória" : operation.was_profitable === false ? "Derrota" : "Sem resultado"}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/40 p-4 text-center">
+          <Swords className="mx-auto h-6 w-6 text-primary" />
+          <div className="mt-1 text-xl font-bold font-display">
+            {operation.had_fight === true ? "Houve confronto" : operation.had_fight === false ? "Sem confronto" : "—"}
+          </div>
+        </div>
+      </div>
+
+      {operation.enemy_name && (
+        <div className="rounded-xl border border-border/60 bg-card/40 p-4">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1">Inimigo</div>
+          <div className="text-lg font-bold">
+            {operation.enemy_name}
+            {operation.enemy_faction && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">({operation.enemy_faction})</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-3">
-        <ResultStat label="Kills Totais" value={fmtNum(totalKills)} icon={Skull} color="text-red-400" />
-        <ResultStat
-          label="Mortes"
-          value={fmtNum(totalDeaths)}
-          icon={Users}
-          color="text-destructive"
-        />
+        <ResultStat label="Kills Totais" value={fmtNum(operation.our_kills ?? totalKills)} icon={Skull} color="text-red-400" />
+        <ResultStat label="Mortes" value={fmtNum(operation.deaths ?? totalDeaths)} icon={Users} color="text-destructive" />
+        <ResultStat label="Sobreviventes" value={fmtNum(operation.survivors ?? participants.filter((p) => p.survived).length)} icon={Shield} color="text-emerald-400" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
         <ResultStat label="K/D Ratio" value={String(kd)} icon={Swords} color="text-primary" />
       </div>
 
       {/* Kill distribution */}
       {participants.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card/40 p-4">
-          <h4 className="mb-3 text-sm font-semibold">Distribuição de Kills</h4>
+          <h4 className="mb-3 text-sm font-semibold">Performance individual</h4>
           <div className="space-y-2">
             {participants
               .sort((a, b) => b.kills - a.kills)
@@ -543,7 +645,7 @@ function ResultTab({
                 return (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-24 truncate text-xs text-muted-foreground">
-                      {(p as any).member_name ?? `M#${(p as any).member_id}`}
+                      {p.member_name ?? `M#${p.member_id}`}
                     </div>
                     <div className="flex-1">
                       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -556,7 +658,11 @@ function ResultTab({
                         />
                       </div>
                     </div>
-                    <div className="w-8 text-right text-xs font-medium">{p.kills}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 text-right text-xs font-medium">{p.kills}K</span>
+                      {p.died && <Skull className="h-3 w-3 text-red-400" />}
+                      {p.survived && !p.died && <Shield className="h-3 w-3 text-emerald-400" />}
+                    </div>
                   </div>
                 );
               })}
@@ -584,5 +690,181 @@ function ResultStat({
       <div className={cn("mt-1 text-2xl font-bold font-display", color)}>{value}</div>
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{label}</div>
     </div>
+  );
+}
+
+function InviteDialog({ operationId, onClose }: { operationId: number; onClose: () => void }) {
+  const [tab, setTab] = useState<"members" | "tags">("members");
+  const [selectedMembers, setSelectedMembers] = useState<Set<number>>(new Set());
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const qc = useQueryClient();
+
+  const membersFn = useAuthedServerFn(listMembersWithStats);
+  const rolesFn = useAuthedServerFn(listRoles);
+  const inviteFn = useAuthedServerFn(inviteMembers);
+
+  const membersQ = useQuery({
+    queryKey: ["members-all-stats"],
+    queryFn: () => membersFn(),
+  });
+
+  const rolesQ = useQuery({
+    queryKey: ["roles"],
+    queryFn: () => rolesFn(),
+  });
+
+  const inviteM = useMutation({
+    mutationFn: (vars: { operation_id: number; member_ids?: number[]; role?: string }) =>
+      inviteFn({ data: vars }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["saida", String(operationId)] });
+      toast.success("Convites enviados");
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const allMembers = (membersQ.data ?? []) as Array<{
+    id: number; display_name: string | null; nick: string | null;
+    role_label: string | null; tier: string | null;
+    kills: number; deaths: number; saidas: number; deliveries: number; sales: number;
+  }>;
+  const roles = (rolesQ.data ?? []) as Array<{ role: string; count: number }>;
+
+  const filtered = allMembers.filter((m) => {
+    const q = search.toLowerCase();
+    return (
+      (m.display_name ?? "").toLowerCase().includes(q) ||
+      (m.nick ?? "").toLowerCase().includes(q) ||
+      (m.role_label ?? "").toLowerCase().includes(q) ||
+      (m.tier ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const tierLabel = (tier: string | null) => {
+    const map: Record<string, string> = {
+      young_blood: "YB", o_gunao: "OG", gangster_fodido: "GF",
+      patrao_di_zona: "PDZ", real_gangster: "RG", og: "OG",
+      kingpin: "KP", manda_chuva: "MC",
+    };
+    return map[tier ?? ""] ?? tier ?? "—";
+  };
+
+  const tierColor = (tier: string | null) => {
+    const map: Record<string, string> = {
+      young_blood: "text-blue-400", o_gunao: "text-emerald-400", gangster_fodido: "text-orange-400",
+      patrao_di_zona: "text-purple-400", real_gangster: "text-red-400", og: "text-yellow-400",
+      kingpin: "text-rose-400", manda_chuva: "text-amber-400",
+    };
+    return map[tier ?? ""] ?? "text-muted-foreground";
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5" />
+            Convidar membros
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+          <TabsList className="w-full">
+            <TabsTrigger value="members">Individuais</TabsTrigger>
+            <TabsTrigger value="tags">Por Tag</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="members" className="mt-3 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Procurar por nome, cargo ou tier..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <div className="max-h-[320px] overflow-y-auto space-y-1">
+              {filtered.map((m) => (
+                <label
+                  key={m.id}
+                  className="flex items-center gap-3 rounded-lg border border-border/40 bg-card/30 px-3 py-2 cursor-pointer hover:bg-card/60"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedMembers.has(m.id)}
+                    onChange={(e) => {
+                      const next = new Set(selectedMembers);
+                      if (e.target.checked) next.add(m.id);
+                      else next.delete(m.id);
+                      setSelectedMembers(next);
+                    }}
+                    className="h-4 w-4 rounded border-border shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{m.display_name ?? m.nick ?? `M#${m.id}`}</span>
+                      <span className={cn("text-[10px] font-bold uppercase", tierColor(m.tier))}>{tierLabel(m.tier)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground/70 mt-0.5">
+                      <span className="flex items-center gap-0.5"><Skull className="h-3 w-3" /> {m.kills}</span>
+                      <span className="flex items-center gap-0.5"><Crosshair className="h-3 w-3" /> {m.saidas}</span>
+                      <span className="flex items-center gap-0.5"><Truck className="h-3 w-3" /> {m.deliveries}</span>
+                      <span className="flex items-center gap-0.5"><Package className="h-3 w-3" /> {m.sales}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground capitalize shrink-0">{m.role_label}</span>
+                </label>
+              ))}
+              {filtered.length === 0 && (
+                <div className="text-center text-xs text-muted-foreground py-4">Nenhum membro encontrado.</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="tags" className="mt-3">
+            <div className="space-y-1">
+              {roles.map((r) => (
+                <label
+                  key={r.role}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors",
+                    selectedRole === r.role
+                      ? "border-primary bg-primary/10"
+                      : "border-border/40 bg-card/30 hover:bg-card/60",
+                  )}
+                  onClick={() => setSelectedRole(r.role)}
+                >
+                  <span className="text-sm font-medium">{r.role}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">{r.count} membros</span>
+                </label>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Deixa lá</Button>
+          <Button
+            disabled={
+              inviteM.isPending ||
+              (tab === "members" && selectedMembers.size === 0) ||
+              (tab === "tags" && !selectedRole)
+            }
+            onClick={() =>
+              inviteM.mutate({
+                operation_id: operationId,
+                member_ids: tab === "members" ? Array.from(selectedMembers) : undefined,
+                role: tab === "tags" ? (selectedRole ?? undefined) : undefined,
+              })
+            }
+          >
+            {inviteM.isPending ? "A enviar" : "Enviar convites"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

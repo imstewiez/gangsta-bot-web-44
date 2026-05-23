@@ -15,8 +15,8 @@
   },
   "workers_dev": true,
   "routes": [
-    { "pattern": "ballasgang.pt", "custom_domain": true },
-    { "pattern": "www.ballasgang.pt", "custom_domain": true }
+    { "pattern": "ballasgang.eu", "custom_domain": true },
+    { "pattern": "www.ballasgang.eu", "custom_domain": true }
   ],
   "headers": [
     {

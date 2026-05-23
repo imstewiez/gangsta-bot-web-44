@@ -22,6 +22,7 @@ export type RecipeRow = {
   }>;
   total_cost: number;
   estimated_value: number;
+  min_sale_price: number | null;
   margin: number;
   margin_pct: number | null;
   recipe_category: string | null;
@@ -41,6 +42,7 @@ export const listRecipes = createServerFn({ method: "GET" })
       tier: string | null;
       unit: string | null;
       estimated_value: string | null;
+      min_sale_price: string | null;
       ing_item_id: number | null;
       ing_name: string | null;
       ing_category: string | null;
@@ -52,6 +54,7 @@ export const listRecipes = createServerFn({ method: "GET" })
       `select r.id as recipe_id, r.item_id, i.name as item_name, i.category, i.subcategory, r.tier, i.unit,
               r.category as recipe_category,
               i.estimated_value,
+              i.min_sale_price,
               ri.ingredient_item_id as ing_item_id,
               ii.name as ing_name,
               ii.category as ing_category,
@@ -81,6 +84,7 @@ export const listRecipes = createServerFn({ method: "GET" })
           ingredients: [],
           total_cost: 0,
           estimated_value: Number(r.estimated_value ?? 0),
+          min_sale_price: r.min_sale_price != null ? Number(r.min_sale_price) : null,
           margin: 0,
           margin_pct: null,
           recipe_category: r.recipe_category,
@@ -120,9 +124,11 @@ export type CraftFeasibility = {
   item_name: string;
   requested_qty: number;
   dirty_money: number;
+  min_sale_price: number | null;
   ingredients: Array<{
     name: string;
     needed: number;
+    qty_per_recipe: number;
     unit_cost: number;
     line_cost: number;
   }>;
@@ -137,8 +143,8 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }): Promise<CraftFeasibility> => {
-    const head = await pgOne<{ item_name: string; tier: string | null; subcategory: string | null }>(
-      `select i.name as item_name, r.tier, i.subcategory
+    const head = await pgOne<{ item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null; min_sale_price: number | null }>(
+      `select i.name as item_name, r.tier, i.subcategory, i.estimated_value::float as estimated_value, i.min_sale_price::float as min_sale_price
        from craft_recipes r join items i on i.id = r.item_id where r.id = $1`,
       [data.recipe_id],
     );
@@ -154,27 +160,30 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
         where ri.recipe_id = $1`,
       [data.recipe_id],
     );
-    let dirty_money = 0;
+    let total_cost = 0;
     const ingredients: CraftFeasibility["ingredients"] = [];
     for (const ing of ings) {
       const needed = Number(ing.quantity) * data.quantity;
       const unitCost = Number(ing.unit_cost ?? 0);
       const lineCost = needed * unitCost;
-      dirty_money += lineCost;
+      total_cost += lineCost;
       // Orange weapons: only show Peças as material, everything else is included in dirty money
       if (isOrange) {
         if (ing.name.toLowerCase().includes("peça")) {
-          ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
+          ingredients.push({ name: ing.name, needed, qty_per_recipe: Number(ing.quantity), unit_cost: unitCost, line_cost: lineCost });
         }
       } else {
-        ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
+        ingredients.push({ name: ing.name, needed, qty_per_recipe: Number(ing.quantity), unit_cost: unitCost, line_cost: lineCost });
       }
     }
+    const itemPrice = (head?.estimated_value ?? 0) * data.quantity;
+    const dirty_money = itemPrice;
     return {
       recipe_id: data.recipe_id,
       item_name: head?.item_name ?? "?",
       requested_qty: data.quantity,
       dirty_money,
+      min_sale_price: head?.min_sale_price ?? null,
       ingredients,
     };
   });
@@ -188,8 +197,8 @@ export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" }
     return d;
   })
   .handler(async ({ data }): Promise<CraftFeasibility | null> => {
-    const recipe = await pgOne<{ recipe_id: number; item_name: string; tier: string | null; subcategory: string | null }>(
-      `select r.id as recipe_id, i.name as item_name, r.tier, i.subcategory
+    const recipe = await pgOne<{ recipe_id: number; item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null; min_sale_price: number | null }>(
+      `select r.id as recipe_id, i.name as item_name, r.tier, i.subcategory, i.estimated_value::float as estimated_value, i.min_sale_price::float as min_sale_price
        from craft_recipes r join items i on i.id = r.item_id where r.item_id = $1 limit 1`,
       [data.item_id],
     );
@@ -206,26 +215,144 @@ export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" }
         where ri.recipe_id = $1`,
       [recipe.recipe_id],
     );
-    let dirty_money = 0;
+    let total_cost = 0;
     const ingredients: CraftFeasibility["ingredients"] = [];
     for (const ing of ings) {
       const needed = Number(ing.quantity) * data.quantity;
       const unitCost = Number(ing.unit_cost ?? 0);
       const lineCost = needed * unitCost;
-      dirty_money += lineCost;
+      total_cost += lineCost;
       if (isOrange) {
         if (ing.name.toLowerCase().includes("peça")) {
-          ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
+          ingredients.push({ name: ing.name, needed, qty_per_recipe: Number(ing.quantity), unit_cost: unitCost, line_cost: lineCost });
         }
       } else {
-        ingredients.push({ name: ing.name, needed, unit_cost: unitCost, line_cost: lineCost });
+        ingredients.push({ name: ing.name, needed, qty_per_recipe: Number(ing.quantity), unit_cost: unitCost, line_cost: lineCost });
       }
     }
+    const itemPrice = (recipe.estimated_value ?? 0) * data.quantity;
+    const dirty_money = itemPrice;
     return {
       recipe_id: recipe.recipe_id,
       item_name: recipe.item_name,
       requested_qty: data.quantity,
       dirty_money,
+      min_sale_price: recipe.min_sale_price ?? null,
       ingredients,
     };
+  });
+
+export type CraftFeasibilityBatch = {
+  dirty_money: number;
+  full_material_cost: number;
+  ingredients: Array<{
+    name: string;
+    needed: number;
+    qty_per_recipe: number;
+    unit_cost: number;
+    line_cost: number;
+  }>;
+  items: Array<{ item_name: string; requested_qty: number }>;
+};
+
+export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { lines: Array<{ item_id: number; quantity: number }> }) => {
+    if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
+    for (const l of d.lines) {
+      if (!Number.isFinite(l.item_id)) throw new Error("item_id inválido");
+      if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("quantidade inválida");
+    }
+    return d;
+  })
+  .handler(async ({ data }): Promise<CraftFeasibilityBatch> => {
+    try {
+      const itemIds = data.lines.map((l) => l.item_id);
+      console.log("[computeCraftFeasibilityBatch] item_ids:", itemIds);
+
+      // Single query: recipes + ingredients for all requested items
+      const rows = await pgQuery<{
+        item_id: number;
+        item_name: string;
+        recipe_id: number;
+        tier: string | null;
+        subcategory: string | null;
+        estimated_value: number | null;
+        ing_name: string | null;
+        ing_qty: number | null;
+        unit_cost: number | null;
+      }>(
+        `select i.id as item_id, i.name as item_name, r.id as recipe_id, r.tier, i.subcategory,
+                i.estimated_value::float as estimated_value,
+                ii.name as ing_name, ri.quantity as ing_qty,
+                coalesce(ii.purchase_price, ii.estimated_value, 0)::float as unit_cost
+         from craft_recipes r
+         join items i on i.id = r.item_id
+         left join recipe_ingredients ri on ri.recipe_id = r.id
+         left join items ii on ii.id = ri.ingredient_item_id
+         where i.id = any($1)`,
+        [itemIds],
+      );
+
+      console.log("[computeCraftFeasibilityBatch] rows returned:", rows.length, rows.slice(0, 5));
+
+      const recipeMap = new Map<number, { item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null }>();
+      const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
+      let dirty_money = 0;
+      let full_material_cost = 0;
+      const items: CraftFeasibilityBatch["items"] = [];
+
+      for (const line of data.lines) {
+        // Find recipe data for this line
+        const recipeRows = rows.filter((r) => r.item_id === line.item_id);
+        console.log(`[computeCraftFeasibilityBatch] line item_id=${line.item_id} qty=${line.quantity} recipeRows=${recipeRows.length}`);
+        if (recipeRows.length === 0) {
+          console.log(`[computeCraftFeasibilityBatch] SKIP item_id=${line.item_id} — no recipe found`);
+          continue;
+        }
+
+        const recipe = recipeRows[0];
+        items.push({ item_name: recipe.item_name, requested_qty: line.quantity });
+
+        const isOrange = (recipe.tier === "orange") || (recipe.subcategory === "armas_orange");
+        const itemPrice = (recipe.estimated_value ?? 0) * line.quantity;
+        dirty_money += itemPrice;
+
+        for (const row of recipeRows) {
+          if (!row.ing_name || row.ing_qty == null) continue;
+          const needed = Number(row.ing_qty) * line.quantity;
+          const unitCost = Number(row.unit_cost ?? 0);
+          const lineCost = needed * unitCost;
+          full_material_cost += lineCost;
+
+          if (isOrange && !row.ing_name.toLowerCase().includes("peça")) continue;
+
+          const existing = allIngredients.get(row.ing_name);
+          if (existing) {
+            existing.needed += needed;
+            existing.line_cost += lineCost;
+          } else {
+            allIngredients.set(row.ing_name, {
+              name: row.ing_name,
+              needed,
+              qty_per_recipe: Number(row.ing_qty),
+              unit_cost: unitCost,
+              line_cost: lineCost,
+            });
+          }
+        }
+      }
+
+      const result = {
+        dirty_money,
+        full_material_cost,
+        ingredients: Array.from(allIngredients.values()),
+        items,
+      };
+      console.log("[computeCraftFeasibilityBatch] RESULT:", JSON.stringify(result));
+      return result;
+    } catch (e: any) {
+      console.error("[computeCraftFeasibilityBatch] ERROR:", e?.message ?? e);
+      throw new Error("Erro ao calcular materiais: " + (e?.message ?? "Erro desconhecido"));
+    }
   });

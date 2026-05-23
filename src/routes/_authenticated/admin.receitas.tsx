@@ -1,6 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
+import { isServer } from "@/lib/auth-helpers";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
+import { checkManagerAccess } from "@/lib/access-check.functions";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 
 import {
   listRecipesAdmin,
@@ -12,14 +16,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Save, Pencil, X, Check } from "lucide-react";
+import { Save, Pencil, X, Check, Package } from "lucide-react";
 import { useState } from "react";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { ARMORY_CAT_ORDER, ARMORY_CAT_CONFIG, itemDisplayCategory } from "@/lib/armory.catalog";
+import { CategoryHeader } from "@/components/domain/CategoryHeader";
 
 export const Route = createFileRoute("/_authenticated/admin/receitas")({
+  beforeLoad: async () => {
+    if (isServer()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/login" });
+  },
+  head: () => ({
+    meta: [{ title: "Editar Receitas | Ballas Gang" }],
+  }),
   component: Page,
 });
 
 function Page() {
+  const managerFn = useAuthedServerFn(checkManagerAccess);
+  const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
+  useRealtimeSync([
+    { table: "craft_recipes", queryKeys: [["adminRecipes"]] },
+    { table: "recipe_ingredients", queryKeys: [["adminRecipes"]] },
+  ]);
   const fn = useAuthedServerFn(listRecipesAdmin);
   const updateFn = useAuthedServerFn(updateRecipeIngredientQty);
   const qc = useQueryClient();
@@ -41,6 +62,38 @@ function Page() {
     r.item_name.toLowerCase().includes((editing.get("_search") ?? "").toLowerCase()),
   );
 
+  const grouped = (() => {
+    const map = new Map<string, AdminRecipeRow[]>();
+    for (const r of filtered) {
+      const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (a.min_sale_price ?? 0) - (b.min_sale_price ?? 0));
+    }
+    return Array.from(map.entries()).sort((a, b) => {
+      const ia = ARMORY_CAT_ORDER.indexOf(a[0] as any);
+      const ib = ARMORY_CAT_ORDER.indexOf(b[0] as any);
+      if (ia === -1 && ib === -1) return a[0].localeCompare(b[0]);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  })();
+
+  if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (!managerCheck.data?.allowed) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-semibold">Acesso restrito</p>
+          <p className="text-sm text-muted-foreground">Só a direção pode aceder a esta página.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader
@@ -57,20 +110,42 @@ function Page() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map((r) => (
-          <RecipeEditorCard
-            key={r.recipe_id}
-            r={r}
-            editing={editing}
-            setEditing={setEditing}
-            onSave={(ingId, qty) =>
-              m.mutate({ recipe_id: r.recipe_id, ingredient_item_id: ingId, quantity: qty })
-            }
-            isPending={m.isPending}
-          />
-        ))}
-      </div>
+      {grouped.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
+          <Package className="mx-auto h-10 w-10 text-muted-foreground/30" />
+          <p className="mt-2 text-sm text-muted-foreground">Sem receitas.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {grouped.map(([category, items]) => {
+            const cfg = (ARMORY_CAT_CONFIG as any)[category];
+            return (
+              <section key={category}>
+                <div className="mb-3">
+                  <CategoryHeader
+                    category={category}
+                    right={`${items.length} receita${items.length !== 1 ? "s" : ""}`}
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {items.map((r) => (
+                    <RecipeEditorCard
+                      key={r.recipe_id}
+                      r={r}
+                      editing={editing}
+                      setEditing={setEditing}
+                      onSave={(ingId, qty) =>
+                        m.mutate({ recipe_id: r.recipe_id, ingredient_item_id: ingId, quantity: qty })
+                      }
+                      isPending={m.isPending}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

@@ -15,11 +15,11 @@ export async function resolveCurrentMember(
 ): Promise<CurrentMember | null> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("discord_id")
+    .select("discord_id, display_name")
     .eq("user_id", userId)
     .maybeSingle();
   if (!profile?.discord_id) return null;
-  const m = await pgOne<{
+  let m = await pgOne<{
     id: number;
     discord_id: string | null;
     display_name: string | null;
@@ -31,9 +31,11 @@ export async function resolveCurrentMember(
     [profile.discord_id],
   );
   if (!m) return null;
+  const isMorador = m.role_label === "bairrista";
   return {
     ...m,
     is_manager: isManager(m),
     can_see_inventory: canSeeInventory(m),
+    is_morador: isMorador,
   };
 }
