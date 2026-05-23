@@ -382,29 +382,59 @@ function NewOrder() {
     enabled: open,
   });
   const items = (cat.data ?? []).filter((i: CatalogItem) => {
-    if (/mk2/i.test(i.name)) return false;
-    // Corpos sempre permitidos
-    if (i.category === "corpos") return true;
-    // Prints: apenas as de cores válidas (filtrar "Revolver" classificado como print na DB)
-    if (i.category === "prints") {
-      const n = i.name.toLowerCase();
-      // Rejeitar itens que NÃO são prints (ex: Revolver classificado como print na DB)
-      if (/revolver|pistola|rifle|smg|carabina|bullpup|shotgun|sniper|fuzil|colete|carregador|mira|silenciador|scope|grip|barrel|muzzle|extensivo|mag/.test(n)) return false;
-      return /laranja|azul|vermelh|amarel|dourad|orange|red|blue|yellow/.test(n);
-    }
-    // Armas Red/Orange (independentemente de side, pois na DB podem ter side=null)
-    if (i.category === "armas_red" || i.category === "armas_orange" || i.subcategory === "armas_red" || i.subcategory === "armas_orange") {
-      // Filtrar MK2 mas deixar passar todas as outras armas destas categorias
-      if (/mk2/i.test(i.name)) return false;
+    const n = i.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // Armas Orange (whitelist rigorosa)
+    if (
+      /\bmini smg\b/.test(n) ||
+      /\bxm3\b/.test(n) || /\bpistol xm3\b/.test(n) || /\bmachine pistol\b/.test(n) ||
+      /\bmicro smg\b/.test(n) ||
+      /\btec[-\s]?9\b/.test(n) || /\btec9\b/.test(n) ||
+      /\btec[-\s]?pistol\b/.test(n) || /\btecpistol\b/.test(n) ||
+      /\bap[-\s]?pistol\b/.test(n) || /\bappistol\b/.test(n)
+    ) {
+      // Rejeitar MK2 e Compact Rifle / Assault Shotgun
+      if (/mk2|compact rifle|assault shotgun/.test(n)) return false;
       return true;
     }
-    if (i.side !== "venda") return false;
-    if (i.subcategory === "armas_brancas") return false;
+
+    // Armas Red (whitelist rigorosa)
+    if (
+      /\bheavy[-\s]?pistol\b/.test(n) || /\bheavypistol\b/.test(n) ||
+      /\b\.50\b/.test(n) || /\bpistol[-\s]?\.50\b/.test(n) || /\bpistol50\b/.test(n) ||
+      /\bp90\b/.test(n) ||
+      /\bpdw\b/.test(n) || /\bcombat[-\s]?pdw\b/.test(n) ||
+      /\bbullpup\b/.test(n) || /\bbullpup[-\s]?rifle\b/.test(n) ||
+      /\bcarabina\b/.test(n) || /\bcarabina[-\s]?rifle\b/.test(n)
+    ) {
+      if (/mk2/.test(n)) return false;
+      return true;
+    }
+
     // Carregadores
-    if (i.subcategory === "carregadores" || i.subcategory === "municoes") return true;
-    // Coletes e acessórios (vão para o grupo Extras)
-    if (i.category === "coletes" || i.subcategory === "coletes") return true;
-    if (i.category === "acessorios" || i.category === "acessorios_armas" || i.subcategory === "acessorios" || i.subcategory === "acessorios_armas") return true;
+    if (/\bcarregador\b/.test(n) || /\bmagazine\b/.test(n)) {
+      if (/mk2/.test(n)) return false;
+      if (/orange/.test(n) || /red/.test(n) || /especial/.test(n) || /special/.test(n)) return true;
+      return false;
+    }
+
+    // Prints
+    if (/\bprint\b/.test(n) || /\bblueprint\b/.test(n) || /\besquema\b/.test(n)) {
+      if (/laranja|orange/.test(n) || /azul|blue/.test(n) || /vermelh|red/.test(n) || /amarel|yellow|dourad/.test(n)) return true;
+      return false;
+    }
+
+    // Corpos
+    if (/\bcorpo\b/.test(n) || /\bchassi\b/.test(n)) {
+      if (/mk2/.test(n)) return false;
+      if (/mini[-\s]?smg|micro[-\s]?smg|xm3|pistol[-\s]?xm3|tec[-\s]?9|tec9|tec[-\s]?pistol|tecpistol|ap[-\s]?pistol|appistol/.test(n)) return true;
+      return false;
+    }
+
+    // Extras: apenas Colete Padrão e attachments básicos
+    if (/\bcolete[-\s]?padrao\b/.test(n) || /\bcolete[-\s]?padrao\b/.test(n.replace(/padrao/, "padrão"))) return true;
+    if (/\bmira\b/.test(n) || /\bsilenciador\b/.test(n) || /\bscope\b/.test(n) || /\bgrip\b/.test(n) || /\bbarrel\b/.test(n) || /\bmuzzle\b/.test(n) || /\bextensivo\b/.test(n) || /\bmag[-\s]?expandido\b/.test(n)) return true;
+
     return false;
   });
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([
