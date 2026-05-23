@@ -192,7 +192,7 @@ export const getMember = createServerFn({ method: "GET" })
         `select
           coalesce((select count(*)::int from kill_logs where killer_id = $1), 0)
           + coalesce((select sum(kills)::int from operation_participants where member_id = $1), 0) as kills_total,
-          coalesce((select sum(deaths)::int from operation_participants where member_id = $1), 0) as deaths_total,
+          coalesce((select sum(deaths_count)::int from operation_participants where member_id = $1), 0) as deaths_total,
           coalesce((select count(distinct operation_id)::int from operation_participants where member_id = $1), 0) as saidas_total,
           coalesce((select count(*)::int from inventory_movements where member_id = $1 and movement_type = 'entrega_bairrista'), 0) as deliveries,
           coalesce((select count(*)::int from inventory_movements where member_id = $1 and movement_type = 'venda_bairrista'), 0) as sales,
@@ -256,7 +256,7 @@ export const getMemberStats = createServerFn({ method: "GET" })
       `select
         coalesce((select count(*)::int from kill_logs where killer_id = $1), 0)
         + coalesce((select sum(kills)::int from operation_participants where member_id = $1), 0) as kills_total,
-        coalesce((select sum(deaths)::int from operation_participants where member_id = $1), 0) as deaths_total,
+        coalesce((select sum(deaths_count)::int from operation_participants where member_id = $1), 0) as deaths_total,
         coalesce((select count(distinct operation_id)::int from operation_participants where member_id = $1), 0) as saidas_total,
         coalesce((select count(*)::int from inventory_movements where member_id = $1 and movement_type = 'entrega_bairrista'), 0) as deliveries,
         coalesce((select count(*)::int from inventory_movements where member_id = $1 and movement_type = 'venda_bairrista'), 0) as sales,
