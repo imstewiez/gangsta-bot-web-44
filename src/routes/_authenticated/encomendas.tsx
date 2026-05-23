@@ -388,7 +388,7 @@ function NewOrder() {
     // Prints: apenas as de cores válidas (filtrar "Revolver" classificado como print na DB)
     if (i.category === "prints") {
       const n = i.name.toLowerCase();
-      return /print/.test(n) && /laranja|azul|vermelh|amarel|dourad/.test(n);
+      return /laranja|azul|vermelh|amarel|dourad|orange|red|blue|yellow/.test(n);
     }
     if (i.side !== "venda") return false;
     if (i.subcategory === "armas_brancas") return false;

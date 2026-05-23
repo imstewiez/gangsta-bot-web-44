@@ -147,6 +147,7 @@ export const getMember = createServerFn({ method: "GET" })
     return { id };
   })
   .handler(async ({ data, context }): Promise<MemberDetail> => {
+    try {
     const id = data.id;
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const member = await pgOne<MemberRow>(
@@ -213,6 +214,9 @@ export const getMember = createServerFn({ method: "GET" })
       vendas: statsRow?.sales ?? 0,
       orders: statsRow?.orders ?? 0,
     };
+    } catch (e: any) {
+      return { member: null, contributions: [], recentMovements: [], kills: 0, deaths: 0, saidas: 0, deliveries: 0, vendas: 0, orders: 0, _debug: { error: e?.message ?? String(e), stack: e?.stack } };
+    }
   });
 
 export type MemberStats = {
