@@ -388,11 +388,15 @@ function NewOrder() {
     // Prints: apenas as de cores válidas (filtrar "Revolver" classificado como print na DB)
     if (i.category === "prints") {
       const n = i.name.toLowerCase();
+      // Rejeitar itens que NÃO são prints (ex: Revolver classificado como print na DB)
+      if (/revolver|pistola|rifle|smg|carabina|bullpup|shotgun|sniper|fuzil|colete|carregador|mira|silenciador|scope|grip|barrel|muzzle|extensivo|mag/.test(n)) return false;
       return /laranja|azul|vermelh|amarel|dourad|orange|red|blue|yellow/.test(n);
     }
     // Armas Red/Orange (independentemente de side, pois na DB podem ter side=null)
     if (i.category === "armas_red" || i.category === "armas_orange" || i.subcategory === "armas_red" || i.subcategory === "armas_orange") {
-      return isAllowedWeapon(i.name);
+      // Filtrar MK2 mas deixar passar todas as outras armas destas categorias
+      if (/mk2/i.test(i.name)) return false;
+      return true;
     }
     if (i.side !== "venda") return false;
     if (i.subcategory === "armas_brancas") return false;
