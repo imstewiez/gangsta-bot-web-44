@@ -153,8 +153,8 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertManager(context.supabase, context.userId);
-    // Ensure orders column exists (idempotent)
-    await pgQuery(`ALTER TABLE public.all_time_stats ADD COLUMN IF NOT EXISTS orders integer DEFAULT 0 NOT NULL`);
+    // Ensure all_time_stats row exists for this member
+    await pgQuery(`INSERT INTO all_time_stats (member_id, orders) VALUES ($1, 0) ON CONFLICT (member_id) DO NOTHING`, [data.id]);
     const reason = data.reason || "ajuste manual direção";
 
     // Kills
@@ -242,8 +242,6 @@ export const adminRecalcAllTimeStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertManager(context.supabase, context.userId);
-    await pgQuery(`ALTER TABLE public.all_time_stats ADD COLUMN IF NOT EXISTS orders integer DEFAULT 0 NOT NULL`);
-
     const result = await pgQuery<{ rows_updated: number }>(
       `with
        kills_logs_src as (

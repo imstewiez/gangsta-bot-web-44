@@ -4,31 +4,6 @@ import { pgQuery, pgOne, withClient } from "./pg.server";
 import { enqueueNotification } from "./notifier.server";
 import { resolveCurrentMember } from "./pricing.server";
 
-export type UnfinalizedSaida = {
-  id: number;
-  operation_type: string | null;
-  spot: string | null;
-  status: string;
-  scheduled_at: string | null;
-  participants: number;
-};
-
-export const listUnfinalizedSaidas = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<UnfinalizedSaida[]> => {
-    return pgQuery<UnfinalizedSaida>(
-      `select o.id, o.operation_type, o.spot,
-              coalesce(o.status, 'criada') as status,
-              coalesce(o.start_time, (o.date::timestamp + coalesce(o.scheduled_time, '00:00'::time))) as scheduled_at,
-              (select count(*)::int from operation_participants p where p.operation_id = o.id) as participants
-         from operations o
-        where o.deleted_at is null
-          and (o.status is null or o.status not in ('concluida','cancelada'))
-        order by coalesce(o.start_time, o.date::timestamp, o.created_at) desc
-        limit 100`,
-    );
-  });
-
 export type SaidaDetail = {
   operation: {
     id: number;

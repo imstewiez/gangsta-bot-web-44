@@ -97,57 +97,6 @@ export const listSaidas = createServerFn({ method: "GET" })
     }));
   });
 
-export type KillRow = {
-  id: number;
-  member_id: number | null;
-  member_name: string | null;
-  victim: string | null;
-  weapon: string | null;
-  notes: string | null;
-  created_at: string;
-};
-
-export const listKills = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<KillRow[]> => {
-    return pgQuery<KillRow>(
-      `select k.id, k.killer_id as member_id, m.display_name as member_name,
-              k.victim_name as victim, k.spot as weapon,
-              coalesce(k.notes, k.context) as notes, k.created_at
-       from kill_logs k
-       left join members m on m.id = k.killer_id
-       order by k.created_at desc
-       limit 100`,
-    );
-  });
-
-export type RankRow = {
-  member_id: number;
-  display_name: string | null;
-  nick: string | null;
-  score: number;
-  contribution: number | null;
-  performance: number | null;
-  reliability: number | null;
-};
-
-export const getWeeklyTop = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<RankRow[]> => {
-    return pgQuery<RankRow>(
-      `select wr.member_id, m.display_name, m.nickname as nick,
-              coalesce(wr.hybrid_score, wr.normalized_score, wr.performance_score, 0)::float as score,
-              wr.weighted_value::float as contribution,
-              wr.performance_score::float as performance,
-              wr.return_rate::float as reliability
-       from weekly_rankings wr
-       join members m on m.id = wr.member_id
-       where wr.week_start = (select max(week_start) from weekly_rankings)
-       order by score desc nulls last
-       limit 50`,
-    ).catch(() => []);
-  });
-
 export const addKill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(

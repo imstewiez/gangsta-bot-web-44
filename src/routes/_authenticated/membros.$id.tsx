@@ -72,7 +72,7 @@ function Page() {
           <p><strong>URL id:</strong> {id}</p>
           <p><strong>Number(id):</strong> {String(Number(id))}</p>
           <p><strong>data:</strong> {JSON.stringify(data, null, 2)}</p>
-          <p><strong>_debug:</strong> {JSON.stringify(data?._debug, null, 2)}</p>
+
         </div>
         <Link to="/membros" className="text-primary interactive-link cursor-pointer">
           Voltar

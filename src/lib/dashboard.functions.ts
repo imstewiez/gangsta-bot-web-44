@@ -297,41 +297,4 @@ export const getHomeKpis = createServerFn({ method: "GET" })
     };
   });
 
-// Kept for /admin (chefia-only) — full sensitive KPIs
-export type AdminKpis = {
-  totalMembers: number;
-  openSaidas: number;
-  pendingTagRequests: number;
-  totalStock: number;
-};
 
-export const getAdminKpis = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<AdminKpis> => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.is_manager) throw new Error("Sem permissão");
-    const [members, saidas, tags, stock] = await Promise.all([
-      pgOne<{ count: string }>(
-        `select count(*)::text as count from members
-         where deleted_at is null
-           and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')`,
-      ).catch(() => ({ count: "0" })),
-      pgOne<{ count: string }>(
-        `select count(*)::text as count from operations
-         where status in ('criada','trancagem','em_preparacao','em_curso','em_liquidacao')
-           and deleted_at is null`,
-      ).catch(() => ({ count: "0" })),
-      pgOne<{ count: string }>(
-        "select count(*)::text as count from tag_requests where status = 'pending'",
-      ).catch(() => ({ count: "0" })),
-      pgOne<{ total: string }>(
-        "select coalesce(sum(balance),0)::text as total from inventory_balance",
-      ).catch(() => ({ total: "0" })),
-    ]);
-    return {
-      totalMembers: Number(members?.count ?? 0),
-      openSaidas: Number(saidas?.count ?? 0),
-      pendingTagRequests: Number(tags?.count ?? 0),
-      totalStock: Number(stock?.total ?? 0),
-    };
-  });

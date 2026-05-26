@@ -268,8 +268,6 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<CraftFeasibilityBatch> => {
     try {
       const itemIds = data.lines.map((l) => l.item_id);
-      // debug: itemIds
-
       // Single query: recipes + ingredients for all requested items
       const rows = await pgQuery<{
         item_id: number;
@@ -294,8 +292,6 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         [itemIds],
       );
 
-      // debug: rows returned
-
       const recipeMap = new Map<number, { item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null }>();
       const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
       let dirty_money = 0;
@@ -305,9 +301,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
       for (const line of data.lines) {
         // Find recipe data for this line
         const recipeRows = rows.filter((r) => r.item_id === line.item_id);
-        // debug: line recipe info
         if (recipeRows.length === 0) {
-          // debug: skip no recipe
           continue;
         }
 
@@ -349,7 +343,6 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         ingredients: Array.from(allIngredients.values()),
         items,
       };
-      // debug: result
       return result;
     } catch (e: any) {
       console.error("[computeCraftFeasibilityBatch] ERROR:", e?.message ?? e);

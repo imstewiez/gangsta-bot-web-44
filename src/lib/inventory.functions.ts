@@ -124,14 +124,4 @@ export const getLedger = createServerFn({ method: "GET" })
     );
   });
 
-// Used by other pages (operações). No inventory gate.
-export const listMembersLite = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    return pgQuery<{ id: number; label: string }>(
-      `select id, coalesce(display_name, username, nickname, discord_id) as label
-       from members where deleted_at is null
-         and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')
-       order by label`,
-    );
-  });
+

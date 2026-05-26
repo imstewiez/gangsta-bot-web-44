@@ -25,7 +25,6 @@ import { Route as AuthenticatedInventarioRouteImport } from './routes/_authentic
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
 import { Route as AuthenticatedEncomendasRouteImport } from './routes/_authenticated/encomendas'
 import { Route as AuthenticatedDisponibilidadeRouteImport } from './routes/_authenticated/disponibilidade'
-import { Route as AuthenticatedDebugMemberRouteImport } from './routes/_authenticated/debug-member'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -116,12 +115,6 @@ const AuthenticatedDisponibilidadeRoute =
     path: '/disponibilidade',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedDebugMemberRoute =
-  AuthenticatedDebugMemberRouteImport.update({
-    id: '/debug-member',
-    path: '/debug-member',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -179,7 +172,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/debug-member': typeof AuthenticatedDebugMemberRoute
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
   '/entregas': typeof AuthenticatedEntregasRoute
@@ -206,7 +198,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/debug-member': typeof AuthenticatedDebugMemberRoute
   '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
   '/entregas': typeof AuthenticatedEntregasRoute
@@ -233,7 +224,6 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/debug-member': typeof AuthenticatedDebugMemberRoute
   '/_authenticated/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/_authenticated/encomendas': typeof AuthenticatedEncomendasRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
@@ -262,7 +252,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditoria'
     | '/dashboard'
-    | '/debug-member'
     | '/disponibilidade'
     | '/encomendas'
     | '/entregas'
@@ -289,7 +278,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditoria'
     | '/dashboard'
-    | '/debug-member'
     | '/disponibilidade'
     | '/encomendas'
     | '/entregas'
@@ -315,7 +303,6 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/auditoria'
     | '/_authenticated/dashboard'
-    | '/_authenticated/debug-member'
     | '/_authenticated/disponibilidade'
     | '/_authenticated/encomendas'
     | '/_authenticated/entregas'
@@ -458,13 +445,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDisponibilidadeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/debug-member': {
-      id: '/_authenticated/debug-member'
-      path: '/debug-member'
-      fullPath: '/debug-member'
-      preLoaderRoute: typeof AuthenticatedDebugMemberRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -577,7 +557,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAuditoriaRoute: typeof AuthenticatedAuditoriaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedDebugMemberRoute: typeof AuthenticatedDebugMemberRoute
   AuthenticatedDisponibilidadeRoute: typeof AuthenticatedDisponibilidadeRoute
   AuthenticatedEncomendasRoute: typeof AuthenticatedEncomendasRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
@@ -596,7 +575,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAuditoriaRoute: AuthenticatedAuditoriaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedDebugMemberRoute: AuthenticatedDebugMemberRoute,
   AuthenticatedDisponibilidadeRoute: AuthenticatedDisponibilidadeRoute,
   AuthenticatedEncomendasRoute: AuthenticatedEncomendasRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
