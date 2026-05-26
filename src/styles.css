@@ -58,20 +58,20 @@
 
 :root {
   --radius: 0.625rem;
-  /* Ballas Gang — Cinematic Noir (deeper blacks, restrained violet) */
-  --background: oklch(0.09 0.018 300);
+  /* Ballas Gang — deep violet underworld */
+  --background: oklch(0.12 0.025 300);
   --foreground: oklch(0.97 0.005 300);
-  --card: oklch(0.14 0.025 300);
+  --card: oklch(0.17 0.035 300);
   --card-foreground: oklch(0.97 0.005 300);
-  --popover: oklch(0.13 0.028 300);
+  --popover: oklch(0.15 0.035 300);
   --popover-foreground: oklch(0.97 0.005 300);
-  --primary: oklch(0.62 0.22 300);
-  --primary-foreground: oklch(0.99 0.005 300);
-  --secondary: oklch(0.20 0.035 300);
+  --primary: oklch(0.55 0.22 300);
+  --primary-foreground: oklch(0.98 0.01 300);
+  --secondary: oklch(0.24 0.045 300);
   --secondary-foreground: oklch(0.94 0.005 300);
-  --muted: oklch(0.18 0.025 300);
+  --muted: oklch(0.22 0.030 300);
   --muted-foreground: oklch(0.72 0.025 300);
-  --accent: oklch(0.28 0.070 300);
+  --accent: oklch(0.32 0.080 300);
   --accent-foreground: oklch(0.96 0.005 300);
   --destructive: oklch(0.55 0.24 25);
   --destructive-foreground: oklch(0.98 0.01 90);
@@ -184,34 +184,18 @@
   }
 }
 
-/* Layered card with refined cinematic frame */
+/* Layered card with soft inner highlight */
 .card-frame {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--card) 94%, transparent),
-      color-mix(in oklab, var(--card) 78%, transparent)
-    );
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card) 92%, transparent),
+    color-mix(in oklab, var(--card) 80%, transparent)
+  );
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
   box-shadow:
     var(--shadow-deep),
-    inset 0 1px 0 color-mix(in oklab, white 5%, transparent),
-    inset 0 0 0 1px color-mix(in oklab, white 1.5%, transparent);
-  backdrop-filter: blur(10px) saturate(1.05);
-  position: relative;
-}
-.card-frame::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(
-    120% 60% at 50% -10%,
-    color-mix(in oklab, var(--primary) 7%, transparent) 0%,
-    transparent 60%
-  );
-  opacity: 0.6;
+    inset 0 1px 0 color-mix(in oklab, white 6%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 /* Top hairline — cinematic divider */
@@ -535,119 +519,3 @@ svg.lucide {
     0 0 20px -6px color-mix(in oklab, var(--primary) 50%, transparent);
 }
 
-
-/* ───────── Cinematic Noir — uniform polish ───────── */
-
-/* Section spacer with hairline divider */
-.section-divider {
-  position: relative;
-  margin: 3rem 0 1.5rem;
-}
-.section-divider::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklab, var(--primary) 40%, transparent) 20%,
-    color-mix(in oklab, var(--primary) 40%, transparent) 80%,
-    transparent
-  );
-}
-
-/* Sober refined interactive card (overrides earlier rule for less neon) */
-.interactive-card {
-  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 0.4s ease,
-    border-color 0.4s ease;
-}
-.interactive-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in oklab, var(--primary) 38%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--primary) 18%, transparent),
-    0 18px 40px -18px oklch(0 0 0 / 0.7),
-    0 0 32px -16px color-mix(in oklab, var(--primary) 50%, transparent);
-}
-
-/* Tables — uniform cinematic feel */
-table {
-  font-variant-numeric: tabular-nums;
-}
-thead {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--secondary) 80%, transparent),
-    color-mix(in oklab, var(--secondary) 60%, transparent)
-  ) !important;
-  border-bottom: 1px solid color-mix(in oklab, var(--primary) 25%, transparent);
-}
-tbody tr {
-  transition: background-color 0.18s ease;
-}
-tbody tr:hover {
-  background-color: color-mix(in oklab, var(--primary) 5%, transparent);
-}
-
-/* Inputs / Buttons subtle refinement */
-input, textarea, select {
-  background-color: color-mix(in oklab, var(--input) 70%, transparent) !important;
-  border-color: color-mix(in oklab, var(--border) 70%, transparent) !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-}
-input:focus, textarea:focus, select:focus {
-  border-color: color-mix(in oklab, var(--primary) 60%, transparent) !important;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent);
-}
-
-/* Tabs — cinematic underline */
-[role="tablist"] [data-state="active"] {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--primary) 18%, transparent),
-    color-mix(in oklab, var(--primary) 6%, transparent)
-  );
-  color: var(--foreground);
-  box-shadow: inset 0 -2px 0 var(--primary);
-}
-
-/* Badges polish */
-[data-slot="badge"], .badge {
-  letter-spacing: 0.08em;
-}
-
-/* Reveal staggered children */
-.reveal-stagger > * {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
-    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.reveal-stagger.is-visible > *,
-.reveal-stagger > *.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-.reveal-stagger.is-visible > *:nth-child(1) { transition-delay: 0.00s; }
-.reveal-stagger.is-visible > *:nth-child(2) { transition-delay: 0.06s; }
-.reveal-stagger.is-visible > *:nth-child(3) { transition-delay: 0.12s; }
-.reveal-stagger.is-visible > *:nth-child(4) { transition-delay: 0.18s; }
-.reveal-stagger.is-visible > *:nth-child(5) { transition-delay: 0.24s; }
-.reveal-stagger.is-visible > *:nth-child(6) { transition-delay: 0.30s; }
-
-/* Subtle parallax-on-scroll helper (applied via JS-set CSS var --sy) */
-.parallax-slow { transform: translate3d(0, calc(var(--sy, 0) * 0.04px), 0); }
-.parallax-mid  { transform: translate3d(0, calc(var(--sy, 0) * 0.08px), 0); }
-
-/* Respect reduced motion globally */
-@media (prefers-reduced-motion: reduce) {
-  .reveal, .reveal-stagger > *,
-  .animate-rise, .animate-float-slow, .animate-pulse-glow, .animate-bounce-slow {
-    animation: none !important;
-    transition: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-}

@@ -11,7 +11,6 @@ export type AdminRecipeRow = {
   subcategory: string | null;
   recipe_category: string | null;
   tier: string | null;
-  min_sale_price: number | null;
   ingredients: Array<{
     item_id: number;
     name: string;
@@ -27,7 +26,6 @@ export type AdminItemRow = {
   subcategory: string | null;
   estimated_value: number | null;
   purchase_price: number | null;
-  min_sale_price: number | null;
   unit: string | null;
 };
 
@@ -75,7 +73,6 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
           subcategory: r.subcategory,
           recipe_category: r.recipe_category,
           tier: r.tier,
-          min_sale_price: null,
           ingredients: [],
         };
         map.set(r.recipe_id, recipe);
