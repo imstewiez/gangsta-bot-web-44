@@ -139,13 +139,7 @@ export function AppSidebar() {
                     return (
                       <SidebarMenuItem key={it.to}>
                         <SidebarMenuButton asChild isActive={active} tooltip={it.label}>
-                          <Link to={it.to} className="relative flex items-center gap-2.5">
-                            {active && (
-                              <span
-                                aria-hidden
-                                className="absolute -left-2 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-gradient-to-b from-primary to-blood shadow-[0_0_8px_var(--primary)]"
-                              />
-                            )}
+                          <Link to={it.to} className="flex items-center gap-2.5">
                             <it.icon className="h-4 w-4 shrink-0" />
                             <span className="text-display text-[12px] tracking-[0.12em]">
                               {it.label}
