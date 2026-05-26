@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { ARMORY_CAT_ORDER, ARMORY_CAT_CONFIG, itemDisplayCategory } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/admin/receitas")({
   beforeLoad: async () => {
@@ -164,7 +165,7 @@ function RecipeEditorCard({
   isPending: boolean;
 }) {
   return (
-    <Card>
+    <Card className="interactive-card">
       <CardHeader className="pb-2">
         <CardTitle className="text-display text-sm flex items-center gap-2">
           {r.item_name}

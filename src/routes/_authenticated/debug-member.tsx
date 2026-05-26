@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/debug-member")({
   component: Page,
@@ -48,7 +49,7 @@ function Page() {
 
       {data && (
         <div className="space-y-4">
-          <Card>
+          <Card className="interactive-card">
             <CardHeader>
               <CardTitle>
                 Member: {data.member_name} (ID: {data.member_id})
@@ -63,7 +64,7 @@ function Page() {
           </Card>
 
           {data.orders_rows.length > 0 && (
-            <Card>
+            <Card className="interactive-card">
               <CardHeader>
                 <CardTitle>Orders</CardTitle>
               </CardHeader>
@@ -74,7 +75,7 @@ function Page() {
           )}
 
           {data.movements_rows.length > 0 && (
-            <Card>
+            <Card className="interactive-card">
               <CardHeader>
                 <CardTitle>All Movements</CardTitle>
               </CardHeader>

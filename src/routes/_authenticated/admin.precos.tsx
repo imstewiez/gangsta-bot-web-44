@@ -22,6 +22,7 @@ import { fmtNum, fmtPrice } from "@/lib/domain";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { itemDisplayCategory } from "@/lib/armory.catalog";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/admin/precos")({
   beforeLoad: async () => {
@@ -151,7 +152,7 @@ function PriceCard({
   const isEditingPp = editing.has(ppKey);
 
   return (
-    <Card>
+    <Card className="interactive-card">
       <CardHeader className="pb-2">
         <CardTitle className="text-display text-sm">{item.name}</CardTitle>
       </CardHeader>

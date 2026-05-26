@@ -22,6 +22,7 @@ import redwoodLogo from "@/assets/ballas-logo.png";
 import { toast } from "sonner";
 import { SaidaWizard } from "@/components/operations/SaidaWizard";
 import type { SaidaFilter } from "@/components/operations/SaidaFilters";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/operacoes/")({
   component: Page,

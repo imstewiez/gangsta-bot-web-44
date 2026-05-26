@@ -31,6 +31,7 @@ import { SaidaTimeline } from "@/components/operations/SaidaTimeline";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Reveal } from "@/components/layout/Reveal";
 import {
   ArrowLeft,
   Crosshair,

@@ -17,6 +17,7 @@ import { Package, History, Pencil, Check, X, Loader2 } from "lucide-react";
 import { AccessDenied } from "@/components/domain/AccessDenied";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
+import { Reveal } from "@/components/layout/Reveal";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
@@ -239,7 +240,7 @@ function StockTable({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  <tr>
+                  <tr className="interactive-row">
                     <th className="px-3 py-2 text-left">Item</th>
                     <th className="px-3 py-2 text-right">Em casa</th>
                     <th className="px-3 py-2 text-right">Preço unid.</th>
@@ -363,7 +364,7 @@ function LedgerTable() {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <tr>
+          <tr className="interactive-row">
             <th className="px-3 py-2 text-left">Data</th>
             <th className="px-3 py-2 text-left">Tipo</th>
             <th className="px-3 py-2 text-left">Item</th>

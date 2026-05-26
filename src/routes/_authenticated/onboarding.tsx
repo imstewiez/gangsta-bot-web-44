@@ -24,6 +24,7 @@ import {
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {

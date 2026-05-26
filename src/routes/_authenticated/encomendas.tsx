@@ -52,6 +52,7 @@ import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { FadeIn } from "@/components/layout/FadeIn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({
   errorComponent: PageErrorBoundary,

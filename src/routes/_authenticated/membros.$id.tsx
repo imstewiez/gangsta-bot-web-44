@@ -25,6 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({
   head: () => ({
@@ -165,13 +166,13 @@ function Page() {
         <StatCard icon={Truck} label="Entregas" value={data.deliveries} tone="success" />
         <StatCard icon={Coins} label="Vendas" value={data.vendas} tone="warning" />
         <StatCard icon={ShoppingBag} label="Encomendas" value={data.orders} tone="accent" />
-        <Card>
+        <Card className="interactive-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Entrou</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">{fmtDate(m.joined_at)}</CardContent>
         </Card>
-        <Card>
+        <Card className="interactive-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Discord ID</CardTitle>
           </CardHeader>
@@ -180,7 +181,7 @@ function Page() {
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="interactive-card">
           <CardHeader>
             <CardTitle className="text-display text-sm">Contribuições</CardTitle>
           </CardHeader>
@@ -202,7 +203,7 @@ function Page() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="interactive-card">
           <CardHeader>
             <CardTitle className="text-display text-sm">Movimentos recentes</CardTitle>
           </CardHeader>
@@ -276,7 +277,7 @@ function StatCard({
     accent: "text-accent-foreground",
   };
   return (
-    <Card>
+    <Card className="interactive-card">
       <CardContent className="flex items-center gap-3 p-4">
         <div className={`rounded-sm border border-border/60 bg-secondary/30 p-2 ${toneMap[tone] ?? "text-foreground"}`}>
           <Icon className="h-5 w-5" />

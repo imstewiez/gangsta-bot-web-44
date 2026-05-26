@@ -39,6 +39,7 @@ import {
   isAllowedOrangeWeapon,
 } from "@/lib/armory.catalog";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/precario")({
   head: () => ({
@@ -234,7 +235,7 @@ function BuyTable({
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <tr>
+            <tr className="interactive-row">
               <th className="px-3 py-2 text-left">Item</th>
               <th className="px-3 py-2 text-center">Pontos</th>
               {isDrogas ? (
@@ -285,7 +286,7 @@ function SellTable({
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <tr>
+            <tr className="interactive-row">
               <th className="px-3 py-2 text-left">Item</th>
               <th className="px-3 py-2 text-right">Preço</th>
               <th className="px-3 py-2 text-center w-10"></th>
@@ -417,7 +418,7 @@ function SellRow({
         </td>
       </tr>
       {expanded && recipe && recipe.ingredients.length > 0 && (
-        <tr>
+        <tr className="interactive-row">
           <td colSpan={3} className="px-3 py-2 bg-muted/20 border-t border-border/50">
             <div className="text-xs space-y-1">
               <div className="text-muted-foreground font-medium mb-1.5 flex items-center gap-1.5">

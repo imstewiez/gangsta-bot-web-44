@@ -55,6 +55,7 @@ import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
 import { FadeIn } from "@/components/layout/FadeIn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/entregas")({
   component: Page,

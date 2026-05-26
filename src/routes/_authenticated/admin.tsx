@@ -16,6 +16,7 @@ import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layo
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   errorComponent: PageErrorBoundary,
@@ -144,7 +145,7 @@ function AdminPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="interactive-card">
         <CardHeader>
           <CardTitle className="text-display text-sm">
             Utilizadores da app

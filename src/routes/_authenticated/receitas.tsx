@@ -47,6 +47,7 @@ import {
   isAllowedWeapon,
 } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/receitas")({
   head: () => ({

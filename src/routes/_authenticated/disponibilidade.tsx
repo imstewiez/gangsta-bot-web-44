@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/disponibilidade")({
   errorComponent: PageErrorBoundary,
@@ -45,7 +46,7 @@ function Page() {
         description="Disponibilidade diária"
       />
       <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
+        <Card className="interactive-card">
           <CardHeader>
             <CardTitle className="text-display text-sm">Sessões</CardTitle>
           </CardHeader>
@@ -85,7 +86,7 @@ function Page() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="interactive-card">
           <CardHeader>
             <CardTitle className="text-display text-sm">
               Votos {openId ? `(sessão #${openId})` : ""}

@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { Reveal } from "@/components/layout/Reveal";
 
 /* ────────────── ACTION META ────────────── */
 const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: string; category: string }> = {
