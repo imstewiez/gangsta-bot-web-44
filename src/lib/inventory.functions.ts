@@ -30,7 +30,6 @@ export type StockRow = {
   item_name: string;
   category: string | null;
   subcategory: string | null;
-  tier: string | null;
   qty: number;
   unit_price: number | null;
 };
@@ -40,7 +39,7 @@ export const getStock = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<StockRow[]> => {
     await gateInventory(context.supabase, context.userId);
     return pgQuery<StockRow>(
-      `select i.id as item_id, i.name as item_name, i.category, i.subcategory, i.tier,
+      `select i.id as item_id, i.name as item_name, i.category, i.subcategory,
               coalesce(ib.balance, 0)::float as qty,
               coalesce(i.purchase_price, 0)::float as unit_price
        from items i
@@ -50,7 +49,6 @@ export const getStock = createServerFn({ method: "GET" })
          and (
            i.category = any($1::text[])
            or i.subcategory in ('corpos','prints')
-           or i.tier in ('azul','vermelha','amarela','laranja','orange','red')
          )
        order by unit_price desc nulls last`,
       [INV_CATEGORIES],
@@ -109,7 +107,7 @@ export const getLedger = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
     const params: unknown[] = [data.limit, INV_CATEGORIES];
-    let where = "where (i.category = any($2::text[]) or i.subcategory in ('corpos','prints'))";
+    let where = "where i.category = any($2::text[])";
     if (data.type) {
       params.push(data.type);
       where += ` and im.movement_type = $${params.length}`;

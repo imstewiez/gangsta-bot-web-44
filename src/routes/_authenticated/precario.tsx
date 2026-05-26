@@ -97,7 +97,7 @@ function Page() {
   const grouped = useMemo(() => {
     const out: Record<string, CatalogItem[]> = {};
     for (const it of cat.data ?? []) {
-      const k = itemDisplayCategory(it.name, it.category, it.subcategory, it.tier);
+      const k = itemDisplayCategory(it.name, it.category, it.subcategory);
       (out[k] ||= []).push(it);
     }
     return out;
@@ -125,7 +125,7 @@ function Page() {
 
   function vendaItemsForGroup(catKey: string): CatalogItem[] {
     return (cat.data ?? []).filter((it) => {
-      const c = itemDisplayCategory(it.name, it.category, it.subcategory, it.tier);
+      const c = itemDisplayCategory(it.name, it.category, it.subcategory);
       // Esconder categorias não usadas na venda
       if (c === "outros" || c === "armas_brancas") return false;
       // Apenas colete padrão

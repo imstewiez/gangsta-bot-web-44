@@ -313,6 +313,12 @@ export const RED_WEAPON_NAMES = [
   "P90",
   "Bullpup Rifle",
   "Carabina Rifle",
+  "Carabina Especial",
+  "Bullpup",
+  "PDW",
+  "Gadget Pistol",
+  "Compact Pistol",
+  ".50",
 ];
 
 export const ORANGE_WEAPON_NAMES = [
@@ -322,6 +328,12 @@ export const ORANGE_WEAPON_NAMES = [
   "TEC 9",
   "TEC Pistol",
   "AP Pistol",
+  "Machine Pistol",
+  "Compact Rifle",
+  "SNS Pistol",
+  "Assault Shotgun",
+  "Heavy Shotgun",
+  "Gusenberg",
 ];
 
 export function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
@@ -359,12 +371,10 @@ export function itemDisplayCategory(
   itemName: string,
   category: string | null,
   subcategory: string | null,
-  tier?: string | null,
 ): ArmoryCategory {
   const name = itemName.toLowerCase();
   const sub = subcategory;
   const cat = category;
-  const t = tier?.toLowerCase() ?? "";
 
   // 0. Revolver é excluído explicitamente
   if (name === "revolver") return "outros";
@@ -380,18 +390,8 @@ export function itemDisplayCategory(
     return "carregadores";
   }
 
-  // 2. Armas — usar tier da receita como fonte de verdade quando disponível
-  // Tier vermelha/amarela/azul = red; tier laranja = orange
-  const tierIsRed = t === "vermelha" || t === "amarela" || t === "azul" || t === "red";
-  const tierIsOrange = t === "laranja" || t === "orange";
-
-  // Armas com tier red/orange na DB (mesmo que category='prints')
-  if (tierIsRed || tierIsOrange) {
-    if (tierIsOrange) return "armas_orange";
-    return "armas_red";
-  }
-
-  // Verificar pelo nome se é uma arma permitida
+  // 2. Armas (ANTES de corpos/prints — algumas armas têm category="prints" na DB)
+  // Verificar primeiro pelo nome se é uma arma permitida
   if (isAllowedWeapon(itemName, sub)) {
     if (isOrangeWeapon(itemName)) return "armas_orange";
     return "armas_red";
