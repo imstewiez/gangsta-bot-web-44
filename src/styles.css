@@ -58,20 +58,20 @@
 
 :root {
   --radius: 0.625rem;
-  /* Ballas Gang — deep violet underworld */
-  --background: oklch(0.12 0.025 300);
+  /* Ballas Gang — Cinematic Noir (deeper blacks, restrained violet) */
+  --background: oklch(0.09 0.018 300);
   --foreground: oklch(0.97 0.005 300);
-  --card: oklch(0.17 0.035 300);
+  --card: oklch(0.14 0.025 300);
   --card-foreground: oklch(0.97 0.005 300);
-  --popover: oklch(0.15 0.035 300);
+  --popover: oklch(0.13 0.028 300);
   --popover-foreground: oklch(0.97 0.005 300);
-  --primary: oklch(0.55 0.22 300);
-  --primary-foreground: oklch(0.98 0.01 300);
-  --secondary: oklch(0.24 0.045 300);
+  --primary: oklch(0.62 0.22 300);
+  --primary-foreground: oklch(0.99 0.005 300);
+  --secondary: oklch(0.20 0.035 300);
   --secondary-foreground: oklch(0.94 0.005 300);
-  --muted: oklch(0.22 0.030 300);
+  --muted: oklch(0.18 0.025 300);
   --muted-foreground: oklch(0.72 0.025 300);
-  --accent: oklch(0.32 0.080 300);
+  --accent: oklch(0.28 0.070 300);
   --accent-foreground: oklch(0.96 0.005 300);
   --destructive: oklch(0.55 0.24 25);
   --destructive-foreground: oklch(0.98 0.01 90);
@@ -184,18 +184,34 @@
   }
 }
 
-/* Layered card with soft inner highlight */
+/* Layered card with refined cinematic frame */
 .card-frame {
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--card) 92%, transparent),
-    color-mix(in oklab, var(--card) 80%, transparent)
-  );
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--card) 94%, transparent),
+      color-mix(in oklab, var(--card) 78%, transparent)
+    );
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
   box-shadow:
     var(--shadow-deep),
-    inset 0 1px 0 color-mix(in oklab, white 6%, transparent);
-  backdrop-filter: blur(8px);
+    inset 0 1px 0 color-mix(in oklab, white 5%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, white 1.5%, transparent);
+  backdrop-filter: blur(10px) saturate(1.05);
+  position: relative;
+}
+.card-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 60% at 50% -10%,
+    color-mix(in oklab, var(--primary) 7%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: 0.6;
 }
 
 /* Top hairline — cinematic divider */
