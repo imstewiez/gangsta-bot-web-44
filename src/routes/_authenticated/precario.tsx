@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { listRecipes, type RecipeRow } from "@/lib/recipes.functions";
 import { updateItemPrice } from "@/lib/recipes.admin.functions";
-import { fixItems } from "@/lib/fix-items.functions";
+
 import {
   TIER_LABELS,
   itemPoints,
@@ -56,26 +56,6 @@ const COMPRA_GROUPS: { key: string; label: string }[] = [
   { key: "materiais_craft", label: "Materiais de Craft" },
   { key: "drogas", label: "Drogas" },
 ];
-
-function FixItemsButton() {
-  const fn = useAuthedServerFn(fixItems);
-  const qc = useQueryClient();
-  const m = useMutation({
-    mutationFn: () => fn(),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["catalog"] });
-      alert(`Atualizado! ${data.updated} itens:\n${data.items.join("\n")}`);
-    },
-    onError: (err) => {
-      alert("Erro: " + (err instanceof Error ? err.message : String(err)));
-    },
-  });
-  return (
-    <Button size="sm" variant="destructive" onClick={() => m.mutate()} disabled={m.isPending}>
-      {m.isPending ? "A atualizar..." : "FIX ITENS"}
-    </Button>
-  );
-}
 
 function Page() {
   useRealtimeSync([
@@ -146,7 +126,6 @@ function Page() {
       {isManager && (
         <Reveal direction="up" delay={50}>
           <div className="mb-4 flex justify-end gap-2">
-            <FixItemsButton />
             <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
               <Pencil className="mr-1 h-3.5 w-3.5" />
               {editMode ? "Concluir" : "Editar preços"}

@@ -5,13 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { checkManagerAccess } from "@/lib/access-check.functions";
 import { listAppUsers, setUserRole } from "@/lib/admin.functions";
-import { adminRecalcAllTimeStats, adminImportMissingMembers } from "@/lib/member-admin.functions";
+
 import { PageHeader } from "@/components/layout/AppShell";
 import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Shield, ShieldOff, Calculator, Users } from "lucide-react";
+import { Shield, ShieldOff } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
@@ -36,29 +36,9 @@ function AdminPage() {
   const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
   const listFn = useAuthedServerFn(listAppUsers);
   const setFn = useAuthedServerFn(setUserRole);
-  const recalcFn = useAuthedServerFn(adminRecalcAllTimeStats);
-  const importFn = useAuthedServerFn(adminImportMissingMembers);
   const qc = useQueryClient();
   const users = useQuery({ queryKey: ["appUsers"], queryFn: () => listFn() });
-  const recalcM = useMutation({
-    mutationFn: () => recalcFn(),
-    onSuccess: (res) => {
-      toast.success(`all_time_stats recalculado — ${res.rows_updated} membros atualizados`);
-      qc.invalidateQueries({ queryKey: ["membersWithStats"] });
-      qc.invalidateQueries({ queryKey: ["member"] });
-      qc.invalidateQueries({ queryKey: ["leaderboard"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const importM = useMutation({
-    mutationFn: () => importFn(),
-    onSuccess: (res) => {
-      toast.success(`${res.created} membros importados (${res.totalMissing} em falta)`);
-      qc.invalidateQueries({ queryKey: ["members"] });
-      qc.invalidateQueries({ queryKey: ["appUsers"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+
   const m = useMutation({
     mutationFn: (v: {
       user_id: string;
@@ -105,48 +85,6 @@ function AdminPage() {
         title="Definições"
         description="Gerir permissões e sincronizar dados"
       />
-      <Reveal direction="up">
-        <Card className="mb-6 interactive-card">
-          <CardHeader>
-            <CardTitle className="text-display text-sm">
-              Sincronização de dados
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Recalcula <code className="text-xs bg-muted px-1 rounded">all_time_stats</code> a partir das tabelas fonte
-                (kill_logs, operations, inventory_movements, orders). Use isto se os kills ou stats de um membro
-                parecerem desactualizados no perfil vs leaderboard.
-              </p>
-              <ButtonLoading
-                size="sm"
-                loading={recalcM.isPending}
-                onClick={() => recalcM.mutate()}
-              >
-                <Calculator className="mr-1 h-3 w-3" />
-                Recalcular all_time_stats
-              </ButtonLoading>
-            </div>
-            <div className="border-t border-border pt-4">
-              <p className="text-sm text-muted-foreground mb-3">
-                Importa membros que fizeram login na app (têm perfil Discord) mas ainda não têm registo na tabela
-                <code className="text-xs bg-muted px-1 rounded">members</code>. Isto acontece quando alguém entra no
-                Discord e faz login na app antes de ser aprovado no onboarding.
-              </p>
-              <ButtonLoading
-                size="sm"
-                loading={importM.isPending}
-                onClick={() => importM.mutate()}
-              >
-                <Users className="mr-1 h-3 w-3" />
-                Importar membros em falta
-              </ButtonLoading>
-            </div>
-          </CardContent>
-        </Card>
-      </Reveal>
-
       <Reveal direction="up" delay={150}>
         <Card className="interactive-card">
           <CardHeader>
