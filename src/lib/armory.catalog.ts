@@ -327,12 +327,16 @@ export const ORANGE_WEAPON_NAMES = [
 export function isAllowedRedWeapon(name: string | null): boolean {
   if (!name) return false;
   const n = name.toLowerCase();
+  // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
+  if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
   return RED_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
 }
 
 export function isAllowedOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
   const n = name.toLowerCase();
+  // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
+  if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
   return ORANGE_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
 }
 

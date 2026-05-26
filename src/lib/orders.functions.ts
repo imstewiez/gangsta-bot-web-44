@@ -41,9 +41,10 @@ type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { scope?: "mine" | "manage"; status?: string | null }) => ({
+    (d: { scope?: "mine" | "manage"; status?: string | null; statuses?: string[] | null }) => ({
       scope: d?.scope ?? "mine",
       status: d?.status ?? null,
+      statuses: Array.isArray(d?.statuses) && d.statuses.length > 0 ? d.statuses : null,
     }),
   )
   .handler(async ({ data, context }): Promise<OrderRow[]> => {
@@ -59,7 +60,10 @@ export const listOrders = createServerFn({ method: "GET" })
       // manage scope: only managers
       if (!me?.is_manager) return [];
     }
-    if (data.status) {
+    if (data.statuses) {
+      params.push(data.statuses);
+      conds.push(`o.status = ANY($${params.length})`);
+    } else if (data.status) {
       params.push(data.status);
       conds.push(`o.status = $${params.length}`);
     }
@@ -371,6 +375,71 @@ export const transitionOrder = createServerFn({ method: "POST" })
             link: "/entregas",
           });
         }
+        return { ok: true as const };
+      } catch (e) {
+        await c.query("rollback").catch(() => null);
+        throw e;
+      }
+    });
+  });
+
+
+export const cancelOwnOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { id: number }) => {
+      const id = Number(d.id);
+      if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
+      return { id };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Não tens conta de membro associada.");
+
+    return withClient(async (c) => {
+      await c.query("begin");
+      try {
+        const beforeRes = await c.query(
+          `select o.status, o.member_id, o.item_id, i.name as item_name
+           from orders o left join items i on i.id = o.item_id where o.id = $1`,
+          [data.id],
+        );
+        const before = beforeRes.rows[0] as
+          | {
+              status: string;
+              member_id: number;
+              item_id: number | null;
+              item_name: string | null;
+            }
+          | undefined;
+        if (!before) throw new Error("Encomenda não encontrada");
+        if (before.member_id !== me.id) throw new Error("Não podes cancelar encomendas de outrem.");
+
+        const alreadyFinal = ["fulfilled", "denied", "cancelled"].includes(before.status);
+        if (alreadyFinal) throw new Error("Esta encomenda já está finalizada.");
+
+        await c.query(
+          `update orders set status='cancelled', updated_at=now(), updated_by=$2,
+             resolved_at = now()
+           where id=$1`,
+          [data.id, `web:${context.userId}`],
+        );
+        await c.query(
+          `insert into order_status_history (order_id, old_status, new_status, changed_by, notes, created_at)
+           values ($1, $2, 'cancelled', $3, $4, now())`,
+          [data.id, before.status, `web:${context.userId}`, "Cancelado pelo utilizador"],
+        );
+        await c.query("commit");
+
+        // notify managers
+        await notifyManagers(context.supabase, {
+          type: "order_cancelled",
+          title: "Encomenda cancelada",
+          body: `${me.display_name ?? "Membro"} cancelou a encomenda #${data.id} (${before.item_name ?? "item"}).`,
+          link: "/entregas",
+        });
+
         return { ok: true as const };
       } catch (e) {
         await c.query("rollback").catch(() => null);

@@ -6,6 +6,7 @@ import {
   listOrders,
   createOrder,
   transitionOrder,
+  cancelOwnOrder,
 } from "@/lib/orders.functions";
 import { computeCraftFeasibilityBatch } from "@/lib/recipes.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
@@ -43,7 +44,7 @@ import {
   isAllowedWeapon,
 } from "@/lib/armory.catalog";
 import { toast } from "sonner";
-import { Plus, ShoppingBag, Trash2, Package, Banknote } from "lucide-react";
+import { Plus, ShoppingBag, Trash2, Package, Banknote, X } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
@@ -96,6 +97,9 @@ const NEXT_STATES: Record<
   ready: [{ to: "fulfilled", label: "Entregue" }],
 };
 
+const ACTIVE_STATUSES = ["pending", "approved", "in_progress", "ready"];
+const ARCHIVED_STATUSES = ["fulfilled", "denied", "cancelled"];
+
 function Page() {
   useRealtimeSync([
     { table: "orders", queryKeys: [["orders"], ["stock"], ["my-xp"]] },
@@ -104,6 +108,8 @@ function Page() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;
   const [tab, setTab] = useState<string>("mine");
+  const [mineSub, setMineSub] = useState<string>("active");
+  const [manageSub, setManageSub] = useState<string>("active");
 
   return (
     <>
@@ -116,19 +122,41 @@ function Page() {
       />
       <FadeIn>
         <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="mine" className="interactive-tab">As minhas</TabsTrigger>
-          {isManager && <TabsTrigger value="manage" className="interactive-tab">Para tratar</TabsTrigger>}
-        </TabsList>
-        <TabsContent value="mine" className="mt-4">
-          <OrdersList scope="mine" canManage={false} />
-        </TabsContent>
-        {isManager && (
-          <TabsContent value="manage" className="mt-4">
-            <OrdersList scope="manage" canManage />
+          <TabsList>
+            <TabsTrigger value="mine" className="interactive-tab">As minhas</TabsTrigger>
+            {isManager && <TabsTrigger value="manage" className="interactive-tab">Para tratar</TabsTrigger>}
+          </TabsList>
+          <TabsContent value="mine" className="mt-4">
+            <Tabs value={mineSub} onValueChange={setMineSub}>
+              <TabsList className="mb-3">
+                <TabsTrigger value="active" className="interactive-tab">A decorrer</TabsTrigger>
+                <TabsTrigger value="archived" className="interactive-tab">Histórico</TabsTrigger>
+              </TabsList>
+              <TabsContent value="active">
+                <OrdersList scope="mine" canManage={false} meId={me.data?.id} statusFilter="active" />
+              </TabsContent>
+              <TabsContent value="archived">
+                <OrdersList scope="mine" canManage={false} meId={me.data?.id} statusFilter="archived" />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
-        )}
-      </Tabs>
+          {isManager && (
+            <TabsContent value="manage" className="mt-4">
+              <Tabs value={manageSub} onValueChange={setManageSub}>
+                <TabsList className="mb-3">
+                  <TabsTrigger value="active" className="interactive-tab">A decorrer</TabsTrigger>
+                  <TabsTrigger value="archived" className="interactive-tab">Arquivo de Encomendas</TabsTrigger>
+                </TabsList>
+                <TabsContent value="active">
+                  <OrdersList scope="manage" canManage meId={me.data?.id} statusFilter="active" />
+                </TabsContent>
+                <TabsContent value="archived">
+                  <OrdersList scope="manage" canManage meId={me.data?.id} statusFilter="archived" />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+          )}
+        </Tabs>
       </FadeIn>
     </>
   );
@@ -137,16 +165,22 @@ function Page() {
 function OrdersList({
   scope,
   canManage,
+  meId,
+  statusFilter,
 }: {
   scope: "mine" | "manage";
   canManage: boolean;
+  meId?: number;
+  statusFilter: "active" | "archived";
 }) {
   const fn = useAuthedServerFn(listOrders);
   const transFn = useAuthedServerFn(transitionOrder);
+  const cancelFn = useAuthedServerFn(cancelOwnOrder);
   const qc = useQueryClient();
+  const statuses = statusFilter === "active" ? ACTIVE_STATUSES : ARCHIVED_STATUSES;
   const orders = useQuery({
-    queryKey: ["orders", scope],
-    queryFn: () => fn({ data: { scope } }),
+    queryKey: ["orders", scope, statusFilter],
+    queryFn: () => fn({ data: { scope, statuses } }),
   });
   const m = useMutation({
     mutationFn: (v: { id: number; to: string }) =>
@@ -165,8 +199,8 @@ function OrdersList({
       }),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["orders"] });
-      const prev = qc.getQueryData(["orders", scope]);
-      qc.setQueryData(["orders", scope], (old: any) =>
+      const prev = qc.getQueryData(["orders", scope, statusFilter]);
+      qc.setQueryData(["orders", scope, statusFilter], (old: any) =>
         old?.map((o: any) =>
           o.id === vars.id ? { ...o, status: vars.to } : o
         )
@@ -174,7 +208,7 @@ function OrdersList({
       return { prev };
     },
     onError: (_e, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["orders", scope], ctx.prev);
+      if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
       toast.error(_e.message);
     },
     onSuccess: (res) => {
@@ -185,6 +219,28 @@ function OrdersList({
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["stock"] });
       toast.success("Guardado");
+    },
+  });
+
+  const cancelM = useMutation({
+    mutationFn: (id: number) => cancelFn({ data: { id } }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["orders"] });
+      const prev = qc.getQueryData(["orders", scope, statusFilter]);
+      qc.setQueryData(["orders", scope, statusFilter], (old: any) =>
+        old?.map((o: any) =>
+          o.id === id ? { ...o, status: "cancelled" } : o
+        )
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
+      toast.error(_e.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      toast.success("Encomenda cancelada");
     },
   });
 
@@ -215,9 +271,11 @@ function OrdersList({
       <Card className="p-10 text-center">
         <ShoppingBag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
-          {scope === "mine"
-            ? "Nenhum pedido"
-            : "Nenhuma encomenda"}
+          {statusFilter === "active"
+            ? "Nenhuma encomenda em aberto"
+            : scope === "mine"
+              ? "Nenhum pedido no histórico"
+              : "Nenhuma encomenda arquivada"}
         </p>
       </Card>
     );
@@ -230,6 +288,8 @@ function OrdersList({
         const minId = Math.min(...lines.map((l) => l.id));
         const totalBatch = lines.reduce((s, l) => s + (l.total_price ?? 0), 0);
         const totalDirtyMoney = lines.reduce((s, l) => s + (l.dirty_money ?? 0), 0);
+        const isOwn = meId != null && first.member_id === meId;
+        const canCancel = isOwn && statusFilter === "active" && ACTIVE_STATUSES.includes(first.status);
 
         // Agregar materiais de todas as linhas
         const agg = new Map<string, number>();
@@ -242,6 +302,10 @@ function OrdersList({
 
         const handleTransition = async (to: string) => {
           await Promise.all(lines.map((l) => m.mutateAsync({ id: l.id, to })));
+        };
+        const handleCancel = async () => {
+          if (!confirm("Tens a certeza que queres cancelar esta encomenda?")) return;
+          await Promise.all(lines.map((l) => cancelM.mutateAsync(l.id)));
         };
 
         return (
@@ -344,9 +408,21 @@ function OrdersList({
                   {lines.length} artigo{lines.length !== 1 ? "s" : ""}
                 </div>
               </div>
-              {next && (
+              {(next || canCancel) && (
                 <div className="flex w-full justify-end gap-1.5 border-t border-border pt-3">
-                  {next.map((s) => (
+                  {canCancel && (
+                    <ButtonLoading
+                      size="sm"
+                      variant="outline"
+                      loading={cancelM.isPending}
+                      onClick={handleCancel}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Cancelar
+                    </ButtonLoading>
+                  )}
+                  {next?.map((s) => (
                     <ButtonLoading
                       key={s.to}
                       size="sm"
@@ -495,10 +571,7 @@ function NewOrder() {
 
   const groups = new Map<string, typeof items>();
   for (const i of items) {
-    let cat: string;
-    if (i.category === "prints") cat = "prints";
-    else if (i.category === "corpos") cat = "corpos";
-    else cat = itemDisplayCategory(i.name, i.category, i.subcategory);
+    let cat = itemDisplayCategory(i.name, i.category, i.subcategory);
     // Unificar carregadores e extras no dropdown de encomendas
     if (cat === "carregadores_orange" || cat === "carregadores_red" || cat === "carregadores_especial") cat = "carregadores";
     if (cat === "acessorios" || cat === "acessorios_armas" || cat === "coletes") cat = "extras";
