@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, X, Loader2 } from "lucide-react";
+import { checkManagerAccess } from "@/lib/access-check.functions";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {

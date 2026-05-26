@@ -11,6 +11,7 @@ export type AdminRecipeRow = {
   subcategory: string | null;
   recipe_category: string | null;
   tier: string | null;
+  min_sale_price: number | null;
   ingredients: Array<{
     item_id: number;
     name: string;
@@ -26,6 +27,7 @@ export type AdminItemRow = {
   subcategory: string | null;
   estimated_value: number | null;
   purchase_price: number | null;
+  min_sale_price: number | null;
   unit: string | null;
 };
 
