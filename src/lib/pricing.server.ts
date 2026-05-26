@@ -1,6 +1,8 @@
 // Server-only helpers (touch DB). Must NEVER be imported from client code.
 import { pgOne } from "./pg.server";
 import {
+  isSuperAdmin,
+  isAdmin,
   isManager,
   canSeeInventory,
   type CurrentMember,
@@ -34,6 +36,8 @@ export async function resolveCurrentMember(
   const isMorador = m.role_label === "bairrista";
   return {
     ...m,
+    is_superadmin: isSuperAdmin(m),
+    is_admin: isAdmin(m),
     is_manager: isManager(m),
     can_see_inventory: canSeeInventory(m),
     is_morador: isMorador,

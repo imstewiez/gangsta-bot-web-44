@@ -4,19 +4,19 @@ import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { checkManagerAccess } from "@/lib/access-check.functions";
-import { listAppUsers, setUserRole } from "@/lib/admin.functions";
+import { listAppUsers, setUserRole, checkSuperAdminAccess } from "@/lib/admin.functions";
 
 import { PageHeader } from "@/components/layout/AppShell";
 import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Shield, ShieldOff } from "lucide-react";
-import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
+import { Shield, ShieldOff, Crown } from "lucide-react";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
-import { Reveal, Stagger } from "@/components/layout/Reveal";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   errorComponent: PageErrorBoundary,
@@ -34,15 +34,19 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function AdminPage() {
   const managerFn = useAuthedServerFn(checkManagerAccess);
   const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
+  const superFn = useAuthedServerFn(checkSuperAdminAccess);
+  const superCheck = useQuery({ queryKey: ["superAdminCheck"], queryFn: () => superFn() });
   const listFn = useAuthedServerFn(listAppUsers);
   const setFn = useAuthedServerFn(setUserRole);
   const qc = useQueryClient();
   const users = useQuery({ queryKey: ["appUsers"], queryFn: () => listFn() });
 
+  const isCallerSuper = superCheck.data?.is_superadmin ?? false;
+
   const m = useMutation({
     mutationFn: (v: {
       user_id: string;
-      role: "admin" | "member";
+      role: "superadmin" | "admin" | "member";
       grant: boolean;
     }) => setFn({ data: v }),
     onMutate: async (vars) => {
@@ -51,7 +55,12 @@ function AdminPage() {
       qc.setQueryData(["appUsers"], (old: any) =>
         old?.map((u: any) =>
           u.user_id === vars.user_id
-            ? { ...u, app_role: vars.grant ? vars.role : null }
+            ? {
+                ...u,
+                roles: vars.grant
+                  ? [...new Set([...u.roles, vars.role])]
+                  : u.roles.filter((r: string) => r !== vars.role),
+              }
             : u
         )
       );
@@ -67,7 +76,7 @@ function AdminPage() {
     },
   });
 
-  if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (managerCheck.isLoading || superCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   if (!managerCheck.data?.allowed) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -104,13 +113,21 @@ function AdminPage() {
             <div className="space-y-2">
               {(users.data ?? []).map((u) => {
                 const isAdmin = u.roles.includes("admin");
+                const isSuper = u.roles.includes("superadmin");
+                const isSelf = u.user_id === superCheck.data?.user_id; // checkSuperAdminAccess doesn't return user_id
+                // We don't have user_id from superCheck, but we can compare via supabase or just skip self-check in UI
+                // Actually, self-protection is handled server-side. UI just needs to reflect capability.
+
+                const canToggleSuper = isCallerSuper;
+                const canToggleAdmin = isCallerSuper && !isSuper;
+
                 return (
                   <div
                     key={u.user_id}
                     className="flex items-center gap-3 rounded-sm border border-border p-3 interactive-row"
                   >
-                    <div className="flex-1">
-                      <div className="font-medium">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">
                         {u.display_name ?? "(sem nome)"}
                       </div>
                       <div className="text-xs text-muted-foreground font-mono">
@@ -120,46 +137,81 @@ function AdminPage() {
                         desde {fmtDate(u.created_at)}
                       </div>
                     </div>
-                    <div className="flex gap-2 text-xs">
-                      {u.roles.map((r) => (
-                        <span
-                          key={r}
-                          className={
-                            "rounded-sm px-2 py-1 text-display " +
-                            (r === "admin"
-                              ? "bg-primary/20 text-primary"
-                              : "bg-muted")
+                    <div className="flex gap-2 text-xs flex-wrap justify-end">
+                      {isSuper && (
+                        <span className="rounded-sm px-2 py-1 text-display bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                          <Crown className="inline h-3 w-3 mr-1" />
+                          superadmin
+                        </span>
+                      )}
+                      {isAdmin && !isSuper && (
+                        <span className="rounded-sm px-2 py-1 text-display bg-primary/20 text-primary border border-primary/30">
+                          <Shield className="inline h-3 w-3 mr-1" />
+                          admin
+                        </span>
+                      )}
+                      {!isAdmin && !isSuper && (
+                        <span className="rounded-sm px-2 py-1 text-display bg-muted">
+                          member
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {canToggleSuper && (
+                        <ButtonLoading
+                          size="sm"
+                          loading={m.isPending}
+                          variant={isSuper ? "outline" : "default"}
+                          disabled={m.isPending}
+                          onClick={() =>
+                            m.mutate({
+                              user_id: u.user_id,
+                              role: "superadmin",
+                              grant: !isSuper,
+                            })
                           }
                         >
-                          {r}
-                        </span>
-                      ))}
-                    </div>
-                    <ButtonLoading
-                      size="sm"
-                      loading={m.isPending}
-                      variant={isAdmin ? "outline" : "default"}
-                      disabled={m.isPending}
-                      onClick={() =>
-                        m.mutate({
-                          user_id: u.user_id,
-                          role: "admin",
-                          grant: !isAdmin,
-                        })
-                      }
-                    >
-                      {isAdmin ? (
-                        <>
-                          <ShieldOff className="mr-1 h-3 w-3" />
-                          Remover admin
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="mr-1 h-3 w-3" />
-                          Tornar admin
-                        </>
+                          {isSuper ? (
+                            <>
+                              <ShieldOff className="mr-1 h-3 w-3" />
+                              Remover super
+                            </>
+                          ) : (
+                            <>
+                              <Crown className="mr-1 h-3 w-3" />
+                              Tornar super
+                            </>
+                          )}
+                        </ButtonLoading>
                       )}
-                    </ButtonLoading>
+                      {canToggleAdmin && (
+                        <ButtonLoading
+                          size="sm"
+                          loading={m.isPending}
+                          variant={isAdmin ? "outline" : "default"}
+                          disabled={m.isPending}
+                          onClick={() =>
+                            m.mutate({
+                              user_id: u.user_id,
+                              role: "admin",
+                              grant: !isAdmin,
+                            })
+                          }
+                        >
+                          {isAdmin ? (
+                            <>
+                              <ShieldOff className="mr-1 h-3 w-3" />
+                              Remover admin
+                            </>
+                          ) : (
+                            <>
+                              <Shield className="mr-1 h-3 w-3" />
+                              Tornar admin
+                            </>
+                          )}
+                        </ButtonLoading>
+                      )}
+                    </div>
                   </div>
                 );
               })}

@@ -22,7 +22,9 @@ export const listTagRequests = createServerFn({ method: "GET" })
   .inputValidator((d: { status?: string | null }) => ({
     status: StatusSchema.optional().parse(d?.status) ?? "pending",
   }))
-  .handler(async ({ data }): Promise<TagRequestRow[]> => {
+  .handler(async ({ data, context }): Promise<TagRequestRow[]> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à direção.");
     const params: unknown[] = [];
     let where = "";
     if (data.status && data.status !== "all") {

@@ -7,6 +7,8 @@ import {
   createOrder,
   transitionOrder,
   cancelOwnOrder,
+  listOrderComments,
+  addOrderComment,
 } from "@/lib/orders.functions";
 import { computeCraftFeasibilityBatch } from "@/lib/recipes.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
@@ -42,7 +44,7 @@ import {
   ARMORY_CAT_CONFIG,
 } from "@/lib/armory.catalog";
 import { toast } from "sonner";
-import { Plus, ShoppingBag, Trash2, Package, Banknote, X } from "lucide-react";
+import { Plus, ShoppingBag, Trash2, Package, Banknote, X, MessageSquare, Send } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
@@ -103,6 +105,7 @@ const ARCHIVED_STATUSES = ["fulfilled", "denied", "cancelled"];
 function Page() {
   useRealtimeSync([
     { table: "orders", queryKeys: [["orders"], ["stock"], ["my-xp"]] },
+    { table: "order_comments", queryKeys: [["order_comments"]] },
   ]);
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
@@ -184,6 +187,8 @@ function OrdersList({
   const fn = useAuthedServerFn(listOrders);
   const transFn = useAuthedServerFn(transitionOrder);
   const cancelFn = useAuthedServerFn(cancelOwnOrder);
+  const commentsFn = useAuthedServerFn(listOrderComments);
+  const addCommentFn = useAuthedServerFn(addOrderComment);
   const qc = useQueryClient();
   const statuses = statusFilter === "active" ? ACTIVE_STATUSES : ARCHIVED_STATUSES;
   const orders = useQuery({
@@ -297,7 +302,7 @@ function OrdersList({
         const totalBatch = lines.reduce((s, l) => s + (l.total_price ?? 0), 0);
         const totalDirtyMoney = lines.reduce((s, l) => s + (l.dirty_money ?? 0), 0);
         const isOwn = meId != null && first.member_id === meId;
-        const canCancel = isOwn && statusFilter === "active" && ACTIVE_STATUSES.includes(first.status);
+        const canCancel = isOwn && statusFilter === "active" && ["pending", "approved"].includes(first.status);
 
         // Agregar materiais de todas as linhas
         const agg = new Map<string, number>();
@@ -446,9 +451,88 @@ function OrdersList({
                 </div>
               )}
             </div>
+            <OrderCommentThread orderId={minId} canComment={isOwn || canManage} />
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+function OrderCommentThread({ orderId, canComment }: { orderId: number; canComment: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const commentsFn = useAuthedServerFn(listOrderComments);
+  const addCommentFn = useAuthedServerFn(addOrderComment);
+  const qc = useQueryClient();
+  const comments = useQuery({
+    queryKey: ["order_comments", orderId],
+    queryFn: () => commentsFn({ data: { order_id: orderId } }),
+    enabled: open,
+  });
+  const addM = useMutation({
+    mutationFn: (content: string) => addCommentFn({ data: { order_id: orderId, content } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["order_comments", orderId] });
+      setText("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="border-t border-border mt-3 pt-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+        {comments.data?.length ? `${comments.data.length} comentário${comments.data.length !== 1 ? "s" : ""}` : "Comentários"}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {comments.isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          {comments.error && <p className="text-destructive text-xs">{(comments.error as Error).message}</p>}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {(comments.data ?? []).map((c) => (
+              <div key={c.id} className="rounded-sm bg-muted/40 p-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-xs">{c.author_name ?? "—"}</span>
+                  <span className="text-[10px] text-muted-foreground">{fmtDate(c.created_at)}</span>
+                </div>
+                <p className="mt-0.5 text-sm text-foreground">{c.content}</p>
+              </div>
+            ))}
+            {!comments.isLoading && !(comments.data ?? []).length && (
+              <p className="text-xs text-muted-foreground">Sem comentários ainda.</p>
+            )}
+          </div>
+          {canComment && (
+            <div className="flex gap-2">
+              <Input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Escrever comentário..."
+                className="h-8 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && text.trim()) {
+                    e.preventDefault();
+                    addM.mutate(text.trim());
+                  }
+                }}
+              />
+              <ButtonLoading
+                size="sm"
+                loading={addM.isPending}
+                disabled={!text.trim()}
+                onClick={() => addM.mutate(text.trim())}
+                className="h-8 px-2"
+              >
+                <Send className="h-3.5 w-3.5" />
+              </ButtonLoading>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

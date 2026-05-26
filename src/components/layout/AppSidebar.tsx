@@ -2,10 +2,11 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import {
-  Home, Users, Trophy, Sparkles,
+  Home, Users, Trophy, Sparkles, CalendarDays,
   ShoppingBag, PackageOpen, Crosshair,
   Tags, Package, Hammer,
-  Shield, ScrollText,
+  Shield, ScrollText, Database,
+  UserCircle, Bell, Activity,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -48,9 +49,12 @@ const GROUPS: NavGroup[] = [
     label: "Bairro",
     items: [
       { to: "/dashboard", label: "Casa",        icon: Home },
+      { to: "/perfil",    label: "O meu perfil", icon: UserCircle },
       { to: "/membros",   label: "Membros",     icon: Users },
       { to: "/tops",      label: "Leaderboard", icon: Trophy },
-      { to: "/premios",   label: "Prémios",     icon: Sparkles },
+      { to: "/premios",       label: "Prémios",       icon: Sparkles },
+      { to: "/disponibilidade", label: "Disponibilidade", icon: CalendarDays },
+      { to: "/notificacoes",    label: "Notificações",    icon: Bell },
     ],
   },
   {
@@ -73,8 +77,10 @@ const GROUPS: NavGroup[] = [
   {
     label: "Chefia",
     items: [
-      { to: "/admin",     label: "Definições", icon: Shield,     admin: true },
-      { to: "/auditoria", label: "Auditoria",  icon: ScrollText, admin: true },
+      { to: "/admin/dashboard",   label: "Dashboard",    icon: Activity,   admin: true },
+      { to: "/admin",             label: "Definições",   icon: Shield,     admin: true },
+      { to: "/auditoria",         label: "Auditoria",    icon: ScrollText, admin: true },
+      { to: "/admin/recuperacao", label: "Recuperação",  icon: Database,   admin: true },
     ],
   },
 ];

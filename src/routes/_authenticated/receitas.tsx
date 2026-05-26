@@ -253,7 +253,11 @@ function RecipeCard({
 }
 
 function Page() {
-  useRealtimeSync(["recipes"]);
+  useRealtimeSync([
+    "recipes",
+    { table: "items", queryKeys: [["catalog"], ["adminItems"]] },
+    { table: "recipe_ingredients", queryKeys: [["recipes"], ["adminRecipes"]] },
+  ]);
   const qc = useQueryClient();
   const fn = useAuthedServerFn(listRecipes);
   const calcFn = useAuthedServerFn(computeCraftFeasibility);

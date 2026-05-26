@@ -340,8 +340,9 @@ export const BANNED_WEAPON_NAMES = [
 
 export function isBannedWeapon(name: string | null): boolean {
   if (!name) return false;
-  const n = name.toLowerCase();
-  return BANNED_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
+  const n = name.toLowerCase().trim();
+  // Exact match only — "Combat PDW" is allowed, "PDW" alone is banned
+  return BANNED_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
 }
 
 export function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {

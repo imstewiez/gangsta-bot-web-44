@@ -188,6 +188,7 @@ export const createOperationWithParticipants = createServerFn({ method: "POST" }
       participants?: number[];
     }) => {
       if (!d.operation_type?.trim()) throw new Error("Tipo obrigatório");
+      if (d.participants && d.participants.length > 50) throw new Error("Máximo 50 participantes");
       return d;
     },
   )
@@ -307,6 +308,7 @@ export const inviteMembers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { operation_id: number; member_ids?: number[]; role?: string }) => {
     if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
+    if (d.member_ids && d.member_ids.length > 50) throw new Error("Máximo 50 membros por convite");
     return d;
   })
   .handler(async ({ data, context }) => {
@@ -432,18 +434,39 @@ export const listAvailability = createServerFn({ method: "GET" })
 export const getAvailabilityVotes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { session_id: number }) => d)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    const isManager = me?.is_manager ?? false;
     const [slots, votes] = await Promise.all([
       pgQuery<{ id: number; slot_label: string; position: number }>(
         `select id, slot_label, position from availability_slots where session_id = $1 order by position`,
         [data.session_id],
       ),
-      pgQuery<{ slot_id: number; vote_state: string; discord_user_id: string }>(
-        `select slot_id, vote_state, discord_user_id from availability_votes where session_id = $1`,
+      pgQuery<{ slot_id: number; vote_state: string; user_tag: string }>(
+        `select slot_id, vote_state, ${isManager ? 'discord_user_id' : "right(discord_user_id, 4)"} as user_tag from availability_votes where session_id = $1`,
         [data.session_id],
       ),
     ]);
     return { slots, votes };
+  });
+
+export const castAvailabilityVote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { session_id: number; slot_id: number; vote_state: "yes" | "maybe" | "no" }) => {
+    if (!d.session_id || !d.slot_id) throw new Error("Dados inválidos");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.discord_id) throw new Error("Não tens Discord associado.");
+    await pgQuery(
+      `insert into availability_votes (session_id, slot_id, discord_user_id, vote_state, created_at)
+       values ($1, $2, $3, $4, now())
+       on conflict (session_id, slot_id, discord_user_id)
+       do update set vote_state = excluded.vote_state, created_at = now()`,
+      [data.session_id, data.slot_id, me.discord_id, data.vote_state],
+    );
+    return { ok: true };
   });
 
 export const listAuditLogs = createServerFn({ method: "GET" })

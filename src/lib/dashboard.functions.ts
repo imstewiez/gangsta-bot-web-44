@@ -110,12 +110,13 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          group by 1 order by 2 desc`,
       ).catch(() => []),
       pgQuery<{ tier: string; name: string | null; score: number }>(
-        `select m.tier, m.display_name as name, coalesce(s.total_score, 0)::float as score
+        `select m.tier, m.display_name as name,
+                coalesce(s.kills_total * 3 + s.deliveries * 2 + s.sales * 2 + s.saidas_total * 2 + s.wins * 4 - s.deaths_total, 0)::float as score
          from members m
          left join all_time_stats s on s.member_id = m.id
          where m.deleted_at is null
            and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
-         order by m.tier, coalesce(s.total_score, 0) desc`,
+         order by m.tier, coalesce(s.kills_total * 3 + s.deliveries * 2 + s.sales * 2 + s.saidas_total * 2 + s.wins * 4 - s.deaths_total, 0) desc`,
       ).catch(() => []),
       pgOne<{ count: string }>(
         `select count(*)::text as count from members
@@ -135,7 +136,14 @@ export const getHomeKpis = createServerFn({ method: "GET" })
            and coalesce(start_time, date::timestamp, created_at) >= now() - interval '7 days'`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
-        `select coalesce(sum(kills_total)::text, '0') as count from all_time_stats`,
+        `select coalesce(sum(kills)::text, '0') as count from (
+          select count(*) as kills from kill_logs where date >= now() - interval '7 days'
+          union all
+          select coalesce(sum(p.kills),0)::int as kills
+          from operation_participants p
+          join operations o on o.id = p.operation_id and o.deleted_at is null
+          where o.status = 'concluida' and coalesce(o.end_time, o.start_time, o.date::timestamp) >= now() - interval '7 days'
+        ) src`,
       ).catch(() => ({ count: "0" })),
       pgQuery<{ wins: number; total: number }>(
         `select
@@ -151,7 +159,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
         `select coalesce(avg(coalesce(our_kills,0))::text, '0') as avg
          from operations
          where deleted_at is null
-           and status in ('concluida','cancelada')
+           and status = 'concluida'
            and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`,
       ).catch(() => ({ avg: "0" })),
       pgQuery<{ display_name: string | null; tier: string | null; ops: number }>(

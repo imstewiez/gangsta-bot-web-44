@@ -105,7 +105,11 @@ const TIPO_META: Record<
 };
 
 function Page() {
-  useRealtimeSync(["deliveries"]);
+  useRealtimeSync([
+    "deliveries",
+    { table: "inventory_movements", queryKeys: [["stock"], ["ledger"], ["my-xp"]] },
+    { table: "inventory_balance", queryKeys: [["stock"]] },
+  ]);
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const isManager = me.data?.is_manager ?? false;

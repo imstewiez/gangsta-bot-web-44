@@ -17,8 +17,10 @@ import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/t
 import { Route as AuthenticatedReceitasRouteImport } from './routes/_authenticated/receitas'
 import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticated/premios'
 import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
+import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
 import { Route as AuthenticatedLiquidacaoRouteImport } from './routes/_authenticated/liquidacao'
 import { Route as AuthenticatedInventarioRouteImport } from './routes/_authenticated/inventario'
@@ -32,8 +34,10 @@ import { Route as AuthenticatedOperacoesIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedMembrosIndexRouteImport } from './routes/_authenticated/membros.index'
 import { Route as AuthenticatedOperacoesIdRouteImport } from './routes/_authenticated/operacoes.$id'
 import { Route as AuthenticatedMembrosIdRouteImport } from './routes/_authenticated/membros.$id'
+import { Route as AuthenticatedAdminRecuperacaoRouteImport } from './routes/_authenticated/admin.recuperacao'
 import { Route as AuthenticatedAdminReceitasRouteImport } from './routes/_authenticated/admin.receitas'
 import { Route as AuthenticatedAdminPrecosRouteImport } from './routes/_authenticated/admin.precos'
+import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin.dashboard'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -74,6 +78,11 @@ const AuthenticatedPrecarioRoute = AuthenticatedPrecarioRouteImport.update({
   path: '/precario',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPerfilRoute = AuthenticatedPerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedOperacoesRoute = AuthenticatedOperacoesRouteImport.update({
   id: '/operacoes',
   path: '/operacoes',
@@ -84,6 +93,12 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedNotificacoesRoute =
+  AuthenticatedNotificacoesRouteImport.update({
+    id: '/notificacoes',
+    path: '/notificacoes',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMembrosRoute = AuthenticatedMembrosRouteImport.update({
   id: '/membros',
   path: '/membros',
@@ -153,6 +168,12 @@ const AuthenticatedMembrosIdRoute = AuthenticatedMembrosIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedMembrosRoute,
 } as any)
+const AuthenticatedAdminRecuperacaoRoute =
+  AuthenticatedAdminRecuperacaoRouteImport.update({
+    id: '/recuperacao',
+    path: '/recuperacao',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminReceitasRoute =
   AuthenticatedAdminReceitasRouteImport.update({
     id: '/receitas',
@@ -163,6 +184,12 @@ const AuthenticatedAdminPrecosRoute =
   AuthenticatedAdminPrecosRouteImport.update({
     id: '/precos',
     path: '/precos',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminDashboardRoute =
+  AuthenticatedAdminDashboardRouteImport.update({
+    id: '/dashboard',
+    path: '/dashboard',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
@@ -178,15 +205,19 @@ export interface FileRoutesByFullPath {
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/precos': typeof AuthenticatedAdminPrecosRoute
   '/admin/receitas': typeof AuthenticatedAdminReceitasRoute
+  '/admin/recuperacao': typeof AuthenticatedAdminRecuperacaoRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
   '/operacoes/$id': typeof AuthenticatedOperacoesIdRoute
   '/membros/': typeof AuthenticatedMembrosIndexRoute
@@ -203,14 +234,18 @@ export interface FileRoutesByTo {
   '/entregas': typeof AuthenticatedEntregasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/precos': typeof AuthenticatedAdminPrecosRoute
   '/admin/receitas': typeof AuthenticatedAdminReceitasRoute
+  '/admin/recuperacao': typeof AuthenticatedAdminRecuperacaoRoute
   '/membros/$id': typeof AuthenticatedMembrosIdRoute
   '/operacoes/$id': typeof AuthenticatedOperacoesIdRoute
   '/membros': typeof AuthenticatedMembrosIndexRoute
@@ -230,15 +265,19 @@ export interface FileRoutesById {
   '/_authenticated/inventario': typeof AuthenticatedInventarioRoute
   '/_authenticated/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
+  '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
+  '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/precos': typeof AuthenticatedAdminPrecosRoute
   '/_authenticated/admin/receitas': typeof AuthenticatedAdminReceitasRoute
+  '/_authenticated/admin/recuperacao': typeof AuthenticatedAdminRecuperacaoRoute
   '/_authenticated/membros/$id': typeof AuthenticatedMembrosIdRoute
   '/_authenticated/operacoes/$id': typeof AuthenticatedOperacoesIdRoute
   '/_authenticated/membros/': typeof AuthenticatedMembrosIndexRoute
@@ -258,15 +297,19 @@ export interface FileRouteTypes {
     | '/inventario'
     | '/liquidacao'
     | '/membros'
+    | '/notificacoes'
     | '/onboarding'
     | '/operacoes'
+    | '/perfil'
     | '/precario'
     | '/premios'
     | '/receitas'
     | '/tops'
     | '/auth/callback'
+    | '/admin/dashboard'
     | '/admin/precos'
     | '/admin/receitas'
+    | '/admin/recuperacao'
     | '/membros/$id'
     | '/operacoes/$id'
     | '/membros/'
@@ -283,14 +326,18 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/inventario'
     | '/liquidacao'
+    | '/notificacoes'
     | '/onboarding'
+    | '/perfil'
     | '/precario'
     | '/premios'
     | '/receitas'
     | '/tops'
     | '/auth/callback'
+    | '/admin/dashboard'
     | '/admin/precos'
     | '/admin/receitas'
+    | '/admin/recuperacao'
     | '/membros/$id'
     | '/operacoes/$id'
     | '/membros'
@@ -309,15 +356,19 @@ export interface FileRouteTypes {
     | '/_authenticated/inventario'
     | '/_authenticated/liquidacao'
     | '/_authenticated/membros'
+    | '/_authenticated/notificacoes'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
+    | '/_authenticated/perfil'
     | '/_authenticated/precario'
     | '/_authenticated/premios'
     | '/_authenticated/receitas'
     | '/_authenticated/tops'
     | '/auth/callback'
+    | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/precos'
     | '/_authenticated/admin/receitas'
+    | '/_authenticated/admin/recuperacao'
     | '/_authenticated/membros/$id'
     | '/_authenticated/operacoes/$id'
     | '/_authenticated/membros/'
@@ -389,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPrecarioRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/perfil': {
+      id: '/_authenticated/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof AuthenticatedPerfilRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/operacoes': {
       id: '/_authenticated/operacoes'
       path: '/operacoes'
@@ -401,6 +459,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/notificacoes': {
+      id: '/_authenticated/notificacoes'
+      path: '/notificacoes'
+      fullPath: '/notificacoes'
+      preLoaderRoute: typeof AuthenticatedNotificacoesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/membros': {
@@ -494,6 +559,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMembrosIdRouteImport
       parentRoute: typeof AuthenticatedMembrosRoute
     }
+    '/_authenticated/admin/recuperacao': {
+      id: '/_authenticated/admin/recuperacao'
+      path: '/recuperacao'
+      fullPath: '/admin/recuperacao'
+      preLoaderRoute: typeof AuthenticatedAdminRecuperacaoRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/receitas': {
       id: '/_authenticated/admin/receitas'
       path: '/receitas'
@@ -508,17 +580,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPrecosRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/dashboard': {
+      id: '/_authenticated/admin/dashboard'
+      path: '/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminPrecosRoute: typeof AuthenticatedAdminPrecosRoute
   AuthenticatedAdminReceitasRoute: typeof AuthenticatedAdminReceitasRoute
+  AuthenticatedAdminRecuperacaoRoute: typeof AuthenticatedAdminRecuperacaoRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminPrecosRoute: AuthenticatedAdminPrecosRoute,
   AuthenticatedAdminReceitasRoute: AuthenticatedAdminReceitasRoute,
+  AuthenticatedAdminRecuperacaoRoute: AuthenticatedAdminRecuperacaoRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
@@ -563,8 +646,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedInventarioRoute: typeof AuthenticatedInventarioRoute
   AuthenticatedLiquidacaoRoute: typeof AuthenticatedLiquidacaoRoute
   AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
+  AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRouteWithChildren
+  AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
@@ -581,8 +666,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedInventarioRoute: AuthenticatedInventarioRoute,
   AuthenticatedLiquidacaoRoute: AuthenticatedLiquidacaoRoute,
   AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
+  AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRouteWithChildren,
+  AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,

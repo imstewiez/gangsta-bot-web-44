@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { IdSchema } from "./security";
+import { notifyBot } from "./discord.server";
 
 
 export type MemberRow = {
@@ -26,10 +27,12 @@ const SELECT_MEMBER = `
 
 export const listMembers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<MemberRow[]> => {
+  .handler(async ({ context }): Promise<MemberRow[]> => {
     try {
-      return await pgQuery<MemberRow>(
-        `select id, discord_id, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle
+      const me = await resolveCurrentMember(context.supabase, context.userId);
+      const isManager = me?.is_manager ?? false;
+      const rows = await pgQuery<MemberRow>(
+        `select id, ${isManager ? 'discord_id' : 'null as discord_id'}, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle
          from members
          where deleted_at is null
            and (status = 'ativo' or status is null)
@@ -45,6 +48,7 @@ export const listMembers = createServerFn({ method: "GET" })
            display_name nulls last
          limit 500`,
       );
+      return rows;
     } catch (err) {
       console.error("[listMembers] failed:", err);
       throw new Error(err instanceof Error ? err.message : "DB error");
@@ -53,10 +57,12 @@ export const listMembers = createServerFn({ method: "GET" })
 
 export const listManagers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<MemberRow[]> => {
+  .handler(async ({ context }): Promise<MemberRow[]> => {
     try {
-      return await pgQuery<MemberRow>(
-        `select id, discord_id, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle
+      const me = await resolveCurrentMember(context.supabase, context.userId);
+      const isManager = me?.is_manager ?? false;
+      const rows = await pgQuery<MemberRow>(
+        `select id, ${isManager ? 'discord_id' : 'null as discord_id'}, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle
          from members
          where deleted_at is null
            and (status = 'ativo' or status is null)
@@ -72,6 +78,7 @@ export const listManagers = createServerFn({ method: "GET" })
            display_name nulls last
          limit 200`,
       );
+      return rows;
     } catch (err) {
       console.error("[listManagers] failed:", err);
       throw new Error(err instanceof Error ? err.message : "DB error");
@@ -88,10 +95,12 @@ export type MemberWithStats = MemberRow & {
 
 export const listMembersWithStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<MemberWithStats[]> => {
+  .handler(async ({ context }): Promise<MemberWithStats[]> => {
     try {
-      return await pgQuery<MemberWithStats>(
-        `select m.id, m.discord_id, m.display_name, m.nickname as nick, m.tier, coalesce(m.role,'bairrista') as role_label, m.joined_at, m.status as status_lifecycle,
+      const me = await resolveCurrentMember(context.supabase, context.userId);
+      const isManager = me?.is_manager ?? false;
+      const rows = await pgQuery<MemberWithStats>(
+        `select m.id, ${isManager ? 'm.discord_id' : 'null as discord_id'}, m.display_name, m.nickname as nick, m.tier, coalesce(m.role,'bairrista') as role_label, m.joined_at, m.status as status_lifecycle,
                 coalesce(ats.kills_total,0)::int as kills,
                 coalesce(ats.deaths_total,0)::int as deaths,
                 coalesce(ats.saidas_total,0)::int as saidas,
@@ -113,6 +122,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
            m.display_name nulls last
          limit 500`,
       );
+      return rows;
     } catch (err) {
       console.error("[listMembersWithStats] failed:", err);
       throw new Error(err instanceof Error ? err.message : "DB error");
@@ -149,8 +159,9 @@ export const getMember = createServerFn({ method: "GET" })
     try {
     const id = data.id;
     const me = await resolveCurrentMember(context.supabase, context.userId);
+    const isManager = me?.is_manager ?? false;
     const member = await pgOne<MemberRow>(
-      `select id, discord_id, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle from members where id = $1`,
+      `select id, ${isManager ? 'discord_id' : 'null as discord_id'}, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle from members where id = $1`,
       [id],
     );
     if (!member)
@@ -216,5 +227,29 @@ export const getMember = createServerFn({ method: "GET" })
     } catch (e: any) {
       throw new Error(e?.message ?? "Erro ao carregar perfil do membro");
     }
+  });
+
+export const updateMyProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { display_name?: string; nickname?: string | null }) => {
+    const name = d.display_name?.trim();
+    if (!name || name.length < 1 || name.length > 80) throw new Error("Nome inválido");
+    return { display_name: name, nickname: d.nickname?.trim() ?? null };
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    await pgQuery(
+      `update members set display_name = $2, nickname = $3, updated_at = now() where id = $1`,
+      [me.id, data.display_name, data.nickname],
+    );
+    if (me.discord_id) {
+      await notifyBot({
+        action: "rename",
+        discord_id: me.discord_id,
+        new_name: data.display_name,
+      });
+    }
+    return { ok: true };
   });
 

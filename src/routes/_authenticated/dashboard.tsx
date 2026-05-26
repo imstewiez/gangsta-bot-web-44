@@ -27,6 +27,11 @@ function Dashboard() {
   useRealtimeSync([
     { table: "inventory_movements", queryKeys: [["my-xp"], ["home-kpis"]] },
     { table: "members", queryKeys: [["me"], ["home-kpis"]] },
+    { table: "operations", queryKeys: [["home-kpis"]] },
+    { table: "weekly_rankings", queryKeys: [["home-kpis"], ["leaderboard"]] },
+    { table: "all_time_stats", queryKeys: [["home-kpis"], ["leaderboard"]] },
+    { table: "weekly_prizes", queryKeys: [["home-kpis"]] },
+    { table: "kill_logs", queryKeys: [["home-kpis"], ["leaderboard"]] },
   ]);
   const fn = useAuthedServerFn(getHomeKpis);
   const xpFn = useAuthedServerFn(getCurrentMemberXP);

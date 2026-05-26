@@ -1,0 +1,21 @@
+-- Enable realtime for all critical tables
+alter publication supabase_realtime add table public.all_time_stats;
+alter publication supabase_realtime add table public.weekly_rankings;
+alter publication supabase_realtime add table public.operations;
+alter publication supabase_realtime add table public.operation_participants;
+alter publication supabase_realtime add table public.kill_logs;
+alter publication supabase_realtime add table public.inventory_movements;
+alter publication supabase_realtime add table public.inventory_balance;
+alter publication supabase_realtime add table public.orders;
+alter publication supabase_realtime add table public.order_status_history;
+alter publication supabase_realtime add table public.order_comments;
+alter publication supabase_realtime add table public.deliveries;
+alter publication supabase_realtime add table public.items;
+alter publication supabase_realtime add table public.craft_recipes;
+alter publication supabase_realtime add table public.recipe_ingredients;
+alter publication supabase_realtime add table public.weekly_prizes;
+alter publication supabase_realtime add table public.notifications;
+alter publication supabase_realtime add table public.audit_logs;
+alter publication supabase_realtime add table public.tag_requests;
+alter publication supabase_realtime add table public.user_roles;
+alter publication supabase_realtime add table public.profiles;

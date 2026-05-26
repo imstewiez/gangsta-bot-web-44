@@ -18,11 +18,34 @@ const INVENTORY_TIERS = new Set([
   "kingpin",
   "manda_chuva",
 ]);
+const SUPERADMIN_TIERS = new Set(["manda_chuva"]);
+const ADMIN_TIERS = new Set(["kingpin", "manda_chuva"]);
+
+export function isSuperAdmin(
+  member: { tier: string | null; role_label?: string | null } | null,
+): boolean {
+  if (!member) return false;
+  if (member.tier && SUPERADMIN_TIERS.has(member.tier)) return true;
+  if (member.role_label === "manda_chuva") return true;
+  return false;
+}
+
+export function isAdmin(
+  member: { tier: string | null; role_label?: string | null } | null,
+): boolean {
+  if (!member) return false;
+  if (isSuperAdmin(member)) return true;
+  if (member.tier && ADMIN_TIERS.has(member.tier)) return true;
+  if (member.role_label === "kingpin" || member.role_label === "admin" || member.role_label === "chefia")
+    return true;
+  return false;
+}
 
 export function isManager(
   member: { tier: string | null; role_label?: string | null } | null,
 ): boolean {
   if (!member) return false;
+  if (isAdmin(member)) return true;
   if (member.tier && MANAGER_TIERS.has(member.tier)) return true;
   if (member.role_label === "chefia" || member.role_label === "manda_chuva" || member.role_label === "admin")
     return true;
@@ -45,6 +68,8 @@ export type CurrentMember = {
   display_name: string | null;
   tier: string | null;
   role_label: string | null;
+  is_superadmin: boolean;
+  is_admin: boolean;
   is_manager: boolean;
   can_see_inventory: boolean;
   is_morador: boolean;

@@ -62,6 +62,8 @@ function Page() {
   useRealtimeSync([
     { table: "all_time_stats", queryKeys: [["leaderboard"]] },
     { table: "kill_logs", queryKeys: [["leaderboard"]] },
+    { table: "weekly_rankings", queryKeys: [["leaderboard"]] },
+    { table: "operation_participants", queryKeys: [["leaderboard"]] },
   ]);
   const fn = useAuthedServerFn(getLeaderboard);
   const [period, setPeriod] = useState<LeaderboardPeriod>("week");

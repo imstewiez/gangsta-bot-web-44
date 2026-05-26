@@ -99,6 +99,8 @@ export const createOrder = createServerFn({ method: "POST" })
     (d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: 'materials_money' | 'money_only' }) => {
       if (!Array.isArray(d.lines) || d.lines.length === 0)
         throw new Error("Carrinho vazio");
+      if (d.lines.length > 50)
+        throw new Error("Máximo 50 itens por encomenda");
       for (const l of d.lines) {
         if (!Number.isFinite(l.item_id)) throw new Error("Item inválido");
         if (!Number.isFinite(l.quantity) || l.quantity <= 0)
@@ -381,6 +383,79 @@ export const transitionOrder = createServerFn({ method: "POST" })
         throw e;
       }
     });
+  });
+
+export type OrderCommentRow = {
+  id: number;
+  order_id: number;
+  author_name: string | null;
+  content: string;
+  created_at: string;
+};
+
+async function ensureOrderCommentsTable() {
+  await pgQuery(
+    `create table if not exists order_comments (
+      id serial primary key,
+      order_id int not null references orders(id) on delete cascade,
+      author_id int references members(id) on delete set null,
+      author_name text,
+      content text not null,
+      created_at timestamptz default now()
+    )`,
+  );
+  await pgQuery(
+    `create index if not exists idx_order_comments_order_id on order_comments(order_id)`,
+  );
+}
+
+export const listOrderComments = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { order_id: number }) => {
+    const id = Number(d.order_id);
+    if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
+    return { order_id: id };
+  })
+  .handler(async ({ data }) => {
+    await ensureOrderCommentsTable();
+    return pgQuery<OrderCommentRow>(
+      `select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`,
+      [data.order_id],
+    );
+  });
+
+export const addOrderComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { order_id: number; content: string }) => {
+    const id = Number(d.order_id);
+    if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
+    const content = d.content?.trim();
+    if (!content) throw new Error("Comentário vazio");
+    if (content.length > 1000) throw new Error("Comentário demasiado longo (máx 1000 chars)");
+    return { order_id: id, content };
+  })
+  .handler(async ({ data, context }) => {
+    await ensureOrderCommentsTable();
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Não tens conta de membro associada.");
+
+    // Verify the order exists and the user is either the requester or a manager
+    const order = await pgOne<{ member_id: number; status: string }>(
+      `select member_id, status from orders where id = $1`,
+      [data.order_id],
+    );
+    if (!order) throw new Error("Encomenda não encontrada");
+    const isRequester = order.member_id === me.id;
+    const isManager = me.is_manager;
+    if (!isRequester && !isManager) throw new Error("Sem permissão para comentar nesta encomenda.");
+
+    const row = await pgOne<OrderCommentRow>(
+      `insert into order_comments (order_id, author_id, author_name, content, created_at)
+       values ($1, $2, $3, $4, now())
+       returning id, order_id, author_name, content, created_at`,
+      [data.order_id, me.id, me.display_name ?? "Membro", data.content],
+    );
+    return row;
   });
 
 

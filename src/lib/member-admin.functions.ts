@@ -28,6 +28,23 @@ async function assertManager(
   return me;
 }
 
+async function assertSuperAdminMember(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+) {
+  const me = await resolveCurrentMember(supabase, userId);
+  if (!me?.is_superadmin) throw new Error("Acesso restrito: apenas Manda-Chuva.");
+  return me;
+}
+
+async function getMemberTier(id: number): Promise<string | null> {
+  const m = await pgOne<{ tier: string | null }>(
+    "select tier from members where id = $1",
+    [id],
+  );
+  return m?.tier ?? null;
+}
+
 async function getDiscordId(memberId: number): Promise<string | null> {
   const m = await pgOne<{ discord_id: string | null }>(
     "select discord_id from members where id = $1",
@@ -72,7 +89,15 @@ export const adminSetTier = createServerFn({ method: "POST" })
     }).parse,
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, context.userId);
+    const targetTier = await getMemberTier(data.id);
+    const isPromotingToHighCommand = ["kingpin", "manda_chuva"].includes(data.tier);
+    const isDemotingFromHighCommand = targetTier ? ["kingpin", "manda_chuva"].includes(targetTier) : false;
+
+    if (isPromotingToHighCommand || isDemotingFromHighCommand) {
+      await assertSuperAdminMember(context.supabase, context.userId);
+    } else {
+      await assertManager(context.supabase, context.userId);
+    }
     const before = await pgOne<{
       tier: string | null;
       discord_id: string | null;
@@ -107,7 +132,12 @@ export const adminKickMember = createServerFn({ method: "POST" })
     }).parse,
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, context.userId);
+    const targetTier = await getMemberTier(data.id);
+    if (targetTier && ["kingpin", "manda_chuva"].includes(targetTier)) {
+      await assertSuperAdminMember(context.supabase, context.userId);
+    } else {
+      await assertManager(context.supabase, context.userId);
+    }
     const did = await getDiscordId(data.id);
     await pgQuery(
       "update members set deleted_at = now(), updated_at = now() where id = $1",
