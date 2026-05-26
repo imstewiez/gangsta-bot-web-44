@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import redwoodLogo from "@/assets/ballas-logo.png";
+import ballasLogo from "@/assets/ballas-logo.png";
 import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
+import { Reveal } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -37,27 +38,47 @@ function LoginPage() {
   };
 
   return (
-    <div className="ambient-bg relative min-h-screen overflow-hidden">
+    <div className="ambient-bg relative min-h-screen overflow-hidden flex items-center justify-center">
       <CinematicBackdrop />
 
-      <div className="pointer-events-none absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/10 blur-[100px] animate-pulse-glow" />
-      <div className="pointer-events-none absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-blood/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: "1.2s" }} />
+      <div className="relative z-10 w-full max-w-sm px-6">
+        <Reveal delay={0} direction="scale">
+          <div className="flex flex-col items-center text-center">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 -z-10 rounded-full bg-primary/20 blur-3xl scale-150 animate-pulse-glow" />
+              <img
+                src={ballasLogo}
+                alt="Ballas Gang"
+                draggable={false}
+                className="logo-hd h-24 w-24 object-contain select-none"
+              />
+            </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6">
-        <img
-          src={redwoodLogo}
-          alt="Ballas Gang"
-          className="h-20 w-20 rounded-sm object-contain drop-shadow-[0_0_24px_color-mix(in_oklab,var(--primary)_60%,transparent)] mb-8 animate-rise"
-        />
+            <h1 className="text-display text-2xl font-bold tracking-tight text-glow">
+              Ballas Gang
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Acesso reservado a membros
+            </p>
+          </div>
+        </Reveal>
 
-        <Button
-          disabled={loading}
-          onClick={handleDiscordLogin}
-          className="btn-shine w-full gap-2 text-display tracking-wider h-11 hover:brightness-110 hover:scale-[1.02] transition-all cursor-pointer animate-rise delay-100"
-        >
-          <DiscordIcon className="h-4 w-4" />
-          {loading ? "A abrir" : "Entrar"}
-        </Button>
+        <Reveal delay={150} direction="up">
+          <div className="mt-10">
+            <Button
+              disabled={loading}
+              onClick={handleDiscordLogin}
+              className="btn-shine w-full gap-2 text-display tracking-wider h-12 hover:brightness-110 hover:scale-[1.02] transition-all cursor-pointer"
+            >
+              <DiscordIcon className="h-4 w-4" />
+              {loading ? "A ligar..." : "Entrar com Discord"}
+            </Button>
+
+            <p className="mt-4 text-center text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50">
+              Sessão segura · OAuth 2.0
+            </p>
+          </div>
+        </Reveal>
       </div>
     </div>
   );

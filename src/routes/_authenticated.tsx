@@ -5,12 +5,10 @@ import { isServer } from "@/lib/auth-helpers";
 import { useEffect, useState } from "react";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { checkMemberAccess } from "@/lib/access-check.functions";
-import { Loader2 } from "lucide-react";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
-    // Skip auth check during SSR — supabase client uses localStorage.
-    // Client-side hydration will re-run beforeLoad and redirect if needed.
     if (isServer()) return;
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
@@ -54,7 +52,15 @@ function AuthenticatedLayout() {
   if (checking) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-primary/30 blur-xl animate-pulse-glow" />
+            <div className="relative h-10 w-10 rounded-full border-2 border-primary/60 border-t-primary animate-spin" />
+          </div>
+          <p className="text-display text-[10px] tracking-[0.3em] text-muted-foreground uppercase animate-rise">
+            A verificar acesso
+          </p>
+        </div>
       </div>
     );
   }
@@ -62,7 +68,10 @@ function AuthenticatedLayout() {
   if (!allowed) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="text-center">
+        <div className="text-center animate-rise">
+          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-destructive/10 ring-1 ring-destructive/30">
+            <span className="text-2xl">🚫</span>
+          </div>
           <p className="text-lg font-semibold text-foreground">Acesso negado</p>
           <p className="text-sm text-muted-foreground">Não tens permissão para aceder.</p>
         </div>
@@ -72,7 +81,9 @@ function AuthenticatedLayout() {
 
   return (
     <AppShell>
-      <Outlet />
+      <PageTransition>
+        <Outlet />
+      </PageTransition>
     </AppShell>
   );
 }
