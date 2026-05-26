@@ -21,9 +21,7 @@ import { Reveal, Stagger } from "@/components/layout/Reveal";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
-  itemDisplayCategory,
-  isAllowedRedWeapon,
-  isAllowedOrangeWeapon,
+  filterItemForDisplay,
 } from "@/lib/armory.catalog";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
@@ -68,20 +66,7 @@ function classifyRow(r: { category: string | null; subcategory: string | null; i
   if (/peças estragadas|pecas estragadas/.test(name)) return "materiais_craft";
   if (/\bsucata\b/.test(name)) return "materiais_craft";
 
-  // Usar classificação unificada (fonte de verdade)
-  const cat = itemDisplayCategory(r.item_name, r.category, r.subcategory);
-
-  // Esconder categorias não usadas no armazém
-  if (cat === "outros" || cat === "armas_brancas") return null;
-
-  // Apenas colete padrão
-  if (cat === "coletes" && !/padrão/.test(name)) return null;
-
-  // Apenas armas permitidas aparecem em Red / Orange (sem MK2)
-  if (cat === "armas_red" && (!isAllowedRedWeapon(r.item_name, r.subcategory) || /mk2/.test(name))) return null;
-  if (cat === "armas_orange" && (!isAllowedOrangeWeapon(r.item_name, r.subcategory) || /mk2/.test(name))) return null;
-
-  return cat;
+  return filterItemForDisplay(r.item_name, r.category, r.subcategory);
 }
 
 const MOV_LABEL: Record<string, string> = {

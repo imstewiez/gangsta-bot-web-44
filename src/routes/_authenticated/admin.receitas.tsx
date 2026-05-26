@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Save, Pencil, X, Check, Package } from "lucide-react";
 import { useState } from "react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { ARMORY_CAT_ORDER, ARMORY_CAT_CONFIG, itemDisplayCategory } from "@/lib/armory.catalog";
+import { ARMORY_CAT_ORDER, ARMORY_CAT_CONFIG, filterItemForDisplay } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 
@@ -66,7 +66,7 @@ function Page() {
   const grouped = (() => {
     const map = new Map<string, AdminRecipeRow[]>();
     for (const r of filtered) {
-      const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
+      const key = filterItemForDisplay(r.item_name, r.category, r.subcategory) ?? "outros";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
     }

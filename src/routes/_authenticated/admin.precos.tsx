@@ -20,7 +20,7 @@ import { Save, Pencil, X, Check } from "lucide-react";
 import { useState } from "react";
 import { fmtNum, fmtPrice } from "@/lib/domain";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
-import { itemDisplayCategory } from "@/lib/armory.catalog";
+import { filterItemForDisplay, ARMORY_CAT_ORDER } from "@/lib/armory.catalog";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 
@@ -75,10 +75,17 @@ function Page() {
     for (const list of map.values()) {
       list.sort((a, b) => (a.min_sale_price ?? a.purchase_price ?? 0) - (b.min_sale_price ?? b.purchase_price ?? 0));
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return Array.from(map.entries()).sort((a, b) => {
+      const ia = ARMORY_CAT_ORDER.indexOf(a[0] as any);
+      const ib = ARMORY_CAT_ORDER.indexOf(b[0] as any);
+      if (ia === -1 && ib === -1) return a[0].localeCompare(b[0]);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
   };
 
-  const groups = groupBy((i) => itemDisplayCategory(i.name, i.category, i.subcategory));
+  const groups = groupBy((i) => filterItemForDisplay(i.name, i.category, i.subcategory) ?? "outros");
 
   if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   if (!managerCheck.data?.allowed) {

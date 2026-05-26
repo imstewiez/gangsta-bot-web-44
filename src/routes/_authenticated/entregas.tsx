@@ -38,7 +38,7 @@ import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
-  itemDisplayCategory,
+  filterItemForDisplay,
 } from "@/lib/armory.catalog";
 import { toast } from "sonner";
 import {
@@ -419,7 +419,8 @@ function NewDelivery() {
           {lines.map((l, idx) => {
             const groups = new Map<string, typeof items>();
             for (const i of items) {
-              const cat = itemDisplayCategory(i.name, i.category, i.subcategory);
+              const cat = filterItemForDisplay(i.name, i.category, i.subcategory);
+              if (!cat) continue;
               if (!groups.has(cat)) groups.set(cat, []);
               groups.get(cat)!.push(i);
             }

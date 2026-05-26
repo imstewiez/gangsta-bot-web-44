@@ -40,8 +40,6 @@ import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
-  itemDisplayCategory,
-  isAllowedWeapon,
 } from "@/lib/armory.catalog";
 import { toast } from "sonner";
 import { Plus, ShoppingBag, Trash2, Package, Banknote, X } from "lucide-react";
@@ -581,23 +579,13 @@ function NewOrder() {
 
   const groups = new Map<string, typeof items>();
   for (const i of items) {
-    let cat = itemDisplayCategory(i.name, i.category, i.subcategory);
-    // Unificar carregadores e extras no dropdown de encomendas
-    if (cat === "carregadores_orange" || cat === "carregadores_red" || cat === "carregadores_especial") cat = "carregadores";
-    if (cat === "acessorios" || cat === "acessorios_armas" || cat === "coletes") cat = "extras";
+    const cat = filterItemForDisplay(i.name, i.category, i.subcategory);
+    if (!cat) continue;
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat)!.push(i);
   }
-  const ORDER_ENCOMENDAS: string[] = [
-    "armas_orange",
-    "armas_red",
-    "carregadores",
-    "prints",
-    "corpos",
-    "extras",
-  ];
   const options: { value: string; label: string; group: string; groupColor?: string }[] = [];
-  for (const cat of ORDER_ENCOMENDAS) {
+  for (const cat of ARMORY_CAT_ORDER) {
     const list = groups.get(cat);
     if (!list) continue;
     const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];

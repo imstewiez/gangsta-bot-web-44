@@ -39,12 +39,10 @@ import type { RecipeRow } from "@/lib/recipes.functions";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
-  itemDisplayCategory,
   itemSubLabel,
   PRINT_LABELS,
   PRINT_BADGE_CLASS,
   isOrangeWeapon,
-  isAllowedWeapon,
 } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
@@ -291,18 +289,14 @@ function Page() {
 
   const grouped = useMemo(() => {
     const all = (recipes.data ?? []).filter((r) => {
-      if (/mk2/i.test(r.item_name)) return false;
-      const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
-      if (key === "outros" || key === "armas_brancas") return false;
-      // Apenas armas permitidas (Red / Orange) — tudo o resto é escondido
-      if ((key === "armas_red" || key === "armas_orange") && !isAllowedWeapon(r.item_name, r.subcategory)) return false;
-      return true;
+      return filterItemForDisplay(r.item_name, r.category, r.subcategory) !== null;
     });
     const filtered = search ? all.filter((r) => r.item_name.toLowerCase().includes(search.toLowerCase())) : all;
 
     const map = new Map<string, RecipeRow[]>();
     for (const r of filtered) {
-      const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
+      const key = filterItemForDisplay(r.item_name, r.category, r.subcategory);
+      if (!key) continue;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
     }
@@ -321,11 +315,7 @@ function Page() {
   }, [recipes.data, search]);
 
   const totalRecipes = (recipes.data ?? []).filter(r => {
-    if (/mk2/i.test(r.item_name)) return false;
-    const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
-    if (key === "outros" || key === "armas_brancas") return false;
-    if ((key === "armas_red" || key === "armas_orange") && !isAllowedWeapon(r.item_name, r.subcategory)) return false;
-    return true;
+    return filterItemForDisplay(r.item_name, r.category, r.subcategory) !== null;
   }).length;
 
   return (

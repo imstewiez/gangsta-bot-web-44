@@ -51,22 +51,20 @@ export type ArmoryCategory =
 export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
   "armas_orange",
   "armas_red",
-  "carregadores_orange",
-  "carregadores_red",
-  "carregadores_especial",
-  "acessorios",
-  "acessorios_armas",
-  "coletes",
+  "carregadores",
+  "corpos",
+  "prints",
   "drogas",
-  "craft_armas",
-  "craft_carregadores",
   "materiais_craft",
   "lixo",
   "madeiras",
   "materias_primas",
   "minerios",
-  "corpos",
-  "prints",
+  "coletes",
+  "craft_armas",
+  "craft_carregadores",
+  "acessorios",
+  "acessorios_armas",
   "armas_brancas",
   "extras",
   "outros",
@@ -315,8 +313,6 @@ export const RED_WEAPON_NAMES = [
   "Carabina Rifle",
   "Carabina Especial",
   "Bullpup",
-  "PDW",
-  "Gadget Pistol",
   "Compact Pistol",
   ".50",
 ];
@@ -332,9 +328,21 @@ export const ORANGE_WEAPON_NAMES = [
   "Compact Rifle",
   "SNS Pistol",
   "Assault Shotgun",
-  "Heavy Shotgun",
-  "Gusenberg",
 ];
+
+// ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
+export const BANNED_WEAPON_NAMES = [
+  "Gusenberg",
+  "Heavy Shotgun",
+  "PDW",
+  "Gadget Pistol",
+];
+
+export function isBannedWeapon(name: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return BANNED_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
+}
 
 export function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
   if (subcategory === "armas_red") return true;
@@ -362,6 +370,38 @@ export function isOrangeWeapon(name: string | null): boolean {
 
 export function isAllowedWeapon(name: string | null, subcategory?: string | null): boolean {
   return isAllowedRedWeapon(name, subcategory) || isAllowedOrangeWeapon(name, subcategory);
+}
+
+// ── Filtro UNIFICADO para TODAS as páginas ─────────────────────────────────
+// Retorna a categoria se o item deve aparecer, ou null se deve ser escondido.
+// Usar esta função em vez de replicar filtros ad-hoc em cada página.
+export function filterItemForDisplay(
+  itemName: string,
+  category: string | null,
+  subcategory: string | null,
+): ArmoryCategory | null {
+  const name = itemName.toLowerCase();
+
+  // Banidas
+  if (isBannedWeapon(itemName)) return null;
+  // MK2
+  if (/mk2/i.test(itemName)) return null;
+  // Revolver
+  if (name === "revolver") return null;
+
+  const cat = itemDisplayCategory(itemName, category, subcategory);
+
+  // Categorias escondidas
+  if (cat === "outros" || cat === "armas_brancas") return null;
+
+  // Apenas colete padrão
+  if (cat === "coletes" && !/padrão/.test(name)) return null;
+
+  // Armas red/orange só se permitidas
+  if (cat === "armas_red" && !isAllowedRedWeapon(itemName, subcategory)) return null;
+  if (cat === "armas_orange" && !isAllowedOrangeWeapon(itemName, subcategory)) return null;
+
+  return cat;
 }
 
 // ── Classificação UNIFICADA para TODAS as páginas ──────────────────────────
