@@ -75,6 +75,7 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
           subcategory: r.subcategory,
           recipe_category: r.recipe_category,
           tier: r.tier,
+          min_sale_price: null,
           ingredients: [],
         };
         map.set(r.recipe_id, recipe);
