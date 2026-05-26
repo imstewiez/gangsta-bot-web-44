@@ -10,6 +10,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { ScrollProvider } from "@/components/layout/ScrollProvider";
 import { AuthProvider } from "@/lib/auth";
 
 import appCss from "../styles.css?url";
@@ -129,6 +130,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <ScrollProvider />
         <PageTransition><Outlet /></PageTransition>
         <GlobalSearch />
         <Toaster richColors position="top-right" />
