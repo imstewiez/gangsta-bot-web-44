@@ -11,7 +11,7 @@ import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
 import { Users, RotateCcw } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/membros/")({
   head: () => ({
@@ -51,19 +51,22 @@ function Page() {
         icon={Users}
         action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
       {error && (
-        <div className="mb-4 flex items-center gap-3 rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm animate-rise">
-          <span className="text-destructive">{error instanceof Error ? error.message : "Erro a carregar membros."}</span>
-          <button
-            onClick={() => refetch()}
-            className="ml-auto inline-flex cursor-pointer items-center gap-1 text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Tentar de novo
-          </button>
-        </div>
+        <Reveal direction="up">
+          <div className="mb-4 flex items-center gap-3 rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm animate-rise">
+            <span className="text-destructive">{error instanceof Error ? error.message : "Erro a carregar membros."}</span>
+            <button
+              onClick={() => refetch()}
+              className="ml-auto inline-flex cursor-pointer items-center gap-1 text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Tentar de novo
+            </button>
+          </div>
+        </Reveal>
       )}
-      <div className="overflow-hidden rounded-sm border border-border">
-        <table className="w-full text-sm">
+      <Reveal direction="up" delay={100}>
+        <div className="overflow-hidden rounded-sm border border-border">
+          <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
             <tr className="interactive-row">
               <th className="px-3 py-2 text-left">Nome</th>
@@ -96,6 +99,7 @@ function Page() {
           </tbody>
         </table>
       </div>
+      </Reveal>
     </>
   );
 }

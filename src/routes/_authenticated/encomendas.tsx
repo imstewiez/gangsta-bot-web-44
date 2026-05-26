@@ -50,9 +50,10 @@ import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { FadeIn } from "@/components/layout/FadeIn";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Reveal } from "@/components/layout/Reveal";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/encomendas")({
   errorComponent: PageErrorBoundary,
@@ -134,10 +135,14 @@ function Page() {
                 <TabsTrigger value="archived" className="interactive-tab">Histórico</TabsTrigger>
               </TabsList>
               <TabsContent value="active">
-                <OrdersList scope="mine" canManage={false} meId={me.data?.id} statusFilter="active" />
+                <Reveal direction="up" delay={0}>
+                  <OrdersList scope="mine" canManage={false} meId={me.data?.id} statusFilter="active" />
+                </Reveal>
               </TabsContent>
               <TabsContent value="archived">
-                <OrdersList scope="mine" canManage={false} meId={me.data?.id} statusFilter="archived" />
+                <Reveal direction="up" delay={100}>
+                  <OrdersList scope="mine" canManage={false} meId={me.data?.id} statusFilter="archived" />
+                </Reveal>
               </TabsContent>
             </Tabs>
           </TabsContent>
@@ -149,10 +154,14 @@ function Page() {
                   <TabsTrigger value="archived" className="interactive-tab">Arquivo de Encomendas</TabsTrigger>
                 </TabsList>
                 <TabsContent value="active">
-                  <OrdersList scope="manage" canManage meId={me.data?.id} statusFilter="active" />
+                  <Reveal direction="up" delay={200}>
+                    <OrdersList scope="manage" canManage meId={me.data?.id} statusFilter="active" />
+                  </Reveal>
                 </TabsContent>
                 <TabsContent value="archived">
-                  <OrdersList scope="manage" canManage meId={me.data?.id} statusFilter="archived" />
+                  <Reveal direction="up" delay={300}>
+                    <OrdersList scope="manage" canManage meId={me.data?.id} statusFilter="archived" />
+                  </Reveal>
                 </TabsContent>
               </Tabs>
             </TabsContent>
@@ -269,7 +278,7 @@ function OrdersList({
     );
   if (!orders.data?.length)
     return (
-      <Card className="p-10 text-center">
+      <Card className="p-10 text-center interactive-card">
         <ShoppingBag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
           {statusFilter === "active"
@@ -310,7 +319,7 @@ function OrdersList({
         };
 
         return (
-          <Card key={batchId} className={`p-4 ${first.payment_mode === "money_only" ? "border-amber-500/30 bg-amber-500/[0.02]" : ""}`}>
+          <Card key={batchId} className={cn("p-4 interactive-card", first.payment_mode === "money_only" && "border-amber-500/30 bg-amber-500/[0.02]")}>
             <div className="flex flex-wrap items-start gap-4">
               <div className="flex-1 min-w-[200px]">
                 <div className="flex items-center gap-2">
@@ -342,7 +351,7 @@ function OrdersList({
                 {/* Lista de itens do batch */}
                 <div className="mt-2 space-y-1">
                   {lines.map((l) => (
-                    <div key={l.id} className="flex justify-between items-center text-sm">
+                    <div key={l.id} className="flex justify-between items-center text-sm interactive-row">
                       <span className="font-semibold">{l.quantity}× {l.item_name ?? "—"}</span>
                       <span className="text-muted-foreground font-mono text-xs">{l.total_price != null ? fmtPrice(l.total_price) : "—"}</span>
                     </div>
@@ -380,7 +389,7 @@ function OrdersList({
                           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Materiais a entregar</div>
                           <ul className="space-y-0.5">
                             {aggregatedIngredients.map((ing, idx) => (
-                              <li key={idx} className="flex justify-between items-center">
+                              <li key={idx} className="flex justify-between items-center interactive-row">
                                 <span className="text-foreground">{ing.name}</span>
                                 <span className="text-muted-foreground font-mono">{fmtNum(ing.needed)}</span>
                               </li>
@@ -768,7 +777,7 @@ function NewOrder() {
                   {validLines.map((l, idx) => {
                     const item = items.find((i) => String(i.id) === l.item_id);
                     return (
-                      <li key={idx} className="flex justify-between items-center">
+                      <li key={idx} className="flex justify-between items-center interactive-row">
                         <span className="font-medium">{l.qty}× {item?.name ?? "—"}</span>
                         {item != null && (
                           <span className="text-muted-foreground font-mono text-xs">{fmtPrice((item.min_sale_price ?? 0) * Number(l.qty))}</span>
@@ -815,7 +824,7 @@ function NewOrder() {
                       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Materiais a entregar</div>
                       <ul className="space-y-0.5 text-xs">
                         {sim.data.ingredients.map((ing) => (
-                          <li key={ing.name} className="flex justify-between items-center">
+                          <li key={ing.name} className="flex justify-between items-center interactive-row">
                             <span>{ing.name}</span>
                             <span className="font-mono text-muted-foreground">{fmtNum(ing.needed)}</span>
                           </li>

@@ -39,7 +39,7 @@ import {
   isAllowedOrangeWeapon,
 } from "@/lib/armory.catalog";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/precario")({
   head: () => ({
@@ -151,58 +151,70 @@ function Page() {
       />
 
       {isManager && (
-        <div className="mb-4 flex justify-end gap-2">
-          <FixItemsButton />
-          <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
-            <Pencil className="mr-1 h-3.5 w-3.5" />
-            {editMode ? "Concluir" : "Editar preços"}
-          </Button>
-        </div>
+        <Reveal direction="up" delay={50}>
+          <div className="mb-4 flex justify-end gap-2">
+            <FixItemsButton />
+            <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
+              <Pencil className="mr-1 h-3.5 w-3.5" />
+              {editMode ? "Concluir" : "Editar preços"}
+            </Button>
+          </div>
+        </Reveal>
       )}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="compra" className="interactive-tab">A firma compra</TabsTrigger>
-          <TabsTrigger value="venda" className="interactive-tab">A firma vende</TabsTrigger>
-        </TabsList>
+      <Reveal direction="up" delay={100}>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="compra" className="interactive-tab">A firma compra</TabsTrigger>
+            <TabsTrigger value="venda" className="interactive-tab">A firma vende</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="compra" className="mt-4 space-y-8">
-          <p className="text-xs text-muted-foreground">
-            Preços que pagamos pelo material que entregares. Larga em <span className="text-foreground">Entregas</span>.
-          </p>
-          {COMPRA_GROUPS.map((g) => (
-            <BuyTable
-              key={g.key}
-              catKey={g.key}
-              title={g.label}
-              items={grouped[g.key] ?? []}
-              editMode={editMode && isManager}
-              onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, purchase_price: val })}
-              onUpdatePoints={(id, val) => updatePrice.mutate({ item_id: id, xp_points: val })}
-              pending={updatePrice.isPending}
-            />
-          ))}
-        </TabsContent>
+          <TabsContent value="compra" className="mt-4 space-y-8">
+            <Reveal direction="up" delay={50}>
+              <p className="text-xs text-muted-foreground">
+                Preços que pagamos pelo material que entregares. Larga em <span className="text-foreground">Entregas</span>.
+              </p>
+            </Reveal>
+            <Stagger direction="up" staggerDelay={80} baseDelay={100} className="space-y-8">
+              {COMPRA_GROUPS.map((g) => (
+                <BuyTable
+                  key={g.key}
+                  catKey={g.key}
+                  title={g.label}
+                  items={grouped[g.key] ?? []}
+                  editMode={editMode && isManager}
+                  onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, purchase_price: val })}
+                  onUpdatePoints={(id, val) => updatePrice.mutate({ item_id: id, xp_points: val })}
+                  pending={updatePrice.isPending}
+                />
+              ))}
+            </Stagger>
+          </TabsContent>
 
-        <TabsContent value="venda" className="mt-4 space-y-8">
-          <p className="text-xs text-muted-foreground">
-            Só vendemos a gente da casa. Encomendas em <span className="text-foreground">Encomendas</span>.
-          </p>
-          {ARMORY_CAT_ORDER.map((key) => (
-            <SellTable
-              key={key}
-              catKey={key}
-              title={ARMORY_CAT_CONFIG[key].label}
-              items={vendaItemsForGroup(key)}
-              recipeMap={recipeMap}
-              isManager={isManager}
-              editMode={editMode && isManager}
-              onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, min_sale_price: val })}
-              pending={updatePrice.isPending}
-            />
-          ))}
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="venda" className="mt-4 space-y-8">
+            <Reveal direction="up" delay={50}>
+              <p className="text-xs text-muted-foreground">
+                Só vendemos a gente da casa. Encomendas em <span className="text-foreground">Encomendas</span>.
+              </p>
+            </Reveal>
+            <Stagger direction="up" staggerDelay={80} baseDelay={100} className="space-y-8">
+              {ARMORY_CAT_ORDER.map((key) => (
+                <SellTable
+                  key={key}
+                  catKey={key}
+                  title={ARMORY_CAT_CONFIG[key].label}
+                  items={vendaItemsForGroup(key)}
+                  recipeMap={recipeMap}
+                  isManager={isManager}
+                  editMode={editMode && isManager}
+                  onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, min_sale_price: val })}
+                  pending={updatePrice.isPending}
+                />
+              ))}
+            </Stagger>
+          </TabsContent>
+        </Tabs>
+      </Reveal>
     </>
   );
 }
@@ -235,7 +247,7 @@ function BuyTable({
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <tr className="interactive-row">
+            <tr>
               <th className="px-3 py-2 text-left">Item</th>
               <th className="px-3 py-2 text-center">Pontos</th>
               {isDrogas ? (
@@ -286,7 +298,7 @@ function SellTable({
       <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <tr className="interactive-row">
+            <tr>
               <th className="px-3 py-2 text-left">Item</th>
               <th className="px-3 py-2 text-right">Preço</th>
               <th className="px-3 py-2 text-center w-10"></th>
@@ -314,7 +326,7 @@ function PriceRow({
   const [ptsVal, setPtsVal] = useState(String(itemPoints(it.name, it.category, it.xp_points)));
 
   return (
-    <tr className="border-t border-border">
+    <tr className="border-t border-border interactive-row">
       <td className="px-3 py-2">
         <span className="inline-flex items-center gap-2 font-medium">
           <ItemIcon name={it.name} category={catKey} size={14} />
@@ -385,7 +397,7 @@ function SellRow({
 
   return (
     <>
-      <tr className="border-t border-border">
+      <tr className="border-t border-border interactive-row">
         <td className="px-3 py-2">
           <span className="inline-flex items-center gap-2 font-medium">
             <ItemIcon name={it.name} category={catKey} size={14} />
@@ -418,7 +430,7 @@ function SellRow({
         </td>
       </tr>
       {expanded && recipe && recipe.ingredients.length > 0 && (
-        <tr className="interactive-row">
+        <tr>
           <td colSpan={3} className="px-3 py-2 bg-muted/20 border-t border-border/50">
             <div className="text-xs space-y-1">
               <div className="text-muted-foreground font-medium mb-1.5 flex items-center gap-1.5">

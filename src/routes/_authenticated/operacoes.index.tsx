@@ -22,7 +22,7 @@ import redwoodLogo from "@/assets/ballas-logo.png";
 import { toast } from "sonner";
 import { SaidaWizard } from "@/components/operations/SaidaWizard";
 import type { SaidaFilter } from "@/components/operations/SaidaFilters";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/operacoes/")({
   component: Page,
@@ -70,20 +70,27 @@ function Page() {
       />
 
       {/* Stats */}
-      {data && data.length > 0 && <SaidaStats saidas={data} />}
+      {data && data.length > 0 && (
+        <Reveal direction="up">
+          <SaidaStats saidas={data} />
+        </Reveal>
+      )}
 
       {/* Filters */}
-      <div className="mt-6">
-        <SaidaFilters
-          filter={filter}
-          onChange={setFilter}
-          counts={statusCounts}
-        />
-      </div>
+      <Reveal direction="up" delay={100}>
+        <div className="mt-6">
+          <SaidaFilters
+            filter={filter}
+            onChange={setFilter}
+            counts={statusCounts}
+          />
+        </div>
+      </Reveal>
 
       {/* List */}
-      <div className="mt-5">
-        {isLoading && (
+      <Reveal direction="up" delay={150}>
+        <div className="mt-5">
+          {isLoading && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
@@ -115,6 +122,7 @@ function Page() {
           />
         )}
       </div>
+      </Reveal>
     </>
   );
 }

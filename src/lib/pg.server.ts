@@ -1,24 +1,8 @@
 // Server-only PostgreSQL client using Supabase RPC (Edge-compatible).
 // Uses Supabase REST API instead of TCP sockets — works reliably on Cloudflare Workers.
 // NEVER import this file from client code.
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { escapeSqlParam } from "./security";
-
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
-
-function getSupabase() {
-  if (!supabaseInstance) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_ANON_KEY must be set");
-    }
-    supabaseInstance = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-  }
-  return supabaseInstance;
-}
 
 /**
  * Execute a SQL query via Supabase RPC (exec_sql).
@@ -48,7 +32,7 @@ export async function pgQuery<T = any>(
       throw new Error("Multi-statement queries are not allowed via pgQuery");
     }
 
-    const { data, error } = await (getSupabase() as any).rpc("exec_sql", { sql_query: query });
+    const { data, error } = await (supabaseAdmin as any).rpc("exec_sql", { sql_query: query });
     if (error) throw error;
     const rows = (data as any[] | null) ?? [];
     return rows as T[];

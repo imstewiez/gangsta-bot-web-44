@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
-import { listAvailability, getAvailabilityVotes } from "@/lib/ops.functions";
+import { listAvailability, getAvailabilityVotes } from "@/lib/operations.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/layout/EmptyState";
 import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/disponibilidade")({
   errorComponent: PageErrorBoundary,
@@ -45,8 +45,9 @@ function Page() {
         title="Disponibilidade"
         description="Disponibilidade diária"
       />
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="interactive-card">
+      <Reveal direction="up">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Card className="interactive-card">
           <CardHeader>
             <CardTitle className="text-display text-sm">Sessões</CardTitle>
           </CardHeader>
@@ -145,6 +146,7 @@ function Page() {
           </CardContent>
         </Card>
       </div>
+      </Reveal>
     </>
   );
 }

@@ -27,7 +27,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/tops")({
   head: () => ({
@@ -111,8 +111,9 @@ function Page() {
           </Tabs>
         }
       />
-      <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
-        <table className="w-full text-sm">
+      <Reveal direction="up">
+        <div className="overflow-x-auto overflow-hidden rounded-sm border border-border">
+          <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
             <tr className="interactive-row">
               <th className="px-3 py-2 text-left">#</th>
@@ -216,6 +217,7 @@ function Page() {
           </tbody>
         </table>
       </div>
+      </Reveal>
     </>
   );
 }

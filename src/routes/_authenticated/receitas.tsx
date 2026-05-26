@@ -47,7 +47,7 @@ import {
   isAllowedWeapon,
 } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/receitas")({
   head: () => ({
@@ -120,7 +120,7 @@ function RecipeCard({
         {r.ingredients.map((i) => {
           const isEditing = editing.has(i.item_id);
           return (
-            <li key={i.item_id} className="flex justify-between border-b border-border/40 py-1">
+            <li key={i.item_id} className="flex justify-between border-b border-border/40 py-1 interactive-row">
               <span className="text-muted-foreground">{i.name}</span>
               {editMode && isManager ? (
                 isEditing ? (
@@ -336,17 +336,19 @@ function Page() {
         description={`${totalRecipes} receitas organizadas por categoria. Custo real com base nos preços de compra.`}
       />
 
-      <div className="mb-5 flex items-center gap-3">
-        <div className="max-w-sm flex-1">
-          <Input placeholder="Procurar item" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <Reveal direction="up">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="max-w-sm flex-1">
+            <Input placeholder="Procurar item" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          {isManager && (
+            <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
+              <Pencil className="mr-1 h-3.5 w-3.5" />
+              {editMode ? "Concluir" : "Editar"}
+            </Button>
+          )}
         </div>
-        {isManager && (
-          <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
-            <Pencil className="mr-1 h-3.5 w-3.5" />
-            {editMode ? "Concluir" : "Editar"}
-          </Button>
-        )}
-      </div>
+      </Reveal>
 
       {recipes.isLoading && (
         <div className="grid gap-3 md:grid-cols-2">
@@ -357,42 +359,46 @@ function Page() {
       )}
 
       <div className="space-y-8">
-        {grouped.map(([category, items]) => {
+        {grouped.map(([category, items], idx) => {
           const cfg = (ARMORY_CAT_CONFIG as any)[category];
           const Icon = cfg?.icon ?? Package;
           return (
-            <section key={category} className="animate-rise">
-              <div className="mb-3">
-                <CategoryHeader
-                  category={category}
-                  right={`${items.length} receita${items.length !== 1 ? "s" : ""}`}
-                />
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {items.map((r) => (
-                  <RecipeCard
-                    key={r.recipe_id}
-                    r={r}
-                    isManager={isManager}
-                    member={me.data ?? null}
-                    editMode={editMode}
-                    pending={updateIng.isPending || updatePrice.isPending}
-                    onUpdateIngredient={(rid, iid, qty) => updateIng.mutate({ recipe_id: rid, ingredient_item_id: iid, quantity: qty })}
-                    onUpdatePrice={(itemId, price) => updatePrice.mutate({ item_id: itemId, estimated_value: price })}
-                    onSimulate={(id) => { setCalcRecipe(id); setQtyStr("1"); setResult(null); }}
+            <Reveal key={category} direction="up" delay={idx * 100}>
+              <section className="animate-rise">
+                <div className="mb-3">
+                  <CategoryHeader
+                    category={category}
+                    right={`${items.length} receita${items.length !== 1 ? "s" : ""}`}
                   />
-                ))}
-              </div>
-            </section>
+                </div>
+                <Stagger className="grid gap-3 md:grid-cols-2" staggerDelay={80}>
+                  {items.map((r) => (
+                    <RecipeCard
+                      key={r.recipe_id}
+                      r={r}
+                      isManager={isManager}
+                      member={me.data ?? null}
+                      editMode={editMode}
+                      pending={updateIng.isPending || updatePrice.isPending}
+                      onUpdateIngredient={(rid, iid, qty) => updateIng.mutate({ recipe_id: rid, ingredient_item_id: iid, quantity: qty })}
+                      onUpdatePrice={(itemId, price) => updatePrice.mutate({ item_id: itemId, estimated_value: price })}
+                      onSimulate={(id) => { setCalcRecipe(id); setQtyStr("1"); setResult(null); }}
+                    />
+                  ))}
+                </Stagger>
+              </section>
+            </Reveal>
           );
         })}
       </div>
 
       {!recipes.isLoading && !grouped.length && (
-        <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
-          <Package className="mx-auto h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-2 text-sm text-muted-foreground">Sem receitas.</p>
-        </div>
+        <Reveal direction="up">
+          <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
+            <Package className="mx-auto h-10 w-10 text-muted-foreground/30" />
+            <p className="mt-2 text-sm text-muted-foreground">Sem receitas.</p>
+          </div>
+        </Reveal>
       )}
 
       <Dialog open={calcRecipe != null} onOpenChange={(v) => !v && setCalcRecipe(null)}>
@@ -412,7 +418,7 @@ function Page() {
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Materiais necessários</div>
                   <ul className="space-y-1">
                     {result.ingredients.map((ing) => (
-                      <li key={ing.name} className="flex justify-between items-center">
+                      <li key={ing.name} className="flex justify-between items-center interactive-row">
                         <span className="text-foreground">{ing.name}</span>
                         <span className="text-muted-foreground">
                           {ing.qty_per_recipe} × {result.requested_qty} = {fmtNum(ing.needed)}
@@ -428,7 +434,7 @@ function Page() {
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Custo estimado (chefia)</div>
                     <ul className="space-y-1">
                       {result.ingredients.map((ing) => (
-                        <li key={`cost-${ing.name}`} className="flex justify-between items-center text-muted-foreground/70">
+                        <li key={`cost-${ing.name}`} className="flex justify-between items-center text-muted-foreground/70 interactive-row">
                           <span>{ing.name}</span>
                           <span className="font-mono">{fmtPrice(ing.unit_cost)} × {fmtNum(ing.needed)} = {fmtPrice(Math.round(ing.line_cost))}</span>
                         </li>

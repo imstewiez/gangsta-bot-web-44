@@ -31,7 +31,7 @@ import { SaidaTimeline } from "@/components/operations/SaidaTimeline";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 import {
   ArrowLeft,
   Crosshair,
@@ -175,18 +175,19 @@ function Page() {
 
   return (
     <div className="animate-rise">
-      {/* Back link */}
-      <Link
-        to="/operacoes"
-        className="mb-4 inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Voltar às saídas
-      </Link>
+      <Reveal direction="up">
+        {/* Back link */}
+        <Link
+          to="/operacoes"
+          className="mb-4 inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-primary"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar às saídas
+        </Link>
 
-      {/* Hero header */}
-      <div
-        className={cn(
+        {/* Hero header */}
+        <div
+          className={cn(
           "relative overflow-hidden rounded-2xl border p-6 backdrop-blur-sm",
           "bg-card/60",
           typeStyle.border,
@@ -289,9 +290,11 @@ function Page() {
           </div>
         </div>
       </div>
+      </Reveal>
 
-      {/* Content grid */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <Reveal direction="up" delay={100}>
+        {/* Content grid */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Left: Timeline */}
         <div className="lg:col-span-1">
           <div className="rounded-xl border border-border/60 bg-card/40 p-4 backdrop-blur-sm">
@@ -372,6 +375,7 @@ function Page() {
           </Tabs>
         </div>
       </div>
+      </Reveal>
 
       {/* Liquidation confirmation dialog */}
       <Dialog open={confirmLiq} onOpenChange={setConfirmLiq}>

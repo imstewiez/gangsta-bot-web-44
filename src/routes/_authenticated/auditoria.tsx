@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
-import { listAuditLogs } from "@/lib/ops.functions";
+import { listAuditLogs } from "@/lib/operations.functions";
 import { checkManagerAccess } from "@/lib/access-check.functions";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 /* ────────────── ACTION META ────────────── */
 const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: string; category: string }> = {
@@ -210,46 +210,48 @@ function Page() {
       <PageHeader eyebrow="Direção" title="Auditoria" description="Histórico de ações" icon={ScrollText} />
 
       {/* Filters */}
-      <div className="mb-4 space-y-3">
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Procurar por ação, membro, entidade..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+      <Reveal direction="up">
+        <div className="mb-4 space-y-3">
+          {/* Search */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Procurar por ação, membro, entidade..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-        {/* Category pills */}
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setCategory(c.key)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                category === c.key
-                  ? "border-primary bg-primary/20 text-primary"
-                  : "border-border bg-card/40 text-muted-foreground hover:bg-card/80 hover:text-foreground"
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
+          {/* Category pills */}
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setCategory(c.key)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  category === c.key
+                    ? "border-primary bg-primary/20 text-primary"
+                    : "border-border bg-card/40 text-muted-foreground hover:bg-card/80 hover:text-foreground"
+                )}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Result count */}
-        <div className="text-xs text-muted-foreground">
-          {filtered.length} de {(logs.data ?? []).length} registos
+          {/* Result count */}
+          <div className="text-xs text-muted-foreground">
+            {filtered.length} de {(logs.data ?? []).length} registos
+          </div>
         </div>
-      </div>
+      </Reveal>
 
       {/* Logs */}
       <div className="space-y-6">
@@ -261,24 +263,25 @@ function Page() {
           </div>
         )}
 
-        {grouped.map(([date, items]) => (
-          <section key={date}>
-            <h3 className="mb-2 text-display text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
-              {dateLabel(date)}
-            </h3>
-            <div className="space-y-2">
-              {items.map((l) => {
-                const meta = actionMeta(l.action);
-                const Icon = meta.icon;
-                const entity = resolveEntity(l.entity_type, l.entity_id, l.context);
-                const parsed = parseContext(l.context);
-                const time = new Date(l.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+        {grouped.map(([date, items], gIdx) => (
+          <Reveal key={date} direction="up" delay={gIdx * 80}>
+            <section>
+              <h3 className="mb-2 text-display text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
+                {dateLabel(date)}
+              </h3>
+              <Stagger className="space-y-2" staggerDelay={60}>
+                {items.map((l) => {
+                  const meta = actionMeta(l.action);
+                  const Icon = meta.icon;
+                  const entity = resolveEntity(l.entity_type, l.entity_id, l.context);
+                  const parsed = parseContext(l.context);
+                  const time = new Date(l.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 
-                return (
-                  <div
-                    key={l.id}
-                    className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-3 backdrop-blur-sm interactive-card"
-                  >
+                  return (
+                    <div
+                      key={l.id}
+                      className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-3 backdrop-blur-sm interactive-card"
+                    >
                     {/* Icon */}
                     <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", meta.tone.replace("text-", "border-").replace("400", "500/30"), meta.tone.replace("text-", "bg-").replace("400", "500/10"))}>
                       <Icon className={cn("h-4 w-4", meta.tone)} />
@@ -331,9 +334,10 @@ function Page() {
                   </div>
                 );
               })}
-            </div>
+            </Stagger>
           </section>
-        ))}
+        </Reveal>
+      ))}
 
         {!logs.isLoading && !filtered.length && (
           <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">

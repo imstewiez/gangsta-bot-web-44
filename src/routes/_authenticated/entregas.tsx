@@ -55,7 +55,7 @@ import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
 import { FadeIn } from "@/components/layout/FadeIn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/entregas")({
   component: Page,
@@ -118,8 +118,9 @@ function Page() {
         description="Registo de entregas"
         action={<NewDelivery />}
       />
-      <FadeIn>
-        <Tabs value={tab} onValueChange={setTab}>
+      <Reveal direction="up">
+        <FadeIn>
+          <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="mine" className="interactive-tab">As minhas</TabsTrigger>
           {isManager && <TabsTrigger value="manage" className="interactive-tab">Para conferir</TabsTrigger>}
@@ -135,6 +136,7 @@ function Page() {
         )}
       </Tabs>
       </FadeIn>
+      </Reveal>
     </>
   );
 }
@@ -182,7 +184,7 @@ function DelList({
     return <p className="text-muted-foreground">A carregar entregas</p>;
   if (!list.data?.length)
     return (
-      <Card className="p-10 text-center">
+      <Card className="interactive-card p-10 text-center">
         <PackageOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
         <p className="text-display text-sm text-muted-foreground">
           {scope === "mine"
@@ -198,7 +200,7 @@ function DelList({
         const tipoMeta = TIPO_META[d.tipo] ?? TIPO_META.entrega;
         const st = statusMeta(d.tipo, d.status);
         return (
-          <Card key={d.id} className={`p-4 border-l-4 ${d.tipo === "venda" ? "border-l-warning" : "border-l-info"}`}>
+          <Card key={d.id} className={`interactive-card p-4 border-l-4 ${d.tipo === "venda" ? "border-l-warning" : "border-l-info"}`}>
             <div className="flex items-start gap-4">
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -227,7 +229,7 @@ function DelList({
                 </div>
                 <ul className="mt-3 divide-y divide-border/50 text-sm">
                   {d.lines.map((l, i) => (
-                    <li key={i} className="flex justify-between py-1">
+                    <li key={i} className="interactive-row flex justify-between py-1">
                       <span className="inline-flex items-center gap-2">
                         <span className="font-mono text-muted-foreground">
                           {l.qty}×

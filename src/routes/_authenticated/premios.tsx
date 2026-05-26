@@ -30,7 +30,7 @@ import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
 import { Trophy, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/premios")({
   component: Page,
@@ -85,8 +85,9 @@ function Page() {
           ) : null
         }
       />
-      <div className="space-y-2">
-        {prizes.isLoading && (
+      <Reveal direction="up">
+        <div className="space-y-2">
+          {prizes.isLoading && (
           <p className="text-muted-foreground">A carregar</p>
         )}
         {(prizes.data ?? []).map((p) => (
@@ -132,6 +133,7 @@ function Page() {
           <p className="text-muted-foreground">Sem prémios.</p>
         )}
       </div>
+      </Reveal>
       <Dialog open={editId != null} onOpenChange={(v) => !v && setEditId(null)}>
         <DialogContent>
           <DialogHeader>

@@ -17,7 +17,7 @@ import { Package, History, Pencil, Check, X, Loader2 } from "lucide-react";
 import { AccessDenied } from "@/components/domain/AccessDenied";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
@@ -137,36 +137,40 @@ function Page() {
       />
 
       {isManager && (
-        <div className="mb-4 flex justify-end">
-          <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
-            <Pencil className="mr-1 h-3.5 w-3.5" />
-            {editMode ? "Concluir" : "Editar stock/preços"}
-          </Button>
-        </div>
+        <Reveal direction="up" delay={50}>
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
+              <Pencil className="mr-1 h-3.5 w-3.5" />
+              {editMode ? "Concluir" : "Editar stock/preços"}
+            </Button>
+          </div>
+        </Reveal>
       )}
 
-      <Tabs defaultValue="stock">
-        <TabsList>
-          <TabsTrigger value="stock" className="interactive-tab">
-            <Package className="mr-1.5 h-3.5 w-3.5" /> Stock
-          </TabsTrigger>
-          <TabsTrigger value="ledger" className="interactive-tab">
-            <History className="mr-1.5 h-3.5 w-3.5" /> Movimentos
-          </TabsTrigger>
-        </TabsList>
+      <Reveal direction="up" delay={100}>
+        <Tabs defaultValue="stock">
+          <TabsList>
+            <TabsTrigger value="stock" className="interactive-tab">
+              <Package className="mr-1.5 h-3.5 w-3.5" /> Stock
+            </TabsTrigger>
+            <TabsTrigger value="ledger" className="interactive-tab">
+              <History className="mr-1.5 h-3.5 w-3.5" /> Movimentos
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="stock" className="mt-4">
-          <StockTable
-            editMode={editMode && isManager}
-            onAdjustStock={(id, qty) => adjustMutation.mutate({ item_id: id, new_qty: qty })}
-            onUpdatePrice={(id, price) => priceMutation.mutate({ item_id: id, purchase_price: price })}
-            pending={adjustMutation.isPending || priceMutation.isPending}
-          />
-        </TabsContent>
-        <TabsContent value="ledger" className="mt-4">
-          <LedgerTable />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="stock" className="mt-4">
+            <StockTable
+              editMode={editMode && isManager}
+              onAdjustStock={(id, qty) => adjustMutation.mutate({ item_id: id, new_qty: qty })}
+              onUpdatePrice={(id, price) => priceMutation.mutate({ item_id: id, purchase_price: price })}
+              pending={adjustMutation.isPending || priceMutation.isPending}
+            />
+          </TabsContent>
+          <TabsContent value="ledger" className="mt-4">
+            <LedgerTable />
+          </TabsContent>
+        </Tabs>
+      </Reveal>
     </>
   );
 }
@@ -210,13 +214,15 @@ function StockTable({
     );
   if (!total)
     return (
-      <Card className="p-8 text-center text-muted-foreground">
-        Armazém vazio. Mete-te a trabalhar.
-      </Card>
+      <Reveal direction="up" delay={100}>
+        <Card className="interactive-card p-8 text-center text-muted-foreground">
+          Armazém vazio. Mete-te a trabalhar.
+        </Card>
+      </Reveal>
     );
 
   return (
-    <div className="space-y-6">
+    <Stagger direction="up" staggerDelay={80} baseDelay={100} className="space-y-6">
       {ordered.map(([cat, items]) => {
         const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
         const meta = cfg ?? { label: cat, tone: "muted", order: 99, icon: Package, color: "", bg: "", border: "", headerColor: "" };
@@ -240,7 +246,7 @@ function StockTable({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  <tr className="interactive-row">
+                  <tr>
                     <th className="px-3 py-2 text-left">Item</th>
                     <th className="px-3 py-2 text-right">Em casa</th>
                     <th className="px-3 py-2 text-right">Preço unid.</th>
@@ -267,7 +273,7 @@ function StockTable({
           </section>
         );
       })}
-    </div>
+    </Stagger>
   );
 }
 
@@ -355,16 +361,19 @@ function LedgerTable() {
     );
   if (!rows.length)
     return (
-      <Card className="p-8 text-center text-muted-foreground">
-        Sem movimentos registados.
-      </Card>
+      <Reveal direction="up" delay={100}>
+        <Card className="interactive-card p-8 text-center text-muted-foreground">
+          Sem movimentos registados.
+        </Card>
+      </Reveal>
     );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <Reveal direction="up" delay={100}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
         <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <tr className="interactive-row">
+          <tr>
             <th className="px-3 py-2 text-left">Data</th>
             <th className="px-3 py-2 text-left">Tipo</th>
             <th className="px-3 py-2 text-left">Item</th>
@@ -402,7 +411,8 @@ function LedgerTable() {
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+        </table>
+      </div>
+    </Reveal>
   );
 }

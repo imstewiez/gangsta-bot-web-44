@@ -25,7 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({
   head: () => ({
@@ -99,8 +99,9 @@ function Page() {
       />
 
       {/* XP Progress Card */}
-      {xp.data && !xp.data.maxedOut && (
-        <Card className="mt-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+      <Reveal direction="up">
+        {xp.data && !xp.data.maxedOut && (
+          <Card className="interactive-card mt-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -135,7 +136,7 @@ function Page() {
         </Card>
       )}
       {xp.data && xp.data.maxedOut && (
-        <Card className="mt-4 border-amber-400/30 bg-gradient-to-br from-amber-400/5 to-transparent">
+        <Card className="interactive-card mt-4 border-amber-400/30 bg-gradient-to-br from-amber-400/5 to-transparent">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <div className="rounded-sm bg-amber-400/15 p-1.5">
@@ -157,101 +158,108 @@ function Page() {
           </CardContent>
         </Card>
       )}
+      </Reveal>
 
       {/* Stats grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4">
-        <StatCard icon={Sword} label="Kills" value={data.kills} tone="primary" />
-        <StatCard icon={Skull} label="Mortes" value={data.deaths} tone="destructive" />
-        <StatCard icon={Crosshair} label="Saídas" value={data.saidas} tone="info" />
-        <StatCard icon={Truck} label="Entregas" value={data.deliveries} tone="success" />
-        <StatCard icon={Coins} label="Vendas" value={data.vendas} tone="warning" />
-        <StatCard icon={ShoppingBag} label="Encomendas" value={data.orders} tone="accent" />
-        <Card className="interactive-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Entrou</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">{fmtDate(m.joined_at)}</CardContent>
-        </Card>
-        <Card className="interactive-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Discord ID</CardTitle>
-          </CardHeader>
-          <CardContent className="font-mono text-xs">{m.discord_id ?? "—"}</CardContent>
-        </Card>
-      </div>
+      <Reveal direction="up" delay={100}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4">
+          <StatCard icon={Sword} label="Kills" value={data.kills} tone="primary" />
+          <StatCard icon={Skull} label="Mortes" value={data.deaths} tone="destructive" />
+          <StatCard icon={Crosshair} label="Saídas" value={data.saidas} tone="info" />
+          <StatCard icon={Truck} label="Entregas" value={data.deliveries} tone="success" />
+          <StatCard icon={Coins} label="Vendas" value={data.vendas} tone="warning" />
+          <StatCard icon={ShoppingBag} label="Encomendas" value={data.orders} tone="accent" />
+          <Card className="interactive-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Entrou</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm">{fmtDate(m.joined_at)}</CardContent>
+          </Card>
+          <Card className="interactive-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-display text-[11px] uppercase tracking-wider text-muted-foreground">Discord ID</CardTitle>
+            </CardHeader>
+            <CardContent className="font-mono text-xs">{m.discord_id ?? "—"}</CardContent>
+          </Card>
+        </div>
+      </Reveal>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Card className="interactive-card">
-          <CardHeader>
-            <CardTitle className="text-display text-sm">Contribuições</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(data.contributions?.length ?? 0) === 0 ? (
-              <p className="text-sm text-muted-foreground">Sem registos.</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {data.contributions.map((c) => (
-                  <li
-                    key={c.type}
-                    className="flex justify-between border-b border-border/50 py-1.5 text-sm last:border-0"
-                  >
-                    <MovementTypeBadge type={c.type} />
-                    <span className="font-mono">{fmtNum(c.total)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="interactive-card">
-          <CardHeader>
-            <CardTitle className="text-display text-sm">Movimentos recentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(data.recentMovements?.length ?? 0) === 0 ? (
-              <p className="text-sm text-muted-foreground">Sem movimentos.</p>
-            ) : (
-              <ul className="space-y-1">
-                {data.recentMovements.map((mv) => (
-                  <li
-                    key={mv.id}
-                    className="flex items-baseline gap-2 border-b border-border/50 py-1.5 text-xs last:border-0"
-                  >
-                    <span className="text-muted-foreground">
-                      {fmtDate(mv.created_at).split(",")[0]}
-                    </span>
-                    <MovementTypeBadge type={mv.type} />
-                    <span className="text-muted-foreground">{mv.item_name ?? "—"}</span>
-                    <span className="ml-auto font-mono">{fmtNum(mv.qty)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Reveal direction="up" delay={150}>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <Card className="interactive-card">
+            <CardHeader>
+              <CardTitle className="text-display text-sm">Contribuições</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(data.contributions?.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem registos.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {data.contributions.map((c) => (
+                    <li
+                      key={c.type}
+                      className="interactive-row flex justify-between border-b border-border/50 py-1.5 text-sm last:border-0"
+                    >
+                      <MovementTypeBadge type={c.type} />
+                      <span className="font-mono">{fmtNum(c.total)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="interactive-card">
+            <CardHeader>
+              <CardTitle className="text-display text-sm">Movimentos recentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(data.recentMovements?.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem movimentos.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {data.recentMovements.map((mv) => (
+                    <li
+                      key={mv.id}
+                      className="interactive-row flex items-baseline gap-2 border-b border-border/50 py-1.5 text-xs last:border-0"
+                    >
+                      <span className="text-muted-foreground">
+                        {fmtDate(mv.created_at).split(",")[0]}
+                      </span>
+                      <MovementTypeBadge type={mv.type} />
+                      <span className="text-muted-foreground">{mv.item_name ?? "—"}</span>
+                      <span className="ml-auto font-mono">{fmtNum(mv.qty)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </Reveal>
 
       {isChefia && (
-        <div className="mt-6">
-          <MemberAdminPanel
-            member={{
-              id: m.id,
-              display_name: m.display_name,
-              nick: m.nick,
-              tier: m.tier,
-            }}
-            stats={{
-              kills: data.kills,
-              deaths: data.deaths,
-              saidas: data.saidas,
-              deliveries: data.deliveries,
-              vendas: data.vendas,
-              orders: data.orders,
-            }}
-            myTier={myTier}
-            canManage={canManage}
-          />
-        </div>
+        <Reveal direction="up" delay={200}>
+          <div className="mt-6">
+            <MemberAdminPanel
+              member={{
+                id: m.id,
+                display_name: m.display_name,
+                nick: m.nick,
+                tier: m.tier,
+              }}
+              stats={{
+                kills: data.kills,
+                deaths: data.deaths,
+                saidas: data.saidas,
+                deliveries: data.deliveries,
+                vendas: data.vendas,
+                orders: data.orders,
+              }}
+              myTier={myTier}
+              canManage={canManage}
+            />
+          </div>
+        </Reveal>
       )}
     </>
   );

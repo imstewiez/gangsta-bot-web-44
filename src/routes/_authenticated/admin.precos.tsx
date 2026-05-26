@@ -22,7 +22,7 @@ import { fmtNum, fmtPrice } from "@/lib/domain";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { itemDisplayCategory } from "@/lib/armory.catalog";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/admin/precos")({
   beforeLoad: async () => {
@@ -100,33 +100,37 @@ function Page() {
         description="Editar preços dos items"
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          placeholder="Procurar item"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <Reveal direction="up">
+        <div className="mb-4 max-w-sm">
+          <Input
+            placeholder="Procurar item"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </Reveal>
 
       <div className="space-y-6">
-        {groups.map(([cat, list]) => (
-          <section key={cat}>
-            <div className="mb-2">
-              <CategoryHeader category={cat} />
-            </div>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {list.map((item) => (
-                <PriceCard
-                  key={item.id}
-                  item={item}
-                  editing={editing}
-                  setEditing={setEditing}
-                  onSave={(updates) => m.mutate({ item_id: item.id, ...updates })}
-                  isPending={m.isPending}
-                />
-              ))}
-            </div>
-          </section>
+        {groups.map(([cat, list], idx) => (
+          <Reveal key={cat} direction="up" delay={idx * 100}>
+            <section>
+              <div className="mb-2">
+                <CategoryHeader category={cat} />
+              </div>
+              <Stagger className="grid gap-3 md:grid-cols-2 lg:grid-cols-3" staggerDelay={80}>
+                {list.map((item) => (
+                  <PriceCard
+                    key={item.id}
+                    item={item}
+                    editing={editing}
+                    setEditing={setEditing}
+                    onSave={(updates) => m.mutate({ item_id: item.id, ...updates })}
+                    isPending={m.isPending}
+                  />
+                ))}
+              </Stagger>
+            </section>
+          </Reveal>
         ))}
       </div>
     </>

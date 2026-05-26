@@ -21,7 +21,7 @@ import { useState } from "react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { ARMORY_CAT_ORDER, ARMORY_CAT_CONFIG, itemDisplayCategory } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
-import { Reveal } from "@/components/layout/Reveal";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/admin/receitas")({
   beforeLoad: async () => {
@@ -103,46 +103,52 @@ function Page() {
         description="Editar receitas de craft"
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          placeholder="Procurar arma"
-          value={editing.get("_search") ?? ""}
-          onChange={(e) => setEditing((prev) => new Map(prev).set("_search", e.target.value))}
-        />
-      </div>
+      <Reveal direction="up">
+        <div className="mb-4 max-w-sm">
+          <Input
+            placeholder="Procurar arma"
+            value={editing.get("_search") ?? ""}
+            onChange={(e) => setEditing((prev) => new Map(prev).set("_search", e.target.value))}
+          />
+        </div>
+      </Reveal>
 
       {grouped.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
-          <Package className="mx-auto h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-2 text-sm text-muted-foreground">Sem receitas.</p>
-        </div>
+        <Reveal direction="up">
+          <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
+            <Package className="mx-auto h-10 w-10 text-muted-foreground/30" />
+            <p className="mt-2 text-sm text-muted-foreground">Sem receitas.</p>
+          </div>
+        </Reveal>
       ) : (
         <div className="space-y-8">
-          {grouped.map(([category, items]) => {
+          {grouped.map(([category, items], idx) => {
             const cfg = (ARMORY_CAT_CONFIG as any)[category];
             return (
-              <section key={category}>
-                <div className="mb-3">
-                  <CategoryHeader
-                    category={category}
-                    right={`${items.length} receita${items.length !== 1 ? "s" : ""}`}
-                  />
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {items.map((r) => (
-                    <RecipeEditorCard
-                      key={r.recipe_id}
-                      r={r}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSave={(ingId, qty) =>
-                        m.mutate({ recipe_id: r.recipe_id, ingredient_item_id: ingId, quantity: qty })
-                      }
-                      isPending={m.isPending}
+              <Reveal key={category} direction="up" delay={idx * 100}>
+                <section>
+                  <div className="mb-3">
+                    <CategoryHeader
+                      category={category}
+                      right={`${items.length} receita${items.length !== 1 ? "s" : ""}`}
                     />
-                  ))}
-                </div>
-              </section>
+                  </div>
+                  <Stagger className="grid gap-4 md:grid-cols-2" staggerDelay={80}>
+                    {items.map((r) => (
+                      <RecipeEditorCard
+                        key={r.recipe_id}
+                        r={r}
+                        editing={editing}
+                        setEditing={setEditing}
+                        onSave={(ingId, qty) =>
+                          m.mutate({ recipe_id: r.recipe_id, ingredient_item_id: ingId, quantity: qty })
+                        }
+                        isPending={m.isPending}
+                      />
+                    ))}
+                  </Stagger>
+                </section>
+              </Reveal>
             );
           })}
         </div>

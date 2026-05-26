@@ -268,7 +268,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<CraftFeasibilityBatch> => {
     try {
       const itemIds = data.lines.map((l) => l.item_id);
-      console.log("[computeCraftFeasibilityBatch] item_ids:", itemIds);
+      // debug: itemIds
 
       // Single query: recipes + ingredients for all requested items
       const rows = await pgQuery<{
@@ -294,7 +294,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         [itemIds],
       );
 
-      console.log("[computeCraftFeasibilityBatch] rows returned:", rows.length, rows.slice(0, 5));
+      // debug: rows returned
 
       const recipeMap = new Map<number, { item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null }>();
       const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
@@ -305,9 +305,9 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
       for (const line of data.lines) {
         // Find recipe data for this line
         const recipeRows = rows.filter((r) => r.item_id === line.item_id);
-        console.log(`[computeCraftFeasibilityBatch] line item_id=${line.item_id} qty=${line.quantity} recipeRows=${recipeRows.length}`);
+        // debug: line recipe info
         if (recipeRows.length === 0) {
-          console.log(`[computeCraftFeasibilityBatch] SKIP item_id=${line.item_id} — no recipe found`);
+          // debug: skip no recipe
           continue;
         }
 
@@ -349,7 +349,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         ingredients: Array.from(allIngredients.values()),
         items,
       };
-      console.log("[computeCraftFeasibilityBatch] RESULT:", JSON.stringify(result));
+      // debug: result
       return result;
     } catch (e: any) {
       console.error("[computeCraftFeasibilityBatch] ERROR:", e?.message ?? e);

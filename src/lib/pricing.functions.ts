@@ -13,7 +13,6 @@ export const getCurrentMember = createServerFn({ method: "GET" })
 export const getCatalog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<CatalogItem[]> => {
-    await pgQuery(`ALTER TABLE public.items ADD COLUMN IF NOT EXISTS xp_points integer DEFAULT 1`);
     return pgQuery<CatalogItem>(
       `select id, name, category, subcategory, side,
               purchase_price::float as purchase_price,

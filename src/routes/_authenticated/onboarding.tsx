@@ -23,8 +23,9 @@ import {
 } from "@/components/ui/dialog";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
-import { Reveal } from "@/components/layout/Reveal";
+import { checkManagerAccess } from "@/lib/access-check.functions";
+import { Check, X, Loader2 } from "lucide-react";
+import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {
@@ -86,17 +87,20 @@ function Page() {
         title="Onboarding"
         description="Novos membros"
       />
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          {["pending", "approved", "denied", "all"].map((s) => (
-            <TabsTrigger key={s} value={s} className="interactive-tab">
-              {s}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      <div className="mt-4 space-y-2">
-        {reqs.isLoading && <p className="text-muted-foreground">A carregar</p>}
+      <Reveal direction="up">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            {["pending", "approved", "denied", "all"].map((s) => (
+              <TabsTrigger key={s} value={s} className="interactive-tab">
+                {s}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </Reveal>
+      <Reveal direction="up" delay={100}>
+        <div className="mt-4 space-y-2">
+          {reqs.isLoading && <p className="text-muted-foreground">A carregar</p>}
         {(reqs.data ?? []).map((r) => (
           <div
             key={r.id}
@@ -143,6 +147,7 @@ function Page() {
           <p className="text-muted-foreground">Sem pedidos.</p>
         )}
       </div>
+      </Reveal>
       <Dialog open={denyId != null} onOpenChange={(v) => !v && setDenyId(null)}>
         <DialogContent>
           <DialogHeader>
