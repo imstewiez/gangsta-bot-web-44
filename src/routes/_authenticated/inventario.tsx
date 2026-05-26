@@ -74,9 +74,12 @@ function classifyRow(r: { category: string | null; subcategory: string | null; i
   // Esconder categorias não usadas no armazém
   if (cat === "outros" || cat === "armas_brancas") return null;
 
+  // Apenas colete padrão
+  if (cat === "coletes" && !/padrão/.test(name)) return null;
+
   // Apenas armas permitidas aparecem em Red / Orange (sem MK2)
-  if (cat === "armas_red" && (!isAllowedRedWeapon(r.item_name) || /mk2/.test(name))) return null;
-  if (cat === "armas_orange" && (!isAllowedOrangeWeapon(r.item_name) || /mk2/.test(name))) return null;
+  if (cat === "armas_red" && (!isAllowedRedWeapon(r.item_name, r.subcategory) || /mk2/.test(name))) return null;
+  if (cat === "armas_orange" && (!isAllowedOrangeWeapon(r.item_name, r.subcategory) || /mk2/.test(name))) return null;
 
   return cat;
 }

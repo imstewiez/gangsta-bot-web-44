@@ -324,7 +324,8 @@ export const ORANGE_WEAPON_NAMES = [
   "AP Pistol",
 ];
 
-export function isAllowedRedWeapon(name: string | null): boolean {
+export function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
+  if (subcategory === "armas_red") return true;
   if (!name) return false;
   const n = name.toLowerCase();
   // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
@@ -332,7 +333,8 @@ export function isAllowedRedWeapon(name: string | null): boolean {
   return RED_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
 }
 
-export function isAllowedOrangeWeapon(name: string | null): boolean {
+export function isAllowedOrangeWeapon(name: string | null, subcategory?: string | null): boolean {
+  if (subcategory === "armas_orange") return true;
   if (!name) return false;
   const n = name.toLowerCase();
   // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
@@ -346,8 +348,8 @@ export function isOrangeWeapon(name: string | null): boolean {
   return ORANGE_WEAPON_NAMES.some((o) => n.includes(o.toLowerCase()));
 }
 
-export function isAllowedWeapon(name: string | null): boolean {
-  return isAllowedRedWeapon(name) || isAllowedOrangeWeapon(name);
+export function isAllowedWeapon(name: string | null, subcategory?: string | null): boolean {
+  return isAllowedRedWeapon(name, subcategory) || isAllowedOrangeWeapon(name, subcategory);
 }
 
 // ── Classificação UNIFICADA para TODAS as páginas ──────────────────────────
@@ -386,7 +388,7 @@ export function itemDisplayCategory(
 
   // 2. Armas (ANTES de corpos/prints — algumas armas têm category="prints" na DB)
   // Verificar primeiro pelo nome se é uma arma permitida
-  if (isAllowedWeapon(itemName)) {
+  if (isAllowedWeapon(itemName, sub)) {
     if (isOrangeWeapon(itemName)) return "armas_orange";
     return "armas_red";
   }
@@ -426,7 +428,10 @@ export function itemDisplayCategory(
   if (cat === "prints" || sub === "prints" || /print|esquema|blueprint/.test(name))
     return "prints";
 
-  // 5. Materiais de craft / minérios / matérias-primas / madeiras / lixo
+  // 5. Drogas
+  if (cat === "drogas" || sub === "drogas") return "drogas";
+
+  // 6. Materiais de craft / minérios / matérias-primas / madeiras / lixo
   if (
     cat === "materiais" ||
     cat === "materias_primas" ||
@@ -447,9 +452,6 @@ export function itemDisplayCategory(
     if (cat === "materias_primas") return "materias_primas";
     return "materiais_craft";
   }
-
-  // 6. Drogas
-  if (cat === "drogas" || sub === "drogas") return "drogas";
 
   // 7. Lixo / Madeiras / Matérias-primas / Minérios / Materiais craft (subcategory direta)
   if (sub === "lixo") return "lixo";

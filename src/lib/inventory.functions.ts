@@ -46,7 +46,10 @@ export const getStock = createServerFn({ method: "GET" })
        left join inventory_balance ib on ib.item_id = i.id
        where i.active is not false
          and coalesce(i.deleted_at, 'epoch'::timestamptz) = 'epoch'::timestamptz
-         and i.category = any($1::text[])
+         and (
+           i.category = any($1::text[])
+           or i.subcategory in ('corpos','prints')
+         )
        order by unit_price desc nulls last`,
       [INV_CATEGORIES],
     );
@@ -104,7 +107,7 @@ export const getLedger = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
     const params: unknown[] = [data.limit, INV_CATEGORIES];
-    let where = "where i.category = any($2::text[])";
+    let where = "where (i.category = any($2::text[]) or i.subcategory in ('corpos','prints'))";
     if (data.type) {
       params.push(data.type);
       where += ` and im.movement_type = $${params.length}`;

@@ -11,46 +11,50 @@ export const fixItems = createServerFn({ method: "POST" })
 
     const results: string[] = [];
 
-    // Atualizar todos os corpos
-    const corpoUpdates = [
-      { pattern: "%mini smg%", price: 10000 },
-      { pattern: "%xm3%", price: 10000 },
-      { pattern: "%micro smg%", price: 15000 },
-      { pattern: "%tec-9%", price: 15000 },
-      { pattern: "%tec 9%", price: 15000 },
-      { pattern: "%tec9%", price: 15000 },
-      { pattern: "%tec pistol%", price: 20000 },
-      { pattern: "%ap pistol%", price: 20000 },
-    ];
-    for (const c of corpoUpdates) {
+    // ── Corpos (subcategory = 'corpos') ──────────────────────────────────────
+    const corpoMap: Record<string, number> = {
+      "Corpo Mini SMG": 10000,
+      "Corpo Pistol XM3": 10000,
+      "Corpo Micro SMG": 15000,
+      "Corpo TEC-9": 15000,
+      "Corpo UZI": 15000,
+      "Corpo TEC Pistol": 20000,
+      "Corpo AP Pistol": 20000,
+    };
+
+    for (const [name, price] of Object.entries(corpoMap)) {
       const rows = await pgQuery<{ name: string }>(
         `UPDATE items SET side = 'venda', active = true, updated_at = now(), min_sale_price = $1 
-         WHERE category = 'corpos' AND name ILIKE $2 
+         WHERE subcategory = 'corpos' AND name = $2 
          RETURNING name`,
-        [c.price, c.pattern],
+        [price, name],
       );
-      for (const r of rows) results.push(`Corpo: ${r.name} → ${c.price}€`);
+      if (rows.length > 0) {
+        for (const r of rows) results.push(`Corpo: ${r.name} → ${price}€`);
+      }
     }
 
-    // Atualizar todas as prints
-    const printUpdates = [
-      { pattern: "%laranja%", price: 10000 },
-      { pattern: "%azul%", price: 50000 },
-      { pattern: "%vermelh%", price: 70000 },
-      { pattern: "%amarel%", price: 100000 },
-      { pattern: "%dourad%", price: 100000 },
-    ];
-    for (const p of printUpdates) {
+    // ── Prints (name ILIKE '%print%') ────────────────────────────────────────
+    const printMap: Record<string, number> = {
+      "Print Laranja": 10000,
+      "Print Azul": 50000,
+      "Print Vermelha": 70000,
+      "Print Amarela": 100000,
+    };
+
+    for (const [name, price] of Object.entries(printMap)) {
       const rows = await pgQuery<{ name: string }>(
         `UPDATE items SET side = 'venda', active = true, updated_at = now(), min_sale_price = $1 
-         WHERE category = 'prints' AND name ILIKE $2 
+         WHERE name = $2 
          RETURNING name`,
-        [p.price, p.pattern],
+        [price, name],
       );
-      for (const r of rows) results.push(`Print: ${r.name} → ${p.price}€`);
+      if (rows.length > 0) {
+        for (const r of rows) results.push(`Print: ${r.name} → ${price}€`);
+      }
     }
 
-    // Remover da venda
+    // ── Remover da venda ─────────────────────────────────────────────────────
     const toRemove = ["Bullpup Rifle MK2", "Gadget Pistol", "Revolver"];
     for (const name of toRemove) {
       await pgQuery(
@@ -60,7 +64,7 @@ export const fixItems = createServerFn({ method: "POST" })
       results.push(`Removido: ${name}`);
     }
 
-    // Combat PDW
+    // ── Combat PDW ───────────────────────────────────────────────────────────
     const pdw = await pgQuery<{ name: string }>(
       `UPDATE items SET min_sale_price = 60000, updated_at = now() WHERE name = 'Combat PDW' RETURNING name`,
       [],

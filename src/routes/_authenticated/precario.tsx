@@ -128,11 +128,13 @@ function Page() {
       const c = itemDisplayCategory(it.name, it.category, it.subcategory);
       // Esconder categorias não usadas na venda
       if (c === "outros" || c === "armas_brancas") return false;
+      // Apenas colete padrão
+      if (c === "coletes" && !/padrão/i.test(it.name)) return false;
       // Sem MK2 em lado nenhum
       if (/mk2/i.test(it.name)) return false;
       // Apenas armas permitidas em Red / Orange
-      if (c === "armas_red" && !isAllowedRedWeapon(it.name)) return false;
-      if (c === "armas_orange" && !isAllowedOrangeWeapon(it.name)) return false;
+      if (c === "armas_red" && !isAllowedRedWeapon(it.name, it.subcategory)) return false;
+      if (c === "armas_orange" && !isAllowedOrangeWeapon(it.name, it.subcategory)) return false;
       return c === catKey && (it.min_sale_price ?? 0) > 0;
     });
   }

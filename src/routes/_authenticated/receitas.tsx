@@ -295,7 +295,7 @@ function Page() {
       const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
       if (key === "outros" || key === "armas_brancas") return false;
       // Apenas armas permitidas (Red / Orange) — tudo o resto é escondido
-      if ((key === "armas_red" || key === "armas_orange") && !isAllowedWeapon(r.item_name)) return false;
+      if ((key === "armas_red" || key === "armas_orange") && !isAllowedWeapon(r.item_name, r.subcategory)) return false;
       return true;
     });
     const filtered = search ? all.filter((r) => r.item_name.toLowerCase().includes(search.toLowerCase())) : all;
@@ -324,7 +324,7 @@ function Page() {
     if (/mk2/i.test(r.item_name)) return false;
     const key = itemDisplayCategory(r.item_name, r.category, r.subcategory);
     if (key === "outros" || key === "armas_brancas") return false;
-    if ((key === "armas_red" || key === "armas_orange") && !isAllowedWeapon(r.item_name)) return false;
+    if ((key === "armas_red" || key === "armas_orange") && !isAllowedWeapon(r.item_name, r.subcategory)) return false;
     return true;
   }).length;
 
