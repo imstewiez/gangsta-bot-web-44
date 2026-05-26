@@ -57,7 +57,7 @@ const EXCLUDED_ITEMS = [
   "radio estragado",
 ];
 
-function classifyRow(r: { category: string | null; subcategory: string | null; item_name: string }): string | null {
+function classifyRow(r: { category: string | null; subcategory: string | null; tier: string | null; item_name: string }): string | null {
   const name = r.item_name.toLowerCase();
 
   // Esconder materiais que não usamos
@@ -69,7 +69,7 @@ function classifyRow(r: { category: string | null; subcategory: string | null; i
   if (/\bsucata\b/.test(name)) return "materiais_craft";
 
   // Usar classificação unificada (fonte de verdade)
-  const cat = itemDisplayCategory(r.item_name, r.category, r.subcategory);
+  const cat = itemDisplayCategory(r.item_name, r.category, r.subcategory, r.tier);
 
   // Esconder categorias não usadas no armazém
   if (cat === "outros" || cat === "armas_brancas") return null;

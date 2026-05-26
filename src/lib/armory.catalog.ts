@@ -359,12 +359,17 @@ export function itemDisplayCategory(
   itemName: string,
   category: string | null,
   subcategory: string | null,
+  tier?: string | null,
 ): ArmoryCategory {
   const name = itemName.toLowerCase();
   const sub = subcategory;
   const cat = category;
+  const t = tier?.toLowerCase() ?? "";
 
-  // 1. Carregadores FIRST (têm "carregador" no nome)
+  // 0. Revolver é excluído explicitamente
+  if (name === "revolver") return "outros";
+
+  // 1. Carregadores — tudo na mesma categoria
   if (
     sub === "carregadores" ||
     sub === "municoes" ||
@@ -372,22 +377,21 @@ export function itemDisplayCategory(
     sub === "craft_carregadores" ||
     name.includes("carregador")
   ) {
-    if (name.includes("especial")) return "carregadores_especial";
-    if (
-      name.includes("red") ||
-      /carregador.*(ak|m4|g36|scar|fal|sniper|barrett|kar98|awp)/.test(name)
-    )
-      return "carregadores_red";
-    if (
-      name.includes("orange") ||
-      /carregador.*(ap pistol|mini smg|micro smg|tec|uzi|pistol xm3)/.test(name)
-    )
-      return "carregadores_orange";
     return "carregadores";
   }
 
-  // 2. Armas (ANTES de corpos/prints — algumas armas têm category="prints" na DB)
-  // Verificar primeiro pelo nome se é uma arma permitida
+  // 2. Armas — usar tier da receita como fonte de verdade quando disponível
+  // Tier vermelha/amarela/azul = red; tier laranja = orange
+  const tierIsRed = t === "vermelha" || t === "amarela" || t === "azul" || t === "red";
+  const tierIsOrange = t === "laranja" || t === "orange";
+
+  // Armas com tier red/orange na DB (mesmo que category='prints')
+  if (tierIsRed || tierIsOrange) {
+    if (tierIsOrange) return "armas_orange";
+    return "armas_red";
+  }
+
+  // Verificar pelo nome se é uma arma permitida
   if (isAllowedWeapon(itemName, sub)) {
     if (isOrangeWeapon(itemName)) return "armas_orange";
     return "armas_red";

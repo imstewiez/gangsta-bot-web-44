@@ -14,7 +14,7 @@ export const getCatalog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<CatalogItem[]> => {
     return pgQuery<CatalogItem>(
-      `select id, name, category, subcategory, side,
+      `select id, name, category, subcategory, side, tier,
               purchase_price::float as purchase_price,
               morador_purchase_price::float as morador_purchase_price,
               min_sale_price::float as min_sale_price,
@@ -24,7 +24,8 @@ export const getCatalog = createServerFn({ method: "GET" })
          and (
            side in ('compra','venda')
            or category in ('corpos','prints','armas_red','armas_orange')
-           or subcategory in ('carregadores','municoes','armas_red','armas_orange')
+           or subcategory in ('carregadores','municoes','armas_red','armas_orange','corpos','prints')
+           or tier in ('azul','vermelha','amarela','laranja','orange','red')
          )
        order by side, subcategory, purchase_price desc`,
     );
