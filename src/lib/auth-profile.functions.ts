@@ -2,6 +2,38 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne } from "./pg.server";
 
+export const ensureMemberFromProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const profile = await context.supabase
+      .from("profiles")
+      .select("discord_id, display_name")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    if (!profile.data?.discord_id) {
+      return { created: false, reason: "no_discord" };
+    }
+
+    const existing = await pgOne<{ id: number }>(
+      `select id from members where discord_id = $1 and deleted_at is null limit 1`,
+      [profile.data.discord_id],
+    );
+
+    if (existing) {
+      return { created: false, reason: "already_exists" };
+    }
+
+    const created = await pgOne<{ id: number }>(
+      `insert into members (discord_id, username, display_name, role, tier, status, lifecycle_state, joined_at, created_at, updated_at)
+       values ($1, $2, $2, 'bairrista', 'young_blood', 'ativo', 'active', now(), now(), now())
+       returning id`,
+      [profile.data.discord_id, profile.data.display_name ?? "Unknown"],
+    );
+
+    return { created: true, member_id: created?.id };
+  });
+
 export type Profile = {
   user_id: string;
   display_name: string | null;

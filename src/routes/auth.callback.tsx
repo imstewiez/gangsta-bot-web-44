@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
+import { ensureMemberFromProfile } from "@/lib/auth-profile.functions";
 
 export const Route = createFileRoute("/auth/callback")({
   component: AuthCallbackPage,
@@ -35,6 +36,13 @@ function AuthCallbackPage() {
       if (sessionError || !data.session) {
         setError("Falha na autenticação. Tenta novamente.");
         return;
+      }
+
+      // Ensure member row exists (new users may not have been backfilled yet)
+      try {
+        await ensureMemberFromProfile();
+      } catch (_) {
+        // If creation fails, still let them through — the access check will handle it
       }
 
       // Success — redirect to dashboard

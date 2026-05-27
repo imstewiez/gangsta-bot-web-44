@@ -25,6 +25,7 @@ function AuthenticatedLayout() {
   const checkFn = useAuthedServerFn(checkMemberAccess);
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const [denyReason, setDenyReason] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,9 +33,9 @@ function AuthenticatedLayout() {
       .then((res) => {
         if (cancelled) return;
         if (!res.allowed) {
-          supabase.auth.signOut().then(() => {
-            window.location.href = "/login";
-          });
+          setDenyReason(res.reason ?? "unknown");
+          setAllowed(false);
+          setChecking(false);
           return;
         }
         setAllowed(true);
@@ -42,9 +43,9 @@ function AuthenticatedLayout() {
       })
       .catch(() => {
         if (cancelled) return;
-        supabase.auth.signOut().then(() => {
-          window.location.href = "/login";
-        });
+        setDenyReason("error");
+        setAllowed(false);
+        setChecking(false);
       });
     return () => { cancelled = true; };
   }, [checkFn]);
@@ -66,14 +67,34 @@ function AuthenticatedLayout() {
   }
 
   if (!allowed) {
+    const reasonText =
+      denyReason === "not_member"
+        ? "Ainda não estás registado na firma. Entra no Discord e espera pela aprovação."
+        : denyReason === "deleted"
+          ? "A tua conta foi removida. Contacta a direção."
+          : denyReason === "inactive"
+            ? "A tua conta está inactiva. Contacta a direção."
+            : denyReason === "no_discord"
+              ? "Conta Discord não encontrada. Tenta novamente."
+              : "Não tens permissão para aceder.";
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="text-center animate-rise">
+        <div className="text-center animate-rise max-w-sm px-4">
           <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-destructive/10 ring-1 ring-destructive/30">
             <span className="text-2xl">🚫</span>
           </div>
           <p className="text-lg font-semibold text-foreground">Acesso negado</p>
-          <p className="text-sm text-muted-foreground">Não tens permissão para aceder.</p>
+          <p className="text-sm text-muted-foreground mt-2">{reasonText}</p>
+          <button
+            onClick={() => {
+              supabase.auth.signOut().then(() => {
+                window.location.href = "/login";
+              });
+            }}
+            className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Voltar ao login
+          </button>
         </div>
       </div>
     );
