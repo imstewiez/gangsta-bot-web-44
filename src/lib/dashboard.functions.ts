@@ -24,6 +24,8 @@ export type PrizeHighlight = {
   prize_description: string | null;
   prize_status: string | null;
   week_start: string | null;
+  week_label: string | null;
+  status: "defined" | "in_progress" | "closed" | null;
 };
 
 export type HomeKpis = {
@@ -257,14 +259,42 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          limit 5`,
       ).catch(() => []),
       pgOne<PrizeHighlight>(
-        `select m.display_name as winner_name, m.tier as winner_tier,
-                wp.hybrid_score::float as score,
-                wp.prize_description, wp.prize_status,
-                to_char(wp.week_start,'YYYY-MM-DD') as week_start
-         from weekly_prizes wp
-         left join members m on m.id = wp.winner_member_id
-         order by wp.week_start desc
-         limit 1`,
+        `with current_week as (
+          select date_trunc('week', current_date)::date as ws,
+                 (date_trunc('week', current_date)::date + interval '6 days')::date as we
+        ),
+        prize_defined as (
+          select m.display_name as winner_name, m.tier as winner_tier,
+                 wp.hybrid_score::float as score,
+                 wp.prize_description, wp.prize_status,
+                 to_char(wp.week_start,'YYYY-MM-DD') as week_start,
+                 to_char(wp.week_start,'DD/MM') || ' – ' || to_char(wp.week_end,'DD/MM') as week_label,
+                 'defined'::text as status
+          from weekly_prizes wp
+          left join members m on m.id = wp.winner_member_id
+          where wp.week_start = (select ws from current_week)
+        ),
+        current_leader as (
+          select m.display_name as winner_name, m.tier as winner_tier,
+                 coalesce(wr.total_score, 0)::float as score,
+                 null::text as prize_description,
+                 'em_curso'::text as prize_status,
+                 to_char((select ws from current_week),'YYYY-MM-DD') as week_start,
+                 to_char((select ws from current_week),'DD/MM') || ' – ' || to_char((select we from current_week),'DD/MM') as week_label,
+                 'in_progress'::text as status
+          from weekly_rankings wr
+          join members m on m.id = wr.member_id
+          where wr.week_start = (select ws from current_week)
+            and m.deleted_at is null
+            and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
+          order by coalesce(wr.hybrid_score, 0) desc nulls last
+          limit 1
+        )
+        select * from prize_defined
+        union all
+        select * from current_leader
+        where not exists (select 1 from prize_defined)
+        limit 1`,
       ).catch(() => null),
     ]);
 

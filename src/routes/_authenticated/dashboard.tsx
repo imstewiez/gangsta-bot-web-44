@@ -7,6 +7,7 @@ import { getMyAllTimeStats } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { ProfileCard } from "@/components/domain/ProfileCard";
 import { PageHeader } from "@/components/layout/AppShell";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
@@ -183,16 +184,44 @@ function Dashboard() {
         </div>
       )}
 
-      {data?.prize?.winner_name && (
+      {data?.prize && (
         <Reveal delay={200} direction="up">
-          <Card className="mt-6 border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card interactive-card">
+          <Card className={cn(
+            "mt-6 interactive-card",
+            data.prize.status === "in_progress"
+              ? "border-orange-500/40 bg-gradient-to-br from-orange-500/10 via-card to-card"
+              : "border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card"
+          )}>
             <CardContent className="flex items-center gap-4 p-5">
-              <span className="grid h-12 w-12 place-items-center rounded-full bg-primary/20 ring-1 ring-primary/40">
-                <Sparkles className="h-6 w-6 text-primary" />
+              <span className={cn(
+                "grid h-12 w-12 place-items-center rounded-full ring-1",
+                data.prize.status === "in_progress"
+                  ? "bg-orange-500/20 ring-orange-500/40"
+                  : "bg-primary/20 ring-primary/40"
+              )}>
+                {data.prize.status === "in_progress" ? (
+                  <Flame className="h-6 w-6 text-orange-400" />
+                ) : (
+                  <Sparkles className="h-6 w-6 text-primary" />
+                )}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-display text-[11px] tracking-[0.3em] text-primary uppercase">
-                  Premiado da Semana
+                <div className="flex items-center gap-2">
+                  <div className="text-display text-[11px] tracking-[0.3em] text-primary uppercase">
+                    Semana {data.prize.week_label}
+                  </div>
+                  {data.prize.status === "in_progress" && (
+                    <Badge variant="default" className="bg-orange-500 text-white border-transparent">
+                      <Flame className="w-3 h-3 mr-1" />
+                      A decorrer
+                    </Badge>
+                  )}
+                  {data.prize.status === "defined" && data.prize.prize_status === "entregue" && (
+                    <Badge variant="secondary">Entregue</Badge>
+                  )}
+                  {data.prize.status === "defined" && data.prize.prize_status !== "entregue" && (
+                    <Badge variant="default">Definido</Badge>
+                  )}
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
                   <TierIcon tier={data.prize.winner_tier} size="sm" />
@@ -201,11 +230,13 @@ function Dashboard() {
                     <span className="text-sm font-mono text-muted-foreground">· {fmtNum(Math.round(data.prize.score))} pts</span>
                   )}
                 </div>
-                {data.prize.prize_description && (
+                {data.prize.prize_description ? (
                   <div className="text-xs text-muted-foreground italic">"{data.prize.prize_description}"</div>
-                )}
+                ) : data.prize.status === "in_progress" ? (
+                  <div className="text-xs text-orange-400/80 italic">Líder provisório — prémio ainda não definido</div>
+                ) : null}
               </div>
-              <Link to="/premios" className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-primary interactive-link">
+              <Link to="/premios" className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-primary interactive-link shrink-0">
                 VER PRÉMIOS →
               </Link>
             </CardContent>
