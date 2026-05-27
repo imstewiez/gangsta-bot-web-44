@@ -58,3 +58,14 @@ export const checkManagerAccess = createServerFn({ method: "GET" })
     if (!me.is_manager) return { allowed: false, reason: "not_manager" };
     return { allowed: true };
   });
+
+// Apenas Kingpin e Manda-Chuva (chefia total)
+export const checkChefiaAccess = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) return { allowed: false, reason: "not_member" };
+    const isChefia = me.tier === "kingpin" || me.tier === "manda_chuva" || me.role_label === "kingpin" || me.role_label === "manda_chuva";
+    if (!isChefia) return { allowed: false, reason: "not_chefia" };
+    return { allowed: true };
+  });

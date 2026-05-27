@@ -6,7 +6,6 @@ import { useState } from "react";
 import {
   listPrizes,
   setPrize,
-  generatePrizeForCurrentWeek,
 } from "@/lib/prizes.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,6 @@ function Page() {
   useRealtimeSync(["prizes"]);
   const fn = useAuthedServerFn(listPrizes);
   const setFn = useAuthedServerFn(setPrize);
-  const genFn = useAuthedServerFn(generatePrizeForCurrentWeek);
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const prizes = useQuery({ queryKey: ["prizes"], queryFn: () => fn() });
@@ -58,32 +56,12 @@ function Page() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-  const gen = useMutation({
-    mutationFn: () => genFn(),
-    onSuccess: (r: { created: boolean }) => {
-      qc.invalidateQueries({ queryKey: ["prizes"] });
-      toast.success(r.created ? "Prémio gerado" : "Já existia");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
   return (
     <>
       <PageHeader
         eyebrow="Ranking"
         title="Prémios semanais"
         description="Top semanal"
-        action={
-          isAdmin ? (
-            <Button
-              size="sm"
-              onClick={() => gen.mutate()}
-              disabled={gen.isPending}
-            >
-              <Sparkles className="mr-1 h-4 w-4" />
-              Gerar para a semana
-            </Button>
-          ) : null
-        }
       />
       <Reveal direction="up">
         <div className="space-y-2">

@@ -365,7 +365,7 @@ function SellRow({
   const [editingBase, setEditingBase] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [baseVal, setBaseVal] = useState(String(it.min_sale_price ?? 0));
-  const finalPrice = it.min_sale_price ?? 0;
+  const finalPrice = it.tier_price ?? it.min_sale_price ?? 0;
 
   return (
     <>

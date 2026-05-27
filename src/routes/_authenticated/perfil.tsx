@@ -37,13 +37,12 @@ function PerfilPage() {
   const qc = useQueryClient();
 
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
-  const xp = useQuery({ queryKey: ["my-xp"], queryFn: () => xpFn() });
+  const xp = useQuery({ queryKey: ["my-xp"], queryFn: () => xpFn({ data: { member_id: me.data!.id } }), enabled: !!me.data });
 
   const [name, setName] = useState(me.data?.display_name ?? "");
-  const [nick, setNick] = useState(me.data?.nick ?? "");
 
   const m = useMutation({
-    mutationFn: () => updateFn({ data: { display_name: name, nickname: nick || null } }),
+    mutationFn: () => updateFn({ data: { display_name: name } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("Perfil atualizado");
@@ -76,16 +75,7 @@ function PerfilPage() {
                   maxLength={80}
                 />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Nickname</label>
-                <Input
-                  value={nick}
-                  onChange={(e) => setNick(e.target.value)}
-                  className="mt-1"
-                  maxLength={80}
-                  placeholder="Sem nickname"
-                />
-              </div>
+
               <ButtonLoading
                 loading={m.isPending}
                 onClick={() => m.mutate()}

@@ -7,7 +7,6 @@ import {
   listDeliveries,
   createDelivery,
   decideDelivery,
-  fixMissingDeliveryMemberIds,
 } from "@/lib/deliveries.functions";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { listManagers } from "@/lib/members.functions";
@@ -134,7 +133,6 @@ function Page() {
         </TabsContent>
         {isManager && (
           <TabsContent value="manage" className="mt-4">
-            <FixDeliveriesButton />
             <DelList scope="manage" canDecide />
           </TabsContent>
         )}
@@ -511,28 +509,3 @@ function NewDelivery() {
   );
 }
 
-function FixDeliveriesButton() {
-  const fixFn = useAuthedServerFn(fixMissingDeliveryMemberIds);
-  const qc = useQueryClient();
-  const m = useMutation({
-    mutationFn: () => fixFn(),
-    onSuccess: (res) => {
-      toast.success(`Corrigidas ${res.rows_fixed} entregas antigas`);
-      qc.invalidateQueries({ queryKey: ["stock"] });
-      qc.invalidateQueries({ queryKey: ["member"] });
-      qc.invalidateQueries({ queryKey: ["my-xp"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  return (
-    <div className="mb-4">
-      <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
-        <Wrench className="mr-1 h-3.5 w-3.5" />
-        {m.isPending ? "A corrigir..." : "Corrigir entregas antigas"}
-      </Button>
-      <p className="mt-1 text-[10px] text-muted-foreground">
-        Corrige entregas aprovadas antes da atualização que não tinham membro associado.
-      </p>
-    </div>
-  );
-}

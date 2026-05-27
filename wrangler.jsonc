@@ -18,5 +18,7 @@
     { "pattern": "ballasgang.eu", "custom_domain": true },
     { "pattern": "www.ballasgang.eu", "custom_domain": true }
   ],
-
+  "triggers": {
+    "crons": ["0 0 * * *"]
+  }
 }

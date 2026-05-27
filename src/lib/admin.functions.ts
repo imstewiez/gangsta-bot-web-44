@@ -1,27 +1,54 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { pgOne, pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
-export async function assertAdmin(userId: string) {
-  const { data, error } = await supabaseAdmin
+async function getEffectiveRoles(userId: string): Promise<string[]> {
+  const { data: roleRows, error: rErr } = await supabaseAdmin
     .from("user_roles")
     .select("role")
     .eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
+  if (rErr) throw new Error(rErr.message);
+  const roles = new Set(((roleRows ?? []) as { role: string }[]).map((r) => r.role));
+
+  // Also check member tier / role for implicit admin/superadmin
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("discord_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (profile?.discord_id) {
+    const member = await pgOne<{
+      tier: string | null;
+      role: string | null;
+    }>(
+      `select tier, role from members where discord_id = $1 and deleted_at is null limit 1`,
+      [profile.discord_id],
+    );
+    const tier = member?.tier ?? null;
+    const roleLabel = member?.role ?? null;
+    if (tier === "manda_chuva" || roleLabel === "manda_chuva") {
+      roles.add("superadmin");
+      roles.add("admin");
+    }
+    if (tier === "kingpin" || roleLabel === "kingpin" || roleLabel === "chefia") {
+      roles.add("admin");
+    }
+  }
+  return Array.from(roles);
+}
+
+export async function assertAdmin(userId: string) {
+  const roles = await getEffectiveRoles(userId);
   if (!roles.includes("admin") && !roles.includes("superadmin")) {
     throw new Error("Forbidden: admin only");
   }
 }
 
 export async function assertSuperAdmin(userId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  if (!(data ?? []).some((r) => r.role === "superadmin")) {
+  const roles = await getEffectiveRoles(userId);
+  if (!roles.includes("superadmin")) {
     throw new Error("Forbidden: superadmin only");
   }
 }
@@ -29,12 +56,7 @@ export async function assertSuperAdmin(userId: string) {
 export const checkSuperAdminAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
-    const roles = (data ?? []).map((r) => r.role);
+    const roles = await getEffectiveRoles(context.userId);
     return {
       allowed: roles.includes("superadmin"),
       is_superadmin: roles.includes("superadmin"),
@@ -46,29 +68,95 @@ export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
-    const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] =
-      await Promise.all([
-        supabaseAdmin
-          .from("profiles")
-          .select("user_id, display_name, discord_id, avatar_url, created_at"),
-        supabaseAdmin.from("user_roles").select("user_id, role"),
-      ]);
-    if (pErr) throw new Error(pErr.message);
-    if (rErr) throw new Error(rErr.message);
-    const rolesByUser = new Map<string, string[]>();
-    for (const r of roles ?? []) {
-      const arr = rolesByUser.get(r.user_id) ?? [];
-      arr.push(r.role);
-      rolesByUser.set(r.user_id, arr);
-    }
-    return (profiles ?? []).map((p) => ({
-      user_id: p.user_id,
-      display_name: p.display_name,
-      discord_id: p.discord_id,
-      avatar_url: p.avatar_url,
-      created_at: p.created_at,
-      roles: rolesByUser.get(p.user_id) ?? [],
-    }));
+
+    // Get all profiles with their implicit roles from member tier
+    const rows = await pgQuery<{
+      user_id: string;
+      display_name: string | null;
+      discord_id: string | null;
+      avatar_url: string | null;
+      created_at: string;
+      explicit_roles: string[];
+      tier: string | null;
+      member_role: string | null;
+    }>(
+      `SELECT
+         p.user_id,
+         p.display_name,
+         p.discord_id,
+         p.avatar_url,
+         p.created_at,
+         COALESCE(
+           (SELECT array_agg(ur.role)::text[] FROM user_roles ur WHERE ur.user_id = p.user_id),
+           ARRAY[]::text[]
+         ) as explicit_roles,
+         m.tier,
+         m.role as member_role
+       FROM profiles p
+       LEFT JOIN members m ON m.discord_id = p.discord_id AND m.deleted_at IS NULL
+       ORDER BY p.created_at DESC`
+    );
+
+    return rows.map((r) => {
+      const roles = new Set(r.explicit_roles ?? []);
+      // Add implicit roles from tier
+      if (r.tier === "manda_chuva" || r.member_role === "manda_chuva") {
+        roles.add("superadmin");
+        roles.add("admin");
+      }
+      if (r.tier === "kingpin" || r.member_role === "kingpin" || r.member_role === "chefia") {
+        roles.add("admin");
+      }
+      return {
+        user_id: r.user_id,
+        display_name: r.display_name,
+        discord_id: r.discord_id,
+        avatar_url: r.avatar_url,
+        created_at: r.created_at,
+        roles: Array.from(roles),
+      };
+    });
+  });
+
+export const syncRolesFromTiers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperAdmin(context.userId);
+
+    // 1. Ensure enum has superadmin
+    await pgQuery(`ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'superadmin'`).catch(() => []);
+
+    // 2. Sync superadmin for manda-chuva
+    await pgQuery(
+      `INSERT INTO public.user_roles (user_id, role)
+       SELECT p.user_id, 'superadmin'::public.app_role
+       FROM public.profiles p
+       JOIN public.members m ON m.discord_id = p.discord_id
+       WHERE m.deleted_at IS NULL
+         AND (m.tier = 'manda_chuva' OR m.role = 'manda_chuva')
+         AND NOT EXISTS (
+           SELECT 1 FROM public.user_roles ur
+           WHERE ur.user_id = p.user_id AND ur.role = 'superadmin'
+         )
+       ON CONFLICT (user_id, role) DO NOTHING`
+    );
+
+    // 3. Sync admin for kingpin/chefia
+    await pgQuery(
+      `INSERT INTO public.user_roles (user_id, role)
+       SELECT p.user_id, 'admin'::public.app_role
+       FROM public.profiles p
+       JOIN public.members m ON m.discord_id = p.discord_id
+       WHERE m.deleted_at IS NULL
+         AND (m.tier = 'kingpin' OR m.role = 'kingpin' OR m.role = 'chefia')
+         AND NOT EXISTS (
+           SELECT 1 FROM public.user_roles ur
+           WHERE ur.user_id = p.user_id AND ur.role = 'admin'
+         )
+       ON CONFLICT (user_id, role) DO NOTHING`
+    );
+
+    return { ok: true, message: "Roles sincronizados com sucesso." };
   });
 
 export const setUserRole = createServerFn({ method: "POST" })
@@ -81,22 +169,14 @@ export const setUserRole = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const callerRoles = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId)
-      .then((r) => (r.data ?? []).map((x) => x.role));
+    const callerRoles = await getEffectiveRoles(context.userId);
     const isCallerSuper = callerRoles.includes("superadmin");
     const isCallerAdmin = callerRoles.includes("admin") || isCallerSuper;
 
     if (!isCallerAdmin) throw new Error("Forbidden: admin only");
 
     // Target's current roles
-    const targetRoles = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", data.user_id)
-      .then((r) => (r.data ?? []).map((x) => x.role));
+    const targetRoles = await getEffectiveRoles(data.user_id);
     const isTargetSuper = targetRoles.includes("superadmin");
 
     // Self-protection: cannot demote yourself
@@ -136,7 +216,7 @@ export const setUserRole = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin
         .from("user_roles")
         .upsert(
-          { user_id: data.user_id, role: data.role },
+          { user_id: data.user_id, role: data.role as any },
           { onConflict: "user_id,role" },
         );
       if (error) throw new Error(error.message);
@@ -145,7 +225,7 @@ export const setUserRole = createServerFn({ method: "POST" })
         .from("user_roles")
         .delete()
         .eq("user_id", data.user_id)
-        .eq("role", data.role);
+        .eq("role", data.role as any);
       if (error) throw new Error(error.message);
     }
     return { ok: true };

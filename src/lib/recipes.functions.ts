@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { REAL_UNIT_COST, getWeaponSalePrice, getMagazineSalePrice, getTierPrice } from "./pricing.catalog";
 
 export type RecipeRow = {
   recipe_id: number;
@@ -23,6 +24,7 @@ export type RecipeRow = {
   total_cost: number;
   estimated_value: number;
   min_sale_price: number | null;
+  tier_price: number | null;
   margin: number;
   margin_pct: number | null;
   recipe_category: string | null;
@@ -60,7 +62,15 @@ export const listRecipes = createServerFn({ method: "GET" })
               ii.category as ing_category,
               ii.subcategory as ing_subcategory,
               ri.quantity,
-              coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost
+              case ii.name
+                when 'Corpo Mini SMG' then 8000
+                when 'Corpo Pistol XM3' then 8000
+                when 'Corpo UZI' then 10000
+                when 'Corpo TEC-9' then 10000
+                when 'Corpo TEC Pistol' then 15000
+                when 'Corpo AP Pistol' then 15000
+                else coalesce(ii.purchase_price, 0)
+              end as unit_cost
          from craft_recipes r
          join items i on i.id = r.item_id
          left join recipe_ingredients ri on ri.recipe_id = r.id
@@ -85,6 +95,7 @@ export const listRecipes = createServerFn({ method: "GET" })
           total_cost: 0,
           estimated_value: Number(r.estimated_value ?? 0),
           min_sale_price: r.min_sale_price != null ? Number(r.min_sale_price) : null,
+          tier_price: null,
           margin: 0,
           margin_pct: null,
           recipe_category: r.recipe_category,
@@ -108,8 +119,38 @@ export const listRecipes = createServerFn({ method: "GET" })
       }
     }
     for (const r of map.values()) {
-      const margin = r.estimated_value - r.total_cost;
-      const pct = r.total_cost > 0 ? (margin / r.total_cost) * 100 : null;
+      const realCost = REAL_UNIT_COST[r.item_name] ?? r.total_cost;
+      r.total_cost = realCost;
+      const basePrice = r.min_sale_price ?? r.estimated_value;
+      let tierPrice = basePrice;
+
+      // Corpos e prints mantêm sempre o preço base
+      const isBodyOrPrint = /\bcorpo\b|\bprint\b/i.test(r.item_name);
+
+      // Aplica acréscimo por tier a armas de fogo
+      if (!isBodyOrPrint && (
+        r.category === "armas_red" ||
+        r.category === "armas_orange" ||
+        r.subcategory === "armas_red" ||
+        r.subcategory === "armas_orange" ||
+        /mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|heavy|\.50|p90|pdw|bullpup|carabina|compact rifle/i.test(r.item_name)
+      )) {
+        tierPrice = getWeaponSalePrice(basePrice, me?.tier ?? null);
+      }
+
+      // Aplica preço por tier a carregadores
+      if (r.subcategory === "carregadores" || r.category === "municoes") {
+        const magTier = r.item_name.toLowerCase().includes("special")
+          ? "special"
+          : r.item_name.toLowerCase().includes("red")
+            ? "red"
+            : "orange";
+        tierPrice = getMagazineSalePrice(magTier, me?.tier ?? null);
+      }
+
+      r.tier_price = tierPrice;
+      const margin = tierPrice - realCost;
+      const pct = realCost > 0 ? (margin / realCost) * 100 : null;
       // margem só vai no payload se for chefia
       r.margin = isManager ? margin : 0;
       r.margin_pct = isManager ? pct : null;
@@ -125,6 +166,7 @@ export type CraftFeasibility = {
   requested_qty: number;
   dirty_money: number;
   min_sale_price: number | null;
+  tier_price: number | null;
   ingredients: Array<{
     name: string;
     needed: number;
@@ -142,7 +184,8 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
       throw new Error("quantidade inválida");
     return d;
   })
-  .handler(async ({ data }): Promise<CraftFeasibility> => {
+  .handler(async ({ data, context }): Promise<CraftFeasibility> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
     const head = await pgOne<{ item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null; min_sale_price: number | null }>(
       `select i.name as item_name, r.tier, i.subcategory, i.estimated_value::float as estimated_value, i.min_sale_price::float as min_sale_price
        from craft_recipes r join items i on i.id = r.item_id where r.id = $1`,
@@ -178,12 +221,14 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     }
     const itemPrice = (head?.estimated_value ?? 0) * data.quantity;
     const dirty_money = itemPrice;
+    const tier_price = getTierPrice(head?.item_name ?? "", head?.min_sale_price ?? 0, me?.tier ?? null);
     return {
       recipe_id: data.recipe_id,
       item_name: head?.item_name ?? "?",
       requested_qty: data.quantity,
       dirty_money,
       min_sale_price: head?.min_sale_price ?? null,
+      tier_price,
       ingredients,
     };
   });
@@ -196,7 +241,8 @@ export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" }
       throw new Error("quantidade inválida");
     return d;
   })
-  .handler(async ({ data }): Promise<CraftFeasibility | null> => {
+  .handler(async ({ data, context }): Promise<CraftFeasibility | null> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
     const recipe = await pgOne<{ recipe_id: number; item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null; min_sale_price: number | null }>(
       `select r.id as recipe_id, i.name as item_name, r.tier, i.subcategory, i.estimated_value::float as estimated_value, i.min_sale_price::float as min_sale_price
        from craft_recipes r join items i on i.id = r.item_id where r.item_id = $1 limit 1`,
@@ -232,12 +278,14 @@ export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" }
     }
     const itemPrice = (recipe.estimated_value ?? 0) * data.quantity;
     const dirty_money = itemPrice;
+    const tier_price = getTierPrice(recipe.item_name, recipe.min_sale_price ?? 0, me?.tier ?? null);
     return {
       recipe_id: recipe.recipe_id,
       item_name: recipe.item_name,
       requested_qty: data.quantity,
       dirty_money,
       min_sale_price: recipe.min_sale_price ?? null,
+      tier_price,
       ingredients,
     };
   });

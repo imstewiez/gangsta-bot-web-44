@@ -80,6 +80,38 @@ export const adminRenameMember = createServerFn({ method: "POST" })
   });
 
 // ---------- Promote / Demote (tier change) ----------
+async function syncUserRolesForMember(memberId: number, newTier: string, oldTier: string | null) {
+  const profile = await pgOne<{ user_id: string }>(
+    `select p.user_id from profiles p join members m on m.discord_id = p.discord_id where m.id = $1`,
+    [memberId],
+  );
+  if (!profile) return;
+  const userId = profile.user_id;
+
+  // Add superadmin for manda_chuva
+  if (newTier === "manda_chuva") {
+    await pgQuery(
+      `insert into user_roles (user_id, role) values ($1, 'superadmin') on conflict (user_id, role) do nothing`,
+      [userId],
+    );
+  }
+  // Add admin for kingpin/manda_chuva
+  if (newTier === "kingpin" || newTier === "manda_chuva") {
+    await pgQuery(
+      `insert into user_roles (user_id, role) values ($1, 'admin') on conflict (user_id, role) do nothing`,
+      [userId],
+    );
+  }
+  // Remove superadmin if demoted from manda_chuva
+  if (oldTier === "manda_chuva" && newTier !== "manda_chuva") {
+    await pgQuery(`delete from user_roles where user_id = $1 and role = 'superadmin'`, [userId]);
+  }
+  // Remove admin if demoted from kingpin/manda_chuva to non-admin
+  if ((oldTier === "kingpin" || oldTier === "manda_chuva") && newTier !== "kingpin" && newTier !== "manda_chuva") {
+    await pgQuery(`delete from user_roles where user_id = $1 and role = 'admin'`, [userId]);
+  }
+}
+
 export const adminSetTier = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -106,6 +138,8 @@ export const adminSetTier = createServerFn({ method: "POST" })
       "update members set tier = $2, role = $2, updated_at = now() where id = $1",
       [data.id, data.tier],
     );
+    // Sync user_roles automatically (no more manual syncRolesFromTiers needed)
+    await syncUserRolesForMember(data.id, data.tier, before?.tier ?? null);
     if (before?.discord_id) {
       const fromIdx = TIERS.indexOf(
         (before.tier ?? "young_blood") as (typeof TIERS)[number],

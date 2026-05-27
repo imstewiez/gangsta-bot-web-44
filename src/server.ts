@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { doRecalcWeeklyRankings } from "./lib/data-recovery.functions";
 
 type ServerEntry = {
   fetch: (
@@ -82,6 +83,23 @@ async function normalizeCatastrophicSsrResponse(
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url);
+
+    // Cron endpoint for external triggers (bot, etc)
+    if (url.pathname === "/api/cron/recalc") {
+      const secret = request.headers.get("x-cron-secret");
+      const expected = (env as any).CRON_SECRET || process.env.CRON_SECRET;
+      if (!secret || secret !== expected) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      try {
+        const result = await doRecalcWeeklyRankings();
+        return Response.json({ success: true, ...result });
+      } catch (e) {
+        console.error("[cron/recalc] error", e);
+        return Response.json({ success: false, error: String(e) }, { status: 500 });
+      }
+    }
+
     // Redirect old domain to new domain
     if (url.hostname === "ballasgang.pt" || url.hostname === "www.ballasgang.pt") {
       url.hostname = "ballasgang.eu";
@@ -97,6 +115,17 @@ export default {
     } catch (error) {
       console.error(error);
       return brandedErrorResponse();
+    }
+  },
+
+  async scheduled(controller: any, env: unknown, ctx: unknown) {
+    console.log("[scheduled] running recalc at", new Date().toISOString());
+    try {
+      (globalThis as any).__cloudflareEnv = env;
+      const result = await doRecalcWeeklyRankings();
+      console.log("[scheduled] recalc done", result);
+    } catch (e) {
+      console.error("[scheduled] recalc failed", e);
     }
   },
 };

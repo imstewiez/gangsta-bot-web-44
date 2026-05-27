@@ -85,6 +85,7 @@ export type CatalogItem = {
   morador_purchase_price: number | null;
   min_sale_price: number | null;
   xp_points: number;
+  tier_price?: number | null;
 };
 
 // ── Pontos por item (espelho do real-gangsta-bot) ───────────────────────────

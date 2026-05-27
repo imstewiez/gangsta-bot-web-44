@@ -26,7 +26,11 @@ export async function pgQuery<T = any>(
     }
 
     // Safety: reject multi-statement queries at runtime
-    const normalized = query.replace(/'[^']*'/g, "''").toLowerCase();
+    // Strip both '...' and $$...$$ literals before counting statements
+    const normalized = query
+      .replace(/'[^']*'/g, "''")
+      .replace(/\$\$[^$]*\$\$/g, "''")
+      .toLowerCase();
     const statements = normalized.split(";").filter((s) => s.trim().length > 0);
     if (statements.length > 1) {
       throw new Error("Multi-statement queries are not allowed via pgQuery");

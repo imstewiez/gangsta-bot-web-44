@@ -99,7 +99,7 @@ function NotificacoesPage() {
                       <Link
                         to={n.link}
                         className="inline-flex items-center gap-0.5 text-primary hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         Ver <ExternalLink className="h-3 w-3" />
                       </Link>

@@ -71,7 +71,7 @@ function Page() {
       map.get(key)!.push(r);
     }
     for (const list of map.values()) {
-      list.sort((a, b) => (a.min_sale_price ?? 0) - (b.min_sale_price ?? 0));
+      list.sort((a, b) => (a.item_name.localeCompare(b.item_name)));
     }
     return Array.from(map.entries()).sort((a, b) => {
       const ia = ARMORY_CAT_ORDER.indexOf(a[0] as any);

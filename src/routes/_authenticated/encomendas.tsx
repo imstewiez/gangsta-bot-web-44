@@ -42,6 +42,7 @@ import { fmtDate, fmtNum , fmtPrice, fmtCategoryLabel} from "@/lib/domain";
 import {
   ARMORY_CAT_ORDER,
   ARMORY_CAT_CONFIG,
+  filterItemForDisplay,
 } from "@/lib/armory.catalog";
 import { toast } from "sonner";
 import { Plus, ShoppingBag, Trash2, Package, Banknote, X, MessageSquare, Send } from "lucide-react";
@@ -559,10 +560,11 @@ function NewOrder() {
       /\bmicro smg\b/.test(n) ||
       /\btec[-\s]?9\b/.test(n) || /\btec9\b/.test(n) ||
       /\btec[-\s]?pistol\b/.test(n) || /\btecpistol\b/.test(n) ||
-      /\bap[-\s]?pistol\b/.test(n) || /\bappistol\b/.test(n)
+      /\bap[-\s]?pistol\b/.test(n) || /\bappistol\b/.test(n) ||
+      /\bcompact rifle\b/.test(n)
     ) {
-      // Rejeitar MK2 e Compact Rifle / Assault Shotgun
-      if (/mk2|compact rifle|assault shotgun/.test(n)) return false;
+      // Rejeitar MK2 e Assault Shotgun
+      if (/mk2|assault shotgun/.test(n)) return false;
       return true;
     }
 
@@ -852,7 +854,7 @@ function NewOrder() {
                       <li key={idx} className="flex justify-between items-center interactive-row">
                         <span className="font-medium">{l.qty}× {item?.name ?? "—"}</span>
                         {item != null && (
-                          <span className="text-muted-foreground font-mono text-xs">{fmtPrice((item.min_sale_price ?? 0) * Number(l.qty))}</span>
+                          <span className="text-muted-foreground font-mono text-xs">{fmtPrice((item.tier_price ?? item.min_sale_price ?? 0) * Number(l.qty))}</span>
                         )}
                       </li>
                     );
@@ -867,7 +869,7 @@ function NewOrder() {
                   <span className="font-mono">{fmtPrice((() => {
                     const baseTotal = validLines.reduce((s, l) => {
                       const item = items.find((i) => String(i.id) === l.item_id);
-                      return s + (item?.min_sale_price ?? 0) * Number(l.qty);
+                      return s + (item?.tier_price ?? item?.min_sale_price ?? 0) * Number(l.qty);
                     }, 0);
                     if (paymentMode === 'money_only') {
                       return Math.round(baseTotal + (sim.data?.full_material_cost ?? 0) + baseTotal * 0.20);

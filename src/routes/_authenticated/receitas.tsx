@@ -43,6 +43,7 @@ import {
   PRINT_LABELS,
   PRINT_BADGE_CLASS,
   isOrangeWeapon,
+  filterItemForDisplay,
 } from "@/lib/armory.catalog";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
@@ -90,7 +91,7 @@ function RecipeCard({
   const [expanded, setExpanded] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
   const [priceDraft, setPriceDraft] = useState("");
-  const salePrice = r.min_sale_price ?? 0;
+  const salePrice = r.tier_price ?? r.min_sale_price ?? 0;
 
   return (
     <div className="rounded-xl border border-border/60 bg-card/60 p-4 backdrop-blur-sm interactive-card">
@@ -306,7 +307,7 @@ function Page() {
     }
 
     for (const list of map.values()) {
-      list.sort((a, b) => (a.min_sale_price ?? 0) - (b.min_sale_price ?? 0));
+      list.sort((a, b) => (a.tier_price ?? a.min_sale_price ?? 0) - (b.tier_price ?? b.min_sale_price ?? 0));
     }
     return Array.from(map.entries()).sort((a, b) => {
       const ia = ARMORY_CAT_ORDER.indexOf(a[0] as any);
@@ -439,7 +440,7 @@ function Page() {
                 
                 {/* Preço de venda */}
                 {(() => {
-                  const unitPrice = result.min_sale_price ?? 0;
+                  const unitPrice = result.tier_price ?? result.min_sale_price ?? 0;
                   const total = Math.round(unitPrice * result.requested_qty);
                   return (
                     <div className="border-t border-border pt-2">

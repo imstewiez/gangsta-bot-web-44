@@ -80,7 +80,7 @@ const GROUPS: NavGroup[] = [
       { to: "/admin/dashboard",   label: "Dashboard",    icon: Activity,   admin: true },
       { to: "/admin",             label: "Definições",   icon: Shield,     admin: true },
       { to: "/auditoria",         label: "Auditoria",    icon: ScrollText, admin: true },
-      { to: "/admin/recuperacao", label: "Recuperação",  icon: Database,   admin: true },
+
     ],
   },
 ];
@@ -101,8 +101,14 @@ export function AppSidebar() {
   const myAccent = myTier ? TIER_ACCENT[myTier] : null;
   const myDisplay = me.data?.display_name ?? profile?.display_name ?? "—";
 
-  const isActive = (to: string) =>
-    loc.pathname === to || loc.pathname.startsWith(to + "/");
+  const isActive = (to: string) => {
+    if (loc.pathname === to || loc.pathname === to + "/") return true;
+    // Index routes that have their own children in the sidebar should NOT
+    // match when visiting those children (e.g. /admin should not match /admin/dashboard)
+    const indexRoutes = ["/admin"];
+    if (indexRoutes.includes(to)) return false;
+    return loc.pathname.startsWith(to + "/");
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/60">

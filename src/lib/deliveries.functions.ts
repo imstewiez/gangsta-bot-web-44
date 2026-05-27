@@ -41,7 +41,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
     } else {
       if (!me?.is_manager) return [];
     }
-    return pgQuery<DeliveryRow>(
+    const rows = await pgQuery<DeliveryRow>(
       `select r.id, r.requester_member_id, m.display_name as requester_name,
               r.status, coalesce(r.tipo, 'entrega') as tipo, r.lines, r.notes,
               r.total_qty, r.total_value::float as total_value,
@@ -53,6 +53,30 @@ export const listDeliveries = createServerFn({ method: "GET" })
        limit 200`,
       params,
     );
+
+    // Enrich lines with item names
+    const allItemIds = new Set<number>();
+    for (const r of rows) {
+      for (const l of r.lines) {
+        if (l.item_id) allItemIds.add(l.item_id);
+      }
+    }
+    if (allItemIds.size > 0) {
+      const items = await pgQuery<{ id: number; name: string }>(
+        `select id, name from items where id = any($1::int[])`,
+        [Array.from(allItemIds)],
+      );
+      const nameMap = new Map(items.map((i) => [i.id, i.name]));
+      for (const r of rows) {
+        for (const l of r.lines) {
+          if (!l.item_name && l.item_id) {
+            l.item_name = nameMap.get(l.item_id) ?? undefined;
+          }
+        }
+      }
+    }
+
+    return rows;
   });
 
 export const createDelivery = createServerFn({ method: "POST" })

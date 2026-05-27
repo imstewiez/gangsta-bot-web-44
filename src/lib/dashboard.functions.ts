@@ -78,7 +78,7 @@ async function topForWeek(weekStart: string | null): Promise<RankRow[]> {
      where wr.week_start = $1
        and m.deleted_at is null
        and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
-     order by score desc nulls last
+     order by coalesce(wr.hybrid_score, 0) desc nulls last
      limit 5`,
     [weekStart],
   ).catch(() => []);
@@ -237,7 +237,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       ).catch(() => []),
       pgQuery<RankRow>(
         `select m.display_name, m.nickname as nick,
-                sum(coalesce(wr.total_score, 0))::float as score,
+                sum(coalesce(wr.hybrid_score, 0))::float as score,
                 sum(coalesce(wr.deliveries,0))::int as deliveries,
                 sum(coalesce(wr.sales,0))::int as sales,
                 sum(coalesce(wr.operations_count,0))::int as ops,
@@ -252,7 +252,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
            and m.deleted_at is null
            and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
          group by m.display_name, m.nickname
-         having sum(coalesce(wr.total_score, 0)) > 0
+         having sum(coalesce(wr.hybrid_score, 0)) > 0
          order by score desc nulls last
          limit 5`,
       ).catch(() => []),
