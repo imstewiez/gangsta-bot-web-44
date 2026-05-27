@@ -16,7 +16,21 @@ export type DiscordEvent =
       from_tier: string | null;
       to_tier: string;
     }
-  | { action: "kick"; discord_id: string; reason?: string };
+  | { action: "kick"; discord_id: string; reason?: string }
+  | {
+      action: "prize_defined";
+      discord_id: string;
+      week_start: string;
+      prize_type: string | null;
+      prize_description: string | null;
+    }
+  | {
+      action: "prize_delivered";
+      discord_id: string;
+      week_start: string;
+      prize_type: string | null;
+      prize_description: string | null;
+    };
 
 export async function notifyBot(
   ev: DiscordEvent,

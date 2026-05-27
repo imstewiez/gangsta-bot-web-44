@@ -105,6 +105,20 @@ export const recalcAllTimeStats = createServerFn({ method: "POST" })
          where movement_type = 'venda_bairrista' and member_id is not null
          group by member_id
        ),
+       material_pts as (
+         select im.member_id, coalesce(sum(abs(im.quantity) * i.xp_points), 0)::int as material_points
+         from inventory_movements im
+         join items i on i.id = im.item_id
+         where im.movement_type in ('entrega_bairrista','entrega_oficial') and im.member_id is not null
+         group by im.member_id
+       ),
+       sales_pts as (
+         select im.member_id, coalesce(sum(abs(im.quantity) * i.xp_points), 0)::int as sales_points
+         from inventory_movements im
+         join items i on i.id = im.item_id
+         where im.movement_type = 'venda_bairrista' and im.member_id is not null
+         group by im.member_id
+       ),
        orders_src as (
          select member_id, count(*)::int as orders
          from orders
@@ -134,7 +148,9 @@ export const recalcAllTimeStats = createServerFn({ method: "POST" })
                 coalesce(sa.sales, 0) as sales,
                 coalesce(o.orders, 0) as orders,
                 coalesce(w.wins, 0) as wins,
-                coalesce(l.losses, 0) as losses
+                coalesce(l.losses, 0) as losses,
+                coalesce(mp.material_points, 0) as material_points,
+                coalesce(sp.sales_points, 0) as sales_points
          from members m
          left join kills_src k on k.member_id = m.id
          left join deaths_src d on d.member_id = m.id
@@ -144,11 +160,13 @@ export const recalcAllTimeStats = createServerFn({ method: "POST" })
          left join orders_src o on o.member_id = m.id
          left join wins_src w on w.member_id = m.id
          left join losses_src l on l.member_id = m.id
+         left join material_pts mp on mp.member_id = m.id
+         left join sales_pts sp on sp.member_id = m.id
          where m.deleted_at is null
        )
        insert into all_time_stats (member_id, kills_total, deaths_total, saidas_total, deliveries, sales, orders, wins, losses, total_score, updated_at)
        select member_id, kills_total, deaths_total, saidas_total, deliveries, sales, orders, wins, losses,
-              (kills_total * 3 + deliveries * 2 + sales * 2 + saidas_total * 2 + wins * 4 - deaths_total) as total_score,
+              (material_points + sales_points + (wins + losses) * 5 + wins * 10 + kills_total * 3 - deaths_total * 5) as total_score,
               now()
        from combined
        on conflict (member_id) do update set

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { notifyBot } from "./discord.server";
 
 export type PrizeRow = {
   id: number;
@@ -55,6 +56,16 @@ export const setPrize = createServerFn({ method: "POST" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
     const isDelivered = data.status === "entregue";
+
+    // Fetch winner info before updating
+    const prizeRow = await pgOne<{
+      week_start: string;
+      winner_member_id: number | null;
+    }>(
+      `select week_start, winner_member_id from weekly_prizes where id = $1`,
+      [data.id],
+    );
+
     await pgQuery(
       `update weekly_prizes set
          prize_type = coalesce($2, prize_type),
@@ -77,6 +88,25 @@ export const setPrize = createServerFn({ method: "POST" })
         isDelivered,
       ],
     );
+
+    // Notify bot to DM winner
+    if (prizeRow?.winner_member_id) {
+      const memberRow = await pgOne<{ discord_id: string | null }>(
+        `select discord_id from members where id = $1`,
+        [prizeRow.winner_member_id],
+      );
+      if (memberRow?.discord_id) {
+        const action = isDelivered ? "prize_delivered" : "prize_defined";
+        await notifyBot({
+          action,
+          discord_id: memberRow.discord_id,
+          week_start: prizeRow.week_start,
+          prize_type: data.prize_type ?? null,
+          prize_description: data.description ?? null,
+        }).catch(() => {});
+      }
+    }
+
     return { ok: true };
   });
 
