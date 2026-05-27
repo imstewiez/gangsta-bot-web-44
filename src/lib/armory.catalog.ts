@@ -315,6 +315,19 @@ export const RED_WEAPON_NAMES = [
   "Bullpup",
   "Compact Pistol",
   ".50",
+  "AK",
+  "Bullpup MK2",
+  "Drako",
+  "Military",
+  "Heavy",
+  "SMG",
+  "SMG MK2",
+  "Sniper",
+  "Advanced Rifle",
+  "Marksman Pistol",
+  "Espingarda de Cano Serrado",
+  "Heavy Shotgun",
+  "Gusenberg",
 ];
 
 export const ORANGE_WEAPON_NAMES = [
@@ -328,12 +341,21 @@ export const ORANGE_WEAPON_NAMES = [
   "Compact Rifle",
   "SNS Pistol",
   "Assault Shotgun",
+  "Ceramic Pistol",
+  "Musket",
+  "Pistol",
+  "Pistol MK2",
+  "SNS Pistol MK2",
+  "Taser",
+  "Vintage Pistol",
+  "Double-Action Revolver",
+  "Pistola de Combate",
+  "SMG de Assalto",
+  "Bullpup Shotgun",
 ];
 
 // ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
 export const BANNED_WEAPON_NAMES = [
-  "Gusenberg",
-  "Heavy Shotgun",
   "PDW",
   "Gadget Pistol",
 ];
@@ -385,8 +407,9 @@ export function filterItemForDisplay(
 
   // Banidas
   if (isBannedWeapon(itemName)) return null;
-  // MK2
-  if (/mk2/i.test(itemName)) return null;
+  // MK2 — escondido por default, excepto os sem receita de craft
+  const ALLOWED_MK2 = ["Bullpup MK2", "Pistol MK2", "SMG MK2", "SNS Pistol MK2"];
+  if (/mk2/i.test(itemName) && !ALLOWED_MK2.some((w) => itemName.toLowerCase().includes(w.toLowerCase()))) return null;
   // Revolver
   if (name === "revolver") return null;
 
