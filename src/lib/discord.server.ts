@@ -42,6 +42,8 @@ export async function notifyBot(
     return { ok: false, error: "bot_not_configured" };
   }
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -53,7 +55,9 @@ export async function notifyBot(
         guild_id: process.env.DISCORD_GUILD_ID,
         ts: Date.now(),
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
       console.error("[discord] bot returned", res.status, txt);
@@ -61,6 +65,10 @@ export async function notifyBot(
     }
     return { ok: true };
   } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.warn("[discord] bot webhook timed out — skipping");
+      return { ok: false, error: "timeout" };
+    }
     console.error("[discord] failed", err);
     return { ok: false, error: err instanceof Error ? err.message : "network" };
   }
