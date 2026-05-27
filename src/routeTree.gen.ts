@@ -17,7 +17,6 @@ import { Route as AuthenticatedTopsRouteImport } from './routes/_authenticated/t
 import { Route as AuthenticatedReceitasRouteImport } from './routes/_authenticated/receitas'
 import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticated/premios'
 import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
-import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
@@ -76,11 +75,6 @@ const AuthenticatedPremiosRoute = AuthenticatedPremiosRouteImport.update({
 const AuthenticatedPrecarioRoute = AuthenticatedPrecarioRouteImport.update({
   id: '/precario',
   path: '/precario',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPerfilRoute = AuthenticatedPerfilRouteImport.update({
-  id: '/perfil',
-  path: '/perfil',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOperacoesRoute = AuthenticatedOperacoesRouteImport.update({
@@ -207,7 +201,6 @@ export interface FileRoutesByFullPath {
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
-  '/perfil': typeof AuthenticatedPerfilRoute
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
@@ -234,7 +227,6 @@ export interface FileRoutesByTo {
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/perfil': typeof AuthenticatedPerfilRoute
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
   '/receitas': typeof AuthenticatedReceitasRoute
@@ -266,7 +258,6 @@ export interface FileRoutesById {
   '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
-  '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
   '/_authenticated/premios': typeof AuthenticatedPremiosRoute
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
@@ -298,7 +289,6 @@ export interface FileRouteTypes {
     | '/notificacoes'
     | '/onboarding'
     | '/operacoes'
-    | '/perfil'
     | '/precario'
     | '/premios'
     | '/receitas'
@@ -325,7 +315,6 @@ export interface FileRouteTypes {
     | '/liquidacao'
     | '/notificacoes'
     | '/onboarding'
-    | '/perfil'
     | '/precario'
     | '/premios'
     | '/receitas'
@@ -356,7 +345,6 @@ export interface FileRouteTypes {
     | '/_authenticated/notificacoes'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
-    | '/_authenticated/perfil'
     | '/_authenticated/precario'
     | '/_authenticated/premios'
     | '/_authenticated/receitas'
@@ -435,13 +423,6 @@ declare module '@tanstack/react-router' {
       path: '/precario'
       fullPath: '/precario'
       preLoaderRoute: typeof AuthenticatedPrecarioRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/perfil': {
-      id: '/_authenticated/perfil'
-      path: '/perfil'
-      fullPath: '/perfil'
-      preLoaderRoute: typeof AuthenticatedPerfilRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/operacoes': {
@@ -646,7 +627,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRouteWithChildren
-  AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
   AuthenticatedPremiosRoute: typeof AuthenticatedPremiosRoute
   AuthenticatedReceitasRoute: typeof AuthenticatedReceitasRoute
@@ -666,7 +646,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRouteWithChildren,
-  AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,
   AuthenticatedPremiosRoute: AuthenticatedPremiosRoute,
   AuthenticatedReceitasRoute: AuthenticatedReceitasRoute,

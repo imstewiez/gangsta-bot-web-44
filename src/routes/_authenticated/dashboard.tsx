@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { getHomeKpis } from "@/lib/dashboard.functions";
 import { getCurrentMemberXP } from "@/lib/xp.functions";
+import { getMyAllTimeStats } from "@/lib/members.functions";
+import { getCurrentMember } from "@/lib/pricing.functions";
+import { ProfileCard } from "@/components/domain/ProfileCard";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -35,6 +38,8 @@ function Dashboard() {
   ]);
   const fn = useAuthedServerFn(getHomeKpis);
   const xpFn = useAuthedServerFn(getCurrentMemberXP);
+  const statsFn = useAuthedServerFn(getMyAllTimeStats);
+  const meFn = useAuthedServerFn(getCurrentMember);
   const { profile } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["home-kpis"],
@@ -43,6 +48,16 @@ function Dashboard() {
   const myXP = useQuery({
     queryKey: ["my-xp"],
     queryFn: () => xpFn(),
+    staleTime: 5_000,
+  });
+  const myStats = useQuery({
+    queryKey: ["my-stats"],
+    queryFn: () => statsFn(),
+    staleTime: 5_000,
+  });
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: () => meFn(),
     staleTime: 5_000,
   });
 
@@ -79,41 +94,11 @@ function Dashboard() {
         <Kpi icon={Swords} label="Kills/Saída" value={data?.avgKillsPerSaida ?? 0} loading={isLoading} tone="destructive" />
       </Stagger>
 
-      {myXP.data && !myXP.data.maxedOut && (
-        <Reveal delay={200} direction="up">
-          <Card className="mt-6 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent interactive-card">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-primary/20 ring-1 ring-primary/40">
-                    <Zap className="h-5 w-5 text-primary" />
-                  </span>
-                  <div>
-                    <div className="text-display text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
-                      Progresso de bairrista
-                    </div>
-                    <div className="text-sm font-semibold">
-                      {myXP.data.currentTierName} → {myXP.data.nextTierName}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold tabular-nums">{fmtNum(myXP.data.totalPoints)}</div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">XP total</div>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Progress value={myXP.data.progress} className="h-2" />
-                <div className="flex justify-between text-[11px] text-muted-foreground">
-                  <span>0</span>
-                  <span>{myXP.data.progress.toFixed(1)}% — faltam {fmtNum(myXP.data.remaining)} XP</span>
-                  <span>{fmtNum(myXP.data.threshold ?? 0)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Reveal>
-      )}
+      <ProfileCard
+        member={me.data ?? null}
+        xp={myXP.data ?? null}
+        stats={myStats.data ?? null}
+      />
 
       {(data?.lastSaida || (data?.topOpsParticipants && data.topOpsParticipants.length > 0)) && (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">

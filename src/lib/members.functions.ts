@@ -229,6 +229,63 @@ export const getMember = createServerFn({ method: "GET" })
     }
   });
 
+export const getMyAllTimeStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{
+    kills: number;
+    deaths: number;
+    saidas: number;
+    deliveries: number;
+    sales: number;
+    orders: number;
+    wins: number;
+    losses: number;
+    kd: string;
+    winRate: string;
+  }> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    const row = await pgOne<{
+      kills_total: number;
+      deaths_total: number;
+      saidas_total: number;
+      deliveries: number;
+      sales: number;
+      orders: number;
+      wins: number;
+      losses: number;
+    }>(
+      `select coalesce(kills_total,0)::int as kills_total,
+              coalesce(deaths_total,0)::int as deaths_total,
+              coalesce(saidas_total,0)::int as saidas_total,
+              coalesce(deliveries,0)::int as deliveries,
+              coalesce(sales,0)::int as sales,
+              coalesce(orders,0)::int as orders,
+              coalesce(wins,0)::int as wins,
+              coalesce(losses,0)::int as losses
+       from all_time_stats where member_id = $1`,
+      [me.id],
+    );
+    const kills = row?.kills_total ?? 0;
+    const deaths = row?.deaths_total ?? 0;
+    const wins = row?.wins ?? 0;
+    const saidas = row?.saidas_total ?? 0;
+    const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(0);
+    const wr = saidas > 0 ? ((wins / saidas) * 100).toFixed(0) : "0";
+    return {
+      kills,
+      deaths,
+      saidas,
+      deliveries: row?.deliveries ?? 0,
+      sales: row?.sales ?? 0,
+      orders: row?.orders ?? 0,
+      wins,
+      losses: row?.losses ?? 0,
+      kd,
+      winRate: wr,
+    };
+  });
+
 export const updateMyProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { display_name?: string; nickname?: string | null }) => {

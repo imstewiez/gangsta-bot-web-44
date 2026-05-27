@@ -49,7 +49,7 @@ const GROUPS: NavGroup[] = [
     label: "Bairro",
     items: [
       { to: "/dashboard", label: "Casa",        icon: Home },
-      { to: "/perfil",    label: "O meu perfil", icon: UserCircle },
+
       { to: "/membros",   label: "Membros",     icon: Users },
       { to: "/tops",      label: "Leaderboard", icon: Trophy },
       { to: "/premios",       label: "Prémios",       icon: Sparkles },
