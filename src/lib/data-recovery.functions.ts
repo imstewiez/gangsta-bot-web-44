@@ -356,6 +356,23 @@ export async function doRecalcWeeklyRankings(): Promise<{ rows_updated: number }
           AND member_id IS NOT NULL
         GROUP BY member_id
       ),
+      weighted AS (
+        SELECT member_id, SUM(quantity)::int AS weighted_value
+        FROM inventory_movements, bounds
+        WHERE created_at BETWEEN bounds.ws AND bounds.we + interval '1 day'
+          AND movement_type IN ('entrega_bairrista', 'venda_bairrista', 'entrega_oficial')
+          AND member_id IS NOT NULL
+        GROUP BY member_id
+      ),
+      return_rates AS (
+        SELECT p.member_id, COALESCE(AVG(p.discipline_score), 0)::numeric AS return_rate
+        FROM operation_participants p
+        JOIN operations o ON o.id = p.operation_id AND o.deleted_at IS NULL
+        CROSS JOIN bounds
+        WHERE COALESCE(o.end_time, o.start_time, o.date::timestamp) BETWEEN bounds.ws AND bounds.we + interval '1 day'
+          AND o.status = 'concluida'
+        GROUP BY p.member_id
+      ),
       computed AS (
         SELECT m.id AS member_id,
                COALESCE(k.kills_count, 0) AS kills_count,
@@ -367,22 +384,23 @@ export async function doRecalcWeeklyRankings(): Promise<{ rows_updated: number }
                COALESCE(o.net_profit_generated, 0) AS net_profit_generated,
                COALESCE(d.deliveries, 0) AS deliveries,
                COALESCE(s.sales, 0) AS sales,
+               COALESCE(w.weighted_value, 0) AS weighted_value,
+               COALESCE(r.return_rate, 0) AS return_rate,
                CASE WHEN COALESCE(o.operations_count, 0) > 0
                     THEN COALESCE(o.survived_in_ops, 0)::numeric / COALESCE(o.operations_count, 1)
                     ELSE 0
                END AS survival_rate,
-               COALESCE(k.kills_count, 0) + COALESCE(o.wins_count, 0) * 2 - COALESCE(o.deaths_in_ops, 0) * 0.5 AS performance_score,
-               COALESCE(k.kills_count, 0) + COALESCE(o.wins_count, 0) * 2 - COALESCE(o.deaths_in_ops, 0) * 0.5 +
-                 CASE WHEN COALESCE(o.operations_count, 0) > 0
-                      THEN (COALESCE(o.survived_in_ops, 0)::numeric / COALESCE(o.operations_count, 1)) * 50
-                      ELSE 0
-                 END +
-                 COALESCE(o.net_profit_generated, 0) * 0.001 AS hybrid_score
+               COALESCE(k.kills_count, 0) * 10 + COALESCE(o.wins_count, 0) * 20 - COALESCE(o.loss_count, 0) * 5 + COALESCE(o.net_profit_generated, 0) / 100 + COALESCE(o.operations_count, 0) * 3 AS performance_score,
+               COALESCE(w.weighted_value, 0) * 0.4 +
+               (COALESCE(k.kills_count, 0) * 10 + COALESCE(o.wins_count, 0) * 20 - COALESCE(o.loss_count, 0) * 5 + COALESCE(o.net_profit_generated, 0) / 100 + COALESCE(o.operations_count, 0) * 3) * 0.4 +
+               (COALESCE(r.return_rate, 0) * 0.5 + CASE WHEN COALESCE(o.operations_count, 0) > 0 THEN (COALESCE(o.survived_in_ops, 0)::numeric / COALESCE(o.operations_count, 1)) * 0.3 ELSE 0 END) * 0.2 AS hybrid_score
         FROM members m
         LEFT JOIN kills k ON k.member_id = m.id
         LEFT JOIN ops o ON o.member_id = m.id
         LEFT JOIN inv d ON d.member_id = m.id
         LEFT JOIN sales s ON s.member_id = m.id
+        LEFT JOIN weighted w ON w.member_id = m.id
+        LEFT JOIN return_rates r ON r.member_id = m.id
         WHERE m.deleted_at IS NULL
           AND (m.status = 'ativo' OR m.status IS NULL AND COALESCE(m.lifecycle_state::text, 'active') IN ('active', 'promoted'))
           AND (COALESCE(k.kills_count, 0) + COALESCE(o.operations_count, 0) + COALESCE(d.deliveries, 0) + COALESCE(s.sales, 0) > 0)
@@ -394,7 +412,7 @@ export async function doRecalcWeeklyRankings(): Promise<{ rows_updated: number }
         FROM computed
       )
       SELECT member_id, bounds.ws, bounds.we, deliveries, sales, operations_count,
-             net_profit_generated, survival_rate, rank_position,
+             weighted_value, return_rate, rank_position,
              kills_count, wins_count, loss_count,
              net_profit_generated, survival_rate, performance_score, hybrid_score,
              CASE WHEN max_score > 0 THEN hybrid_score / max_score ELSE 0 END,
