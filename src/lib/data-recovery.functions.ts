@@ -420,6 +420,7 @@ export async function doRecalcWeeklyRankings(): Promise<{ rows_updated: number }
         LEFT JOIN weighted w ON w.member_id = m.id
         LEFT JOIN return_rates r ON r.member_id = m.id
         WHERE m.deleted_at IS NULL
+          AND m.role = 'bairrista'
           AND (m.status = 'ativo' OR m.status IS NULL AND COALESCE(m.lifecycle_state::text, 'active') IN ('active', 'promoted'))
           AND (COALESCE(k.kills_count, 0) + COALESCE(o.operations_count, 0) + COALESCE(d.deliveries, 0) + COALESCE(s.sales, 0) > 0)
       ),
