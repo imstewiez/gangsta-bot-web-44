@@ -10,6 +10,7 @@ export type PrizeRow = {
   winner_member_id: number | null;
   winner_name: string | null;
   hybrid_score: number | null;
+  prize_type: string | null;
   prize_description: string | null;
   prize_status: string;
   defined_by: string | null;
@@ -26,7 +27,8 @@ export const listPrizes = createServerFn({ method: "GET" })
       `select wp.id, wp.week_start, wp.week_end, wp.winner_member_id,
               m.display_name as winner_name,
               wp.hybrid_score::float as hybrid_score,
-              wp.prize_description, coalesce(wp.prize_status, 'por_definir') as prize_status,
+              wp.prize_type, wp.prize_description,
+              coalesce(wp.prize_status, 'por_definir') as prize_status,
               wp.defined_by, wp.defined_at, wp.delivered_by, wp.delivered_at, wp.notes
        from weekly_prizes wp
        left join members m on m.id = wp.winner_member_id
@@ -35,11 +37,15 @@ export const listPrizes = createServerFn({ method: "GET" })
     );
   });
 
+const PRIZE_TYPES = ["Casa", "Arma", "Carro", "Dinheiro", "Outro"] as const;
+export type PrizeType = (typeof PRIZE_TYPES)[number];
+
 export const setPrize = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
     (d: {
       id: number;
+      prize_type?: string | null;
       description?: string | null;
       status?: string | null;
       notes?: string | null;
@@ -51,17 +57,19 @@ export const setPrize = createServerFn({ method: "POST" })
     const isDelivered = data.status === "entregue";
     await pgQuery(
       `update weekly_prizes set
-         prize_description = coalesce($2, prize_description),
-         prize_status = coalesce($3, prize_status),
-         notes = coalesce($4, notes),
-         defined_by = coalesce(defined_by, $5),
+         prize_type = coalesce($2, prize_type),
+         prize_description = coalesce($3, prize_description),
+         prize_status = coalesce($4, prize_status),
+         notes = coalesce($5, notes),
+         defined_by = coalesce(defined_by, $6),
          defined_at = coalesce(defined_at, now()),
-         delivered_by = case when $6 then $5 else delivered_by end,
-         delivered_at = case when $6 then now() else delivered_at end,
+         delivered_by = case when $7 then $6 else delivered_by end,
+         delivered_at = case when $7 then now() else delivered_at end,
          updated_at = now()
        where id = $1`,
       [
         data.id,
+        data.prize_type ?? null,
         data.description ?? null,
         data.status ?? null,
         data.notes ?? null,

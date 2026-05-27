@@ -407,6 +407,36 @@ export async function doRecalcWeeklyRankings(): Promise<{ rows_updated: number }
   }
 
   const r = await pgOne<{ count: number }>(`select count(*)::int as count from weekly_rankings`);
+
+  // Auto-generate prize for the most recent week if not already exists
+  const top = await pgOne<{
+    member_id: number;
+    week_start: string;
+    week_end: string;
+    score: number | null;
+  }>(
+    `select wr.member_id, wr.week_start, wr.week_end,
+            coalesce(wr.hybrid_score, wr.normalized_score, wr.performance_score)::float as score
+     from weekly_rankings wr
+     where wr.week_start = (select max(week_start) from weekly_rankings)
+     order by score desc nulls last
+     limit 1`,
+  );
+  if (top) {
+    const existing = await pgOne<{ id: number }>(
+      `select id from weekly_prizes where week_start = $1`,
+      [top.week_start],
+    );
+    if (!existing) {
+      await pgQuery(
+        `insert into weekly_prizes
+           (week_start, week_end, winner_member_id, hybrid_score, prize_status, created_at, updated_at)
+         values ($1, $2, $3, $4, 'por_definir', now(), now())`,
+        [top.week_start, top.week_end, top.member_id, top.score],
+      );
+    }
+  }
+
   return { rows_updated: r?.count ?? 0 };
 }
 
