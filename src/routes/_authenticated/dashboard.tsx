@@ -192,9 +192,9 @@ function Dashboard() {
               ? "border-orange-500/40 bg-gradient-to-br from-orange-500/10 via-card to-card"
               : "border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card"
           )}>
-            <CardContent className="flex items-center gap-4 p-5">
+            <CardContent className="flex items-start gap-4 p-5">
               <span className={cn(
-                "grid h-12 w-12 place-items-center rounded-full ring-1",
+                "grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1",
                 data.prize.status === "in_progress"
                   ? "bg-orange-500/20 ring-orange-500/40"
                   : "bg-primary/20 ring-primary/40"
@@ -206,37 +206,52 @@ function Dashboard() {
                 )}
               </span>
               <div className="flex-1 min-w-0">
+                {/* Semana + estado */}
                 <div className="flex items-center gap-2">
                   <div className="text-display text-[11px] tracking-[0.3em] text-primary uppercase">
                     Semana {data.prize.week_label}
                   </div>
                   {data.prize.status === "in_progress" && (
-                    <Badge variant="default" className="bg-orange-500 text-white border-transparent">
+                    <Badge variant="default" className="bg-orange-500 text-white border-transparent text-[10px]">
                       <Flame className="w-3 h-3 mr-1" />
                       A decorrer
                     </Badge>
                   )}
-                  {data.prize.status === "defined" && data.prize.prize_status === "entregue" && (
-                    <Badge variant="secondary">Entregue</Badge>
-                  )}
-                  {data.prize.status === "defined" && data.prize.prize_status !== "entregue" && (
-                    <Badge variant="default">Definido</Badge>
-                  )}
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
+
+                {/* Vencedor (sempre o líder / calculado) */}
+                <div className="mt-1 flex items-center gap-2 text-lg font-semibold">
                   <TierIcon tier={data.prize.winner_tier} size="sm" />
                   <span className="truncate">{data.prize.winner_name}</span>
                   {data.prize.score != null && (
                     <span className="text-sm font-mono text-muted-foreground">· {fmtNum(Math.round(data.prize.score))} pts</span>
                   )}
                 </div>
+
+                {/* Prémio — separado e destacado */}
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-display text-[10px] uppercase tracking-wider text-muted-foreground">Prémio:</span>
+                  {!data.prize.prize_description ? (
+                    <Badge variant="outline" className="text-[10px] border-yellow-500/50 text-yellow-400 bg-yellow-500/10">
+                      Por definir
+                    </Badge>
+                  ) : data.prize.prize_status === "entregue" ? (
+                    <Badge variant="default" className="text-[10px] bg-green-600 text-white border-transparent">
+                      Entregue
+                    </Badge>
+                  ) : (
+                    <Badge variant="default" className="text-[10px] bg-purple-600 text-white border-transparent">
+                      Definido
+                    </Badge>
+                  )}
+                </div>
                 {data.prize.prize_description ? (
-                  <div className="text-xs text-muted-foreground italic">"{data.prize.prize_description}"</div>
-                ) : data.prize.status === "in_progress" ? (
-                  <div className="text-xs text-orange-400/80 italic">Líder provisório — prémio ainda não definido</div>
-                ) : null}
+                  <div className="mt-0.5 text-sm font-medium text-foreground">{data.prize.prize_description}</div>
+                ) : (
+                  <div className="mt-0.5 text-xs text-muted-foreground italic">A chefia ainda não definiu o prémio desta semana.</div>
+                )}
               </div>
-              <Link to="/premios" className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-primary interactive-link shrink-0">
+              <Link to="/premios" className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-primary interactive-link shrink-0 mt-1">
                 VER PRÉMIOS →
               </Link>
             </CardContent>
