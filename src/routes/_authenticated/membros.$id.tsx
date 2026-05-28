@@ -5,12 +5,21 @@ import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { getMember } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { getMemberXP } from "@/lib/xp.functions";
+import { getMemberPreview } from "@/lib/member-preview.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { fmtNum, fmtDate, ROLE_LABELS, POSITION_LABELS, TIER_ORDER } from "@/lib/domain";
 import { MemberIdentity } from "@/components/domain/RoleBadge";
 import { MemberAdminPanel } from "@/components/domain/MemberAdminPanel";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Skull,
   Crosshair,
@@ -23,9 +32,12 @@ import {
   Zap,
   TrendingUp,
   Loader2,
+  Eye,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
+import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({
   head: () => ({
@@ -36,6 +48,7 @@ export const Route = createFileRoute("/_authenticated/membros/$id")({
 
 function Page() {
   const { id } = Route.useParams();
+  const [previewOpen, setPreviewOpen] = useState(false);
   useRealtimeSync([
     "members",
     { table: "inventory_movements", queryKeys: [["member", id], ["member-xp", id]] },
@@ -44,6 +57,7 @@ function Page() {
   const fn = useAuthedServerFn(getMember);
   const meFn = useAuthedServerFn(getCurrentMember);
   const xpFn = useAuthedServerFn(getMemberXP);
+  const previewFn = useAuthedServerFn(getMemberPreview);
   const { data, isLoading } = useQuery({
     queryKey: ["member", id],
     queryFn: () => fn({ data: { id: Number(id) } }),
@@ -57,6 +71,11 @@ function Page() {
     queryKey: ["member-xp", id],
     queryFn: () => xpFn({ data: { member_id: Number(id) } }),
     enabled: !isLoading && !!data?.member,
+  });
+  const preview = useQuery({
+    queryKey: ["member-preview", id],
+    queryFn: () => previewFn({ data: { member_id: Number(id) } }),
+    enabled: previewOpen && !!me.data?.is_superadmin,
   });
   if (isLoading)
     return (
@@ -236,6 +255,105 @@ function Page() {
           </Card>
         </div>
       </Reveal>
+
+      {me.data?.is_superadmin && (
+        <Reveal direction="up" delay={180}>
+          <div className="mt-4">
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+              <DialogTrigger asChild>
+                <button className="inline-flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 ring-1 ring-primary/30 transition-colors">
+                  <Eye className="h-4 w-4" />
+                  Ver como este membro
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5 text-primary" />
+                    Preview: {m.display_name}
+                    <Badge variant="secondary" className="text-[10px]">
+                      {POSITION_LABELS[m.tier ?? "bairrista"]}
+                    </Badge>
+                    {preview.data?.member.is_manager && (
+                      <Badge variant="default" className="text-[10px]">Manager</Badge>
+                    )}
+                  </DialogTitle>
+                </DialogHeader>
+
+                {preview.isLoading && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+
+                {preview.data && (
+                  <div className="space-y-4 mt-2">
+                    {/* Encomendas */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-display text-sm flex items-center gap-2">
+                          <ShoppingBag className="h-4 w-4 text-accent-foreground" />
+                          Encomendas ({preview.data.orders.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {preview.data.orders.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Sem encomendas visíveis.</p>
+                        ) : (
+                          <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {preview.data.orders.map((o) => (
+                              <li key={o.id} className="flex items-center justify-between text-sm border-b border-border/50 py-1.5 last:border-0">
+                                <span className="text-muted-foreground">#{o.id}</span>
+                                <span className="truncate max-w-[180px]">{o.item_name ?? "—"}</span>
+                                <span className="font-mono">{o.quantity}x</span>
+                                <Badge variant={o.status === "fulfilled" ? "default" : o.status === "pending" ? "secondary" : "outline"} className="text-[10px]">
+                                  {o.status}
+                                </Badge>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Entregas / Vendas */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-display text-sm flex items-center gap-2">
+                          <Truck className="h-4 w-4 text-info" />
+                          Entregas / Vendas ({preview.data.deliveries.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {preview.data.deliveries.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Sem entregas/vendas visíveis.</p>
+                        ) : (
+                          <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {preview.data.deliveries.map((d) => (
+                              <li key={d.id} className="flex items-center justify-between text-sm border-b border-border/50 py-1.5 last:border-0">
+                                <span className="text-muted-foreground">#{d.id.slice(0, 8)}</span>
+                                <span className="truncate max-w-[180px]">{d.requester_name ?? "—"}</span>
+                                <span className="font-mono">{d.total_qty}x</span>
+                                <Badge variant={d.status === "approved" ? "default" : d.status === "pending" ? "secondary" : "outline"} className="text-[10px]">
+                                  {d.tipo}
+                                </Badge>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <div className="text-xs text-muted-foreground text-center pt-2">
+                      Só superadmins veem este preview. Os dados reflectem exactamente o que {m.display_name} vê na app.
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </div>
+        </Reveal>
+      )}
 
       {isChefia && (
         <Reveal direction="up" delay={200}>
