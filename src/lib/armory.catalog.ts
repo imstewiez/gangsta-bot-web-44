@@ -169,10 +169,14 @@ export const PRINT_BADGE_CLASS: Record<string, string> = {
 export const RED_WEAPON_NAMES = [
   "Heavy Pistol",
   "Pistol .50",
+  ".50 Pistol",
   "Combat PDW",
+  "PDW",
   "P90",
   "Bullpup Rifle",
+  "Bullpup",
   "Carabina Rifle",
+  "Carabina",
 ];
 
 export const ORANGE_WEAPON_NAMES = [
@@ -180,6 +184,8 @@ export const ORANGE_WEAPON_NAMES = [
   "Pistol XM3",
   "Micro SMG",
   "TEC 9",
+  "TEC-9",
+  "Tec 9",
   "TEC Pistol",
   "AP Pistol",
 ];
@@ -196,7 +202,6 @@ export function isBannedWeapon(name: string | null): boolean {
 }
 
 export function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
-  if (subcategory === "armas_red") return true;
   if (!name) return false;
   const n = name.toLowerCase();
   // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
@@ -205,7 +210,6 @@ export function isAllowedRedWeapon(name: string | null, subcategory?: string | n
 }
 
 export function isAllowedOrangeWeapon(name: string | null, subcategory?: string | null): boolean {
-  if (subcategory === "armas_orange") return true;
   if (!name) return false;
   const n = name.toLowerCase();
   // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words

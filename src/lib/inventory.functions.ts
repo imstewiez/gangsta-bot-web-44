@@ -13,6 +13,13 @@ const INV_CATEGORIES = [
   "prints",
 ];
 
+// Subcategorias extra para o armazém (além das categorias principais)
+const INV_SUBCATEGORIES = [
+  "carregadores",
+  "corpos",
+  "prints",
+];
+
 async function gateInventory(supabase: unknown, userId: string) {
   const me = await resolveCurrentMember(supabase as never, userId);
   if (!me?.can_see_inventory) throw new Error("Sem acesso ao armazém.");
@@ -42,10 +49,10 @@ export const getStock = createServerFn({ method: "GET" })
          and coalesce(i.deleted_at, 'epoch'::timestamptz) = 'epoch'::timestamptz
          and (
            i.category = any($1::text[])
-           or i.subcategory in ('corpos','prints')
+           or i.subcategory = any($2::text[])
          )
        order by unit_price desc nulls last`,
-      [INV_CATEGORIES],
+      [INV_CATEGORIES, INV_SUBCATEGORIES],
     );
   });
 
@@ -100,8 +107,8 @@ export const getLedger = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const params: unknown[] = [data.limit, INV_CATEGORIES];
-    let where = "where i.category = any($2::text[])";
+    const params: unknown[] = [data.limit, INV_CATEGORIES, INV_SUBCATEGORIES];
+    let where = "where (i.category = any($2::text[]) or i.subcategory = any($3::text[]))";
     if (data.type) {
       params.push(data.type);
       where += ` and im.movement_type = $${params.length}`;

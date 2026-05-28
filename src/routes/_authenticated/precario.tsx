@@ -100,7 +100,8 @@ function Page() {
     return (cat.data ?? []).filter((it) => {
       const c = filterItemForDisplay(it.name, it.category, it.subcategory);
       if (!c) return false;
-      return c === catKey && (it.min_sale_price ?? 0) > 0;
+      const hasPrice = (it.min_sale_price ?? 0) > 0 || (it.tier_price ?? 0) > 0;
+      return c === catKey && hasPrice;
     });
   }
 
