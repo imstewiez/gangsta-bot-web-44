@@ -65,7 +65,7 @@ export const listRecipes = createServerFn({ method: "GET" })
               case ii.name
                 when 'Corpo Mini SMG' then 8000
                 when 'Corpo Pistol XM3' then 8000
-                when 'Corpo UZI' then 10000
+                when 'Corpo Micro SMG' then 10000
                 when 'Corpo TEC-9' then 10000
                 when 'Corpo TEC Pistol' then 15000
                 when 'Corpo AP Pistol' then 15000
@@ -133,7 +133,7 @@ export const listRecipes = createServerFn({ method: "GET" })
         r.category === "armas_orange" ||
         r.subcategory === "armas_red" ||
         r.subcategory === "armas_orange" ||
-        /mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|heavy|\.50|p90|pdw|bullpup|carabina|compact rifle/i.test(r.item_name)
+        /mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|heavy|\.50|p90|pdw|bullpup|carabina/i.test(r.item_name)
       )) {
         tierPrice = getWeaponSalePrice(basePrice, me?.tier ?? null);
       }

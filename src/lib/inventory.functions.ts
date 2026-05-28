@@ -7,14 +7,8 @@ import { resolveCurrentMember } from "./pricing.server";
 const INV_CATEGORIES = [
   "armas",
   "armas_fogo",
-  "armas_brancas",
   "municoes",
   "acessorios",
-  "drogas",
-  "materiais",
-  "materias_primas",
-  "componentes",
-  "minerios",
   "corpos",
   "prints",
 ];

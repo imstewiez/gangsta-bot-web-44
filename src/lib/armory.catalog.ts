@@ -27,23 +27,9 @@ import {
 export type ArmoryCategory =
   | "armas_orange"
   | "armas_red"
-  | "armas_brancas"
   | "carregadores"
-  | "carregadores_orange"
-  | "carregadores_red"
-  | "carregadores_especial"
   | "acessorios"
-  | "acessorios_armas"
   | "coletes"
-  | "extras"
-  | "drogas"
-  | "craft_armas"
-  | "craft_carregadores"
-  | "materiais_craft"
-  | "lixo"
-  | "madeiras"
-  | "materias_primas"
-  | "minerios"
   | "corpos"
   | "prints"
   | "outros";
@@ -54,19 +40,8 @@ export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
   "carregadores",
   "corpos",
   "prints",
-  "drogas",
-  "materiais_craft",
-  "lixo",
-  "madeiras",
-  "materias_primas",
-  "minerios",
   "coletes",
-  "craft_armas",
-  "craft_carregadores",
   "acessorios",
-  "acessorios_armas",
-  "armas_brancas",
-  "extras",
   "outros",
 ];
 
@@ -118,33 +93,7 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-blue-400",
     tone: "primary",
   },
-  carregadores_orange: {
-    label: "Carregadores Orange",
-    icon: Cylinder,
-    color: "text-orange-400",
-    bg: "bg-orange-500/10",
-    border: "border-orange-500/30",
-    headerColor: "text-orange-400",
-    tone: "warning",
-  },
-  carregadores_red: {
-    label: "Carregadores Red",
-    icon: Cylinder,
-    color: "text-red-400",
-    bg: "bg-red-500/10",
-    border: "border-red-500/30",
-    headerColor: "text-red-400",
-    tone: "destructive",
-  },
-  carregadores_especial: {
-    label: "Carregadores Especial",
-    icon: Cylinder,
-    color: "text-yellow-400",
-    bg: "bg-yellow-500/10",
-    border: "border-yellow-500/30",
-    headerColor: "text-yellow-400",
-    tone: "warning",
-  },
+
   acessorios: {
     label: "Acessórios",
     icon: Telescope,
@@ -154,15 +103,7 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-yellow-400",
     tone: "info",
   },
-  acessorios_armas: {
-    label: "Acessórios",
-    icon: Telescope,
-    color: "text-yellow-400",
-    bg: "bg-yellow-500/10",
-    border: "border-yellow-500/30",
-    headerColor: "text-yellow-400",
-    tone: "info",
-  },
+
   coletes: {
     label: "Coletes",
     icon: Shield,
@@ -172,78 +113,7 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-emerald-400",
     tone: "warning",
   },
-  drogas: {
-    label: "Drogas",
-    icon: Pill,
-    color: "text-purple-400",
-    bg: "bg-purple-500/10",
-    border: "border-purple-500/30",
-    headerColor: "text-purple-400",
-    tone: "success",
-  },
-  craft_armas: {
-    label: "Craft Armas",
-    icon: Hammer,
-    color: "text-orange-400",
-    bg: "bg-orange-500/10",
-    border: "border-orange-500/30",
-    headerColor: "text-orange-400",
-    tone: "primary",
-  },
-  craft_carregadores: {
-    label: "Craft Carregadores",
-    icon: FlaskConical,
-    color: "text-blue-400",
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/30",
-    headerColor: "text-blue-400",
-    tone: "muted",
-  },
-  materiais_craft: {
-    label: "Materiais Craft",
-    icon: Cog,
-    color: "text-stone-400",
-    bg: "bg-stone-500/10",
-    border: "border-stone-500/30",
-    headerColor: "text-stone-400",
-    tone: "muted",
-  },
-  lixo: {
-    label: "Lixo",
-    icon: Recycle,
-    color: "text-muted-foreground",
-    bg: "bg-muted/40",
-    border: "border-border",
-    headerColor: "text-muted-foreground",
-    tone: "muted",
-  },
-  madeiras: {
-    label: "Madeiras",
-    icon: Trees,
-    color: "text-amber-700",
-    bg: "bg-amber-700/10",
-    border: "border-amber-700/30",
-    headerColor: "text-amber-700",
-    tone: "success",
-  },
-  materias_primas: {
-    label: "Matérias-primas",
-    icon: Cog,
-    color: "text-stone-400",
-    bg: "bg-stone-500/10",
-    border: "border-stone-500/30",
-    headerColor: "text-stone-400",
-    tone: "muted",
-  },
-  minerios: {
-    label: "Minérios",
-    icon: Pickaxe,
-    color: "text-slate-400",
-    bg: "bg-slate-500/10",
-    border: "border-slate-500/30",
-    headerColor: "text-slate-400",
-    tone: "info",
-  },
+
   corpos: {
     label: "Corpos",
     icon: Box,
@@ -262,15 +132,7 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-primary",
     tone: "primary",
   },
-  extras: {
-    label: "Extras",
-    icon: Package,
-    color: "text-yellow-400",
-    bg: "bg-yellow-500/10",
-    border: "border-yellow-500/30",
-    headerColor: "text-yellow-400",
-    tone: "info",
-  },
+
   outros: {
     label: "Outros",
     icon: Package,
@@ -311,23 +173,6 @@ export const RED_WEAPON_NAMES = [
   "P90",
   "Bullpup Rifle",
   "Carabina Rifle",
-  "Carabina Especial",
-  "Bullpup",
-  "Compact Pistol",
-  ".50",
-  "AK",
-  "Bullpup MK2",
-  "Drako",
-  "Military",
-  "Heavy",
-  "SMG",
-  "SMG MK2",
-  "Sniper",
-  "Advanced Rifle",
-  "Marksman Pistol",
-  "Espingarda de Cano Serrado",
-  "Heavy Shotgun",
-  "Gusenberg",
 ];
 
 export const ORANGE_WEAPON_NAMES = [
@@ -337,27 +182,10 @@ export const ORANGE_WEAPON_NAMES = [
   "TEC 9",
   "TEC Pistol",
   "AP Pistol",
-  "Machine Pistol",
-  "Compact Rifle",
-  "SNS Pistol",
-  "Assault Shotgun",
-  "Ceramic Pistol",
-  "Musket",
-  "Pistol",
-  "Pistol MK2",
-  "SNS Pistol MK2",
-  "Taser",
-  "Vintage Pistol",
-  "Double-Action Revolver",
-  "Pistola de Combate",
-  "SMG de Assalto",
-  "Bullpup Shotgun",
 ];
 
 // ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
-export const BANNED_WEAPON_NAMES = [
-  "PDW",
-  "Gadget Pistol",
+export const BANNED_WEAPON_NAMES: string[] = [
 ];
 
 export function isBannedWeapon(name: string | null): boolean {
@@ -407,19 +235,22 @@ export function filterItemForDisplay(
 
   // Banidas
   if (isBannedWeapon(itemName)) return null;
-  // MK2 — escondido por default, excepto os sem receita de craft
-  const ALLOWED_MK2 = ["Bullpup MK2", "Pistol MK2", "SMG MK2", "SNS Pistol MK2"];
-  if (/mk2/i.test(itemName) && !ALLOWED_MK2.some((w) => itemName.toLowerCase().includes(w.toLowerCase()))) return null;
-  // Revolver
-  if (name === "revolver") return null;
+  // MK2 — totalmente banido
+  if (/mk2/i.test(itemName)) return null;
 
   const cat = itemDisplayCategory(itemName, category, subcategory);
 
   // Categorias escondidas
-  if (cat === "outros" || cat === "armas_brancas") return null;
+  if (cat === "outros") return null;
 
   // Apenas colete padrão
   if (cat === "coletes" && !/padrão/.test(name)) return null;
+
+  // Apenas acessórios permitidos explicitamente
+  if (cat === "acessorios") {
+    const allowed = /silenciador|barrel|muzzle|grip|mira|extensivo|mag expandido/i;
+    if (!allowed.test(itemName)) return null;
+  }
 
   // Armas red/orange só se permitidas
   if (cat === "armas_red" && !isAllowedRedWeapon(itemName, subcategory)) return null;
@@ -496,39 +327,7 @@ export function itemDisplayCategory(
   if (cat === "prints" || sub === "prints" || /print|esquema|blueprint/.test(name))
     return "prints";
 
-  // 5. Drogas
-  if (cat === "drogas" || sub === "drogas") return "drogas";
-
-  // 6. Materiais de craft / minérios / matérias-primas / madeiras / lixo
-  if (
-    cat === "materiais" ||
-    cat === "materias_primas" ||
-    cat === "componentes" ||
-    cat === "minerios" ||
-    cat === "madeiras" ||
-    cat === "lixo"
-  ) {
-    if (name.includes("carvão") || name.includes("carvao")) return "materiais_craft";
-    if (sub === "lixo") return "lixo";
-    if (sub === "madeiras") return "madeiras";
-    if (sub === "materias_primas") return "materias_primas";
-    if (sub === "minerios") return "minerios";
-    if (sub === "materiais_craft") return "materiais_craft";
-    if (cat === "lixo") return "lixo";
-    if (cat === "madeiras") return "madeiras";
-    if (cat === "minerios") return "minerios";
-    if (cat === "materias_primas") return "materias_primas";
-    return "materiais_craft";
-  }
-
-  // 7. Lixo / Madeiras / Matérias-primas / Minérios / Materiais craft (subcategory direta)
-  if (sub === "lixo") return "lixo";
-  if (sub === "madeiras") return "madeiras";
-  if (sub === "materias_primas") return "materias_primas";
-  if (sub === "minerios") return "minerios";
-  if (sub === "materiais_craft") return "materiais_craft";
-
-  // 8. Acessórios / coletes / armas brancas
+  // 5. Acessórios / coletes
   if (
     sub === "acessorios" ||
     sub === "acessorios_armas" ||
@@ -537,7 +336,6 @@ export function itemDisplayCategory(
   )
     return "acessorios";
   if (sub === "coletes" || cat === "coletes") return "coletes";
-  if (sub === "armas_brancas" || cat === "armas_brancas") return "armas_brancas";
 
   // 9. Outros
   return "outros";
@@ -568,7 +366,7 @@ export const INGREDIENT_UNIT_PRICE: Record<string, number> = {
   "Print Laranja": 10000,
   "Corpo Mini SMG": 20000,
   "Corpo Pistol XM3": 20000,
-  "Corpo UZI": 20000,
+  "Corpo Micro SMG": 20000,
   "Corpo TEC-9": 20000,
   "Corpo TEC Pistol": 20000,
   "Corpo AP Pistol": 20000,

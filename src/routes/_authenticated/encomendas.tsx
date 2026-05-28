@@ -556,34 +556,29 @@ function NewOrder() {
     // Armas Orange (whitelist rigorosa)
     if (
       /\bmini smg\b/.test(n) ||
-      /\bxm3\b/.test(n) || /\bpistol xm3\b/.test(n) || /\bmachine pistol\b/.test(n) ||
+      /\bpistol xm3\b/.test(n) || /\bxm3\b/.test(n) ||
       /\bmicro smg\b/.test(n) ||
       /\btec[-\s]?9\b/.test(n) || /\btec9\b/.test(n) ||
       /\btec[-\s]?pistol\b/.test(n) || /\btecpistol\b/.test(n) ||
-      /\bap[-\s]?pistol\b/.test(n) || /\bappistol\b/.test(n) ||
-      /\bcompact rifle\b/.test(n)
+      /\bap[-\s]?pistol\b/.test(n) || /\bappistol\b/.test(n)
     ) {
-      // Rejeitar MK2 e Assault Shotgun
-      if (/mk2|assault shotgun/.test(n)) return false;
       return true;
     }
 
     // Armas Red (whitelist rigorosa)
     if (
       /\bheavy[-\s]?pistol\b/.test(n) || /\bheavypistol\b/.test(n) ||
-      /\b\.50\b/.test(n) || /\bpistol[-\s]?\.50\b/.test(n) || /\bpistol50\b/.test(n) ||
+      /\bpistol[-\s]?\.50\b/.test(n) || /\bpistol50\b/.test(n) || /\b\.50\b/.test(n) ||
       /\bp90\b/.test(n) ||
-      /\bpdw\b/.test(n) || /\bcombat[-\s]?pdw\b/.test(n) ||
-      /\bbullpup\b/.test(n) || /\bbullpup[-\s]?rifle\b/.test(n) ||
-      /\bcarabina\b/.test(n) || /\bcarabina[-\s]?rifle\b/.test(n)
+      /\bcombat[-\s]?pdw\b/.test(n) || /\bpdw\b/.test(n) ||
+      /\bbullpup[-\s]?rifle\b/.test(n) || /\bbullpup\b/.test(n) ||
+      /\bcarabina[-\s]?rifle\b/.test(n) || /\bcarabina\b/.test(n)
     ) {
-      if (/mk2/.test(n)) return false;
       return true;
     }
 
     // Carregadores
     if (/\bcarregador\b/.test(n) || /\bmagazine\b/.test(n)) {
-      if (/mk2/.test(n)) return false;
       if (/orange/.test(n) || /red/.test(n) || /especial/.test(n) || /special/.test(n)) return true;
       return false;
     }
@@ -596,13 +591,12 @@ function NewOrder() {
 
     // Corpos
     if (/\bcorpo\b/.test(n) || /\bchassi\b/.test(n)) {
-      if (/mk2/.test(n)) return false;
       if (/mini[-\s]?smg|micro[-\s]?smg|xm3|pistol[-\s]?xm3|tec[-\s]?9|tec9|tec[-\s]?pistol|tecpistol|ap[-\s]?pistol|appistol/.test(n)) return true;
       return false;
     }
 
     // Extras: apenas Colete Padrão e attachments básicos
-    if (/\bcolete[-\s]?padrao\b/.test(n) || /\bcolete[-\s]?padrao\b/.test(n.replace(/padrao/, "padrão"))) return true;
+    if (/\bcolete[-\s]?padr[aã]o\b/.test(n)) return true;
     if (/\bmira\b/.test(n) || /\bsilenciador\b/.test(n) || /\bscope\b/.test(n) || /\bgrip\b/.test(n) || /\bbarrel\b/.test(n) || /\bmuzzle\b/.test(n) || /\bextensivo\b/.test(n) || /\bmag[-\s]?expandido\b/.test(n)) return true;
 
     return false;

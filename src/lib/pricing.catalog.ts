@@ -21,7 +21,7 @@
 export const INGREDIENT_CHEFIA_PRICES: Record<string, number> = {
   "Corpo Mini SMG": 8000,
   "Corpo Pistol XM3": 8000,
-  "Corpo UZI": 10000,
+  "Corpo Micro SMG": 10000,
   "Corpo TEC-9": 10000,
   "Corpo TEC Pistol": 15000,
   "Corpo AP Pistol": 15000,
@@ -46,10 +46,7 @@ export const REAL_UNIT_COST: Record<string, number> = {
   "P90": 60000,
   "Combat PDW": 60000,
   "Bullpup Rifle": 85000,
-  "Carabina Especial": 100000,
-
-  // ── Compact Rifle (custo compra + peças) ──
-  "Compact Rifle": 60000, // 60k + 20 peças (peças = 0)
+  "Carabina Rifle": 100000,
 
   // ── Carregadores (custo fixo por tier — chefia/oficiais) ──
   "Carregador Orange": 330,
@@ -59,7 +56,7 @@ export const REAL_UNIT_COST: Record<string, number> = {
   // ── Corpos (preços internos chefia) ──
   "Corpo Mini SMG": 8000,
   "Corpo Pistol XM3": 8000,
-  "Corpo UZI": 10000,
+  "Corpo Micro SMG": 10000,
   "Corpo TEC-9": 10000,
   "Corpo TEC Pistol": 15000,
   "Corpo AP Pistol": 15000,
@@ -155,7 +152,7 @@ export function getTierPrice(itemName: string, basePrice: number, tier: string |
     const magTier = n.includes("special") ? "special" : n.includes("red") ? "red" : "orange";
     return getMagazineSalePrice(magTier, tier);
   }
-  if (/mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|heavy|\.50|p90|pdw|bullpup|carabina|compact rifle/i.test(itemName)) {
+  if (/mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|heavy|\.50|p90|pdw|bullpup|carabina/i.test(itemName)) {
     return getWeaponSalePrice(basePrice, tier);
   }
   return basePrice;

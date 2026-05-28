@@ -160,14 +160,13 @@ export const getOrderCycles = createServerFn({ method: "GET" })
             WHEN 'P90' THEN 60000
             WHEN 'Combat PDW' THEN 60000
             WHEN 'Bullpup Rifle' THEN 85000
-            WHEN 'Carabina Especial' THEN 100000
-            WHEN 'Compact Rifle' THEN 60000
+            WHEN 'Carabina Rifle' THEN 100000
             WHEN 'Carregador Orange' THEN 330
             WHEN 'Carregador Red' THEN 660
             WHEN 'Carregador Special' THEN 990
             WHEN 'Corpo Mini SMG' THEN 8000
             WHEN 'Corpo Pistol XM3' THEN 8000
-            WHEN 'Corpo UZI' THEN 10000
+            WHEN 'Corpo Micro SMG' THEN 10000
             WHEN 'Corpo TEC-9' THEN 10000
             WHEN 'Corpo TEC Pistol' THEN 15000
             WHEN 'Corpo AP Pistol' THEN 15000
@@ -233,14 +232,13 @@ export const getOrderCycles = createServerFn({ method: "GET" })
             WHEN 'P90' THEN 60000
             WHEN 'Combat PDW' THEN 60000
             WHEN 'Bullpup Rifle' THEN 85000
-            WHEN 'Carabina Especial' THEN 100000
-            WHEN 'Compact Rifle' THEN 60000
+            WHEN 'Carabina Rifle' THEN 100000
             WHEN 'Carregador Orange' THEN 330
             WHEN 'Carregador Red' THEN 660
             WHEN 'Carregador Special' THEN 990
             WHEN 'Corpo Mini SMG' THEN 8000
             WHEN 'Corpo Pistol XM3' THEN 8000
-            WHEN 'Corpo UZI' THEN 10000
+            WHEN 'Corpo Micro SMG' THEN 10000
             WHEN 'Corpo TEC-9' THEN 10000
             WHEN 'Corpo TEC Pistol' THEN 15000
             WHEN 'Corpo AP Pistol' THEN 15000

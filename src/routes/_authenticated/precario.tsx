@@ -47,14 +47,8 @@ export const Route = createFileRoute("/_authenticated/precario")({
 });
 
 const COMPRA_GROUPS: { key: string; label: string }[] = [
-  { key: "lixo", label: "Lixo" },
-  { key: "madeiras", label: "Madeiras" },
-  { key: "materias_primas", label: "Matérias-primas" },
-  { key: "minerios", label: "Minérios" },
   { key: "corpos", label: "Corpos" },
   { key: "prints", label: "Prints" },
-  { key: "materiais_craft", label: "Materiais de Craft" },
-  { key: "drogas", label: "Drogas" },
 ];
 
 function Page() {
