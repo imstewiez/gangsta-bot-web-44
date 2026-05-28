@@ -2,11 +2,11 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import {
-  Home, Users, Trophy, Sparkles, CalendarDays,
+  Home, Users, Trophy, Sparkles,
   ShoppingBag, PackageOpen, Crosshair,
   Tags, Package, Hammer,
   Shield, ScrollText, Database,
-  UserCircle, Bell, Activity,
+  UserCircle, Activity,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -53,8 +53,7 @@ const GROUPS: NavGroup[] = [
       { to: "/membros",   label: "Membros",     icon: Users },
       { to: "/tops",      label: "Leaderboard", icon: Trophy },
       { to: "/premios",       label: "Prémios",       icon: Sparkles },
-      { to: "/disponibilidade", label: "Disponibilidade", icon: CalendarDays },
-      { to: "/notificacoes",    label: "Notificações",    icon: Bell },
+
     ],
   },
   {

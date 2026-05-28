@@ -99,9 +99,6 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
                COALESCE((SELECT MAX(ord.created_at)
                          FROM orders ord
                          WHERE ord.member_id = m.id), m.joined_at),
-               COALESCE((SELECT MAX(v.created_at)
-                         FROM availability_votes v
-                         WHERE v.discord_user_id = m.discord_id), m.joined_at),
                m.joined_at,
                m.created_at
              ) as last_active

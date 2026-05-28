@@ -29,7 +29,7 @@ const PAGES = [
   { label: "Tops", path: "/tops", icon: null },
   { label: "Prémios", path: "/premios", icon: null },
   { label: "Auditoria", path: "/auditoria", icon: null },
-  { label: "Disponibilidade", path: "/disponibilidade", icon: null },
+
   { label: "Liquidação", path: "/liquidacao", icon: null },
   { label: "Definições", path: "/admin", icon: null },
 ];

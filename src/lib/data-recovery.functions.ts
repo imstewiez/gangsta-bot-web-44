@@ -28,16 +28,12 @@ export const diagnoseDatabase = createServerFn({ method: "GET" })
       "inventory_balance",
       "orders",
       "order_status_history",
-      "availability_sessions",
-      "availability_slots",
-      "availability_votes",
       "weekly_rankings",
       "items",
       "craft_recipes",
       "recipe_ingredients",
       "tag_requests",
       "audit_logs",
-      "notifications",
       "order_comments",
     ];
 
@@ -218,42 +214,6 @@ export const ensureCriticalTables = createServerFn({ method: "POST" })
     );
     await pgQuery(`create index if not exists idx_osh_order_id on order_status_history(order_id)`);
 
-    // availability_sessions
-    await pgQuery(
-      `create table if not exists availability_sessions (
-        id serial primary key,
-        session_date date not null,
-        status text default 'open',
-        header_text text,
-        created_at timestamptz default now(),
-        deleted_at timestamptz
-      )`
-    );
-
-    // availability_slots
-    await pgQuery(
-      `create table if not exists availability_slots (
-        id serial primary key,
-        session_id int not null references availability_sessions(id) on delete cascade,
-        slot_label text not null,
-        position int not null default 0,
-        created_at timestamptz default now()
-      )`
-    );
-
-    // availability_votes
-    await pgQuery(
-      `create table if not exists availability_votes (
-        id serial primary key,
-        session_id int not null references availability_sessions(id) on delete cascade,
-        slot_id int not null references availability_slots(id) on delete cascade,
-        discord_user_id text not null,
-        vote_state text not null default 'yes',
-        created_at timestamptz default now(),
-        unique(session_id, slot_id, discord_user_id)
-      )`
-    );
-
     // weekly_rankings
     await pgQuery(
       `create table if not exists weekly_rankings (
@@ -298,20 +258,6 @@ export const ensureCriticalTables = createServerFn({ method: "POST" })
         wins int default 0,
         losses int default 0,
         updated_at timestamptz default now()
-      )`
-    );
-
-    // notifications
-    await pgQuery(
-      `create table if not exists notifications (
-        id serial primary key,
-        discord_id text,
-        type text not null,
-        title text not null,
-        body text,
-        link text,
-        read boolean default false,
-        created_at timestamptz default now()
       )`
     );
 

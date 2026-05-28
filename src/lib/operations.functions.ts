@@ -410,65 +410,6 @@ export const listRoles = createServerFn({ method: "GET" })
 
 import { assertAdmin } from "./admin.functions";
 
-export const listAvailability = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    return pgQuery<{
-      id: number;
-      session_date: string;
-      status: string;
-      header_text: string | null;
-      created_at: string;
-      vote_count: number;
-    }>(
-      `select s.id, s.session_date, coalesce(s.status,'open') as status,
-              s.header_text, s.created_at,
-              (select count(*)::int from availability_votes v where v.session_id = s.id) as vote_count
-       from availability_sessions s
-       where s.deleted_at is null
-       order by s.session_date desc, s.created_at desc
-       limit 60`,
-    );
-  });
-
-export const getAvailabilityVotes = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { session_id: number }) => d)
-  .handler(async ({ data, context }) => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    const isManager = me?.is_manager ?? false;
-    const [slots, votes] = await Promise.all([
-      pgQuery<{ id: number; slot_label: string; position: number }>(
-        `select id, slot_label, position from availability_slots where session_id = $1 order by position`,
-        [data.session_id],
-      ),
-      pgQuery<{ slot_id: number; vote_state: string; user_tag: string }>(
-        `select slot_id, vote_state, ${isManager ? 'discord_user_id' : "right(discord_user_id, 4)"} as user_tag from availability_votes where session_id = $1`,
-        [data.session_id],
-      ),
-    ]);
-    return { slots, votes };
-  });
-
-export const castAvailabilityVote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { session_id: number; slot_id: number; vote_state: "yes" | "maybe" | "no" }) => {
-    if (!d.session_id || !d.slot_id) throw new Error("Dados inválidos");
-    return d;
-  })
-  .handler(async ({ data, context }) => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.discord_id) throw new Error("Não tens Discord associado.");
-    await pgQuery(
-      `insert into availability_votes (session_id, slot_id, discord_user_id, vote_state, created_at)
-       values ($1, $2, $3, $4, now())
-       on conflict (session_id, slot_id, discord_user_id)
-       do update set vote_state = excluded.vote_state, created_at = now()`,
-      [data.session_id, data.slot_id, me.discord_id, data.vote_state],
-    );
-    return { ok: true };
-  });
-
 export const listAuditLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { limit?: number }) => ({

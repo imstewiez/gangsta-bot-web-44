@@ -19,13 +19,11 @@ import { Route as AuthenticatedPremiosRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPrecarioRouteImport } from './routes/_authenticated/precario'
 import { Route as AuthenticatedOperacoesRouteImport } from './routes/_authenticated/operacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthenticatedMembrosRouteImport } from './routes/_authenticated/membros'
 import { Route as AuthenticatedLiquidacaoRouteImport } from './routes/_authenticated/liquidacao'
 import { Route as AuthenticatedInventarioRouteImport } from './routes/_authenticated/inventario'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
 import { Route as AuthenticatedEncomendasRouteImport } from './routes/_authenticated/encomendas'
-import { Route as AuthenticatedDisponibilidadeRouteImport } from './routes/_authenticated/disponibilidade'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -87,12 +85,6 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedNotificacoesRoute =
-  AuthenticatedNotificacoesRouteImport.update({
-    id: '/notificacoes',
-    path: '/notificacoes',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedMembrosRoute = AuthenticatedMembrosRouteImport.update({
   id: '/membros',
   path: '/membros',
@@ -118,12 +110,6 @@ const AuthenticatedEncomendasRoute = AuthenticatedEncomendasRouteImport.update({
   path: '/encomendas',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDisponibilidadeRoute =
-  AuthenticatedDisponibilidadeRouteImport.update({
-    id: '/disponibilidade',
-    path: '/disponibilidade',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -192,13 +178,11 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/membros': typeof AuthenticatedMembrosRouteWithChildren
-  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
   '/precario': typeof AuthenticatedPrecarioRoute
@@ -220,12 +204,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/encomendas': typeof AuthenticatedEncomendasRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/inventario': typeof AuthenticatedInventarioRoute
   '/liquidacao': typeof AuthenticatedLiquidacaoRoute
-  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/precario': typeof AuthenticatedPrecarioRoute
   '/premios': typeof AuthenticatedPremiosRoute
@@ -249,13 +231,11 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/disponibilidade': typeof AuthenticatedDisponibilidadeRoute
   '/_authenticated/encomendas': typeof AuthenticatedEncomendasRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/inventario': typeof AuthenticatedInventarioRoute
   '/_authenticated/liquidacao': typeof AuthenticatedLiquidacaoRoute
   '/_authenticated/membros': typeof AuthenticatedMembrosRouteWithChildren
-  '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/operacoes': typeof AuthenticatedOperacoesRouteWithChildren
   '/_authenticated/precario': typeof AuthenticatedPrecarioRoute
@@ -280,13 +260,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditoria'
     | '/dashboard'
-    | '/disponibilidade'
     | '/encomendas'
     | '/entregas'
     | '/inventario'
     | '/liquidacao'
     | '/membros'
-    | '/notificacoes'
     | '/onboarding'
     | '/operacoes'
     | '/precario'
@@ -308,12 +286,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/auditoria'
     | '/dashboard'
-    | '/disponibilidade'
     | '/encomendas'
     | '/entregas'
     | '/inventario'
     | '/liquidacao'
-    | '/notificacoes'
     | '/onboarding'
     | '/precario'
     | '/premios'
@@ -336,13 +312,11 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/auditoria'
     | '/_authenticated/dashboard'
-    | '/_authenticated/disponibilidade'
     | '/_authenticated/encomendas'
     | '/_authenticated/entregas'
     | '/_authenticated/inventario'
     | '/_authenticated/liquidacao'
     | '/_authenticated/membros'
-    | '/_authenticated/notificacoes'
     | '/_authenticated/onboarding'
     | '/_authenticated/operacoes'
     | '/_authenticated/precario'
@@ -439,13 +413,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/notificacoes': {
-      id: '/_authenticated/notificacoes'
-      path: '/notificacoes'
-      fullPath: '/notificacoes'
-      preLoaderRoute: typeof AuthenticatedNotificacoesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/membros': {
       id: '/_authenticated/membros'
       path: '/membros'
@@ -479,13 +446,6 @@ declare module '@tanstack/react-router' {
       path: '/encomendas'
       fullPath: '/encomendas'
       preLoaderRoute: typeof AuthenticatedEncomendasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/disponibilidade': {
-      id: '/_authenticated/disponibilidade'
-      path: '/disponibilidade'
-      fullPath: '/disponibilidade'
-      preLoaderRoute: typeof AuthenticatedDisponibilidadeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -618,13 +578,11 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAuditoriaRoute: typeof AuthenticatedAuditoriaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedDisponibilidadeRoute: typeof AuthenticatedDisponibilidadeRoute
   AuthenticatedEncomendasRoute: typeof AuthenticatedEncomendasRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedInventarioRoute: typeof AuthenticatedInventarioRoute
   AuthenticatedLiquidacaoRoute: typeof AuthenticatedLiquidacaoRoute
   AuthenticatedMembrosRoute: typeof AuthenticatedMembrosRouteWithChildren
-  AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOperacoesRoute: typeof AuthenticatedOperacoesRouteWithChildren
   AuthenticatedPrecarioRoute: typeof AuthenticatedPrecarioRoute
@@ -637,13 +595,11 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAuditoriaRoute: AuthenticatedAuditoriaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedDisponibilidadeRoute: AuthenticatedDisponibilidadeRoute,
   AuthenticatedEncomendasRoute: AuthenticatedEncomendasRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedInventarioRoute: AuthenticatedInventarioRoute,
   AuthenticatedLiquidacaoRoute: AuthenticatedLiquidacaoRoute,
   AuthenticatedMembrosRoute: AuthenticatedMembrosRouteWithChildren,
-  AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOperacoesRoute: AuthenticatedOperacoesRouteWithChildren,
   AuthenticatedPrecarioRoute: AuthenticatedPrecarioRoute,

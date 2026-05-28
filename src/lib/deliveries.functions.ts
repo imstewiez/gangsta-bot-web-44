@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { notifyUsers, notifyManagers } from "./notifications.server";
+
 
 export type DeliveryLine = {
   item_id: number;
@@ -157,14 +157,6 @@ export const createDelivery = createServerFn({ method: "POST" })
         data.responsavel_member_id ?? null,
       ],
     );
-    const verb = data.tipo === "venda" ? "quer vender" : "vai entregar";
-    await notifyManagers(context.supabase, {
-      type: "delivery_new",
-      title:
-        data.tipo === "venda" ? "Pedido de compra" : "Nova entrega de material",
-      body: `${me.display_name ?? "Membro"} ${verb} ${totalQty} ${totalQty === 1 ? "item" : "itens"} (€${Math.round(totalValue)})`,
-      link: "/entregas",
-    });
     return { id: row?.id };
   });
 
@@ -250,11 +242,5 @@ export const decideDelivery = createServerFn({ method: "POST" })
         [before.requester_member_id],
       );
     }
-    await notifyUsers(context.supabase, [before.requester_discord_id], {
-      type: "delivery_update",
-      title: data.approve ? "Entrega aprovada" : "Entrega rejeitada",
-      body: data.reason ?? "",
-      link: "/entregas",
-    });
     return { ok: true };
   });

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne, withClient } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { notifyUsers, notifyManagers } from "./notifications.server";
+
 
 export type OrderRow = {
   id: number;
@@ -264,13 +264,6 @@ export const createOrder = createServerFn({ method: "POST" })
         results.push({ id: row.id, item_name: item.name, quantity: line.quantity });
       }
     }
-    const bodyLines = results.map((r) => `${r.quantity}× ${r.item_name}`).join(", ");
-    await notifyManagers(context.supabase, {
-      type: "order_new",
-      title: "Nova encomenda",
-      body: `${me.display_name ?? "Membro"} pediu: ${bodyLines}`,
-      link: "/entregas",
-    });
     return { ids: results.map((r) => r.id) };
   });
 
@@ -368,23 +361,6 @@ export const transitionOrder = createServerFn({ method: "POST" })
           `select discord_id from members where id = $1`,
           [before.member_id],
         );
-        if (reqProfile?.discord_id) {
-          const STATUS_PT: Record<string, string> = {
-            pending: "à espera",
-            approved: "aceite pela chefia",
-            in_progress: "a ser tratada",
-            ready: "pronta a levantar",
-            fulfilled: "entregue",
-            denied: "recusada",
-            cancelled: "cancelada",
-          };
-          await notifyUsers(context.supabase, [reqProfile.discord_id], {
-            type: "order_update",
-            title: `Encomenda #${data.id} · ${STATUS_PT[data.to] ?? data.to}`,
-            body: `${before.item_name ?? "Item"} — ${STATUS_PT[data.to] ?? data.to}`,
-            link: "/entregas",
-          });
-        }
         return { ok: true as const };
       } catch (e) {
         await c.query("rollback").catch(() => null);
@@ -516,13 +492,6 @@ export const cancelOwnOrder = createServerFn({ method: "POST" })
         await c.query("commit");
 
         // notify managers
-        await notifyManagers(context.supabase, {
-          type: "order_cancelled",
-          title: "Encomenda cancelada",
-          body: `${me.display_name ?? "Membro"} cancelou a encomenda #${data.id} (${before.item_name ?? "item"}).`,
-          link: "/entregas",
-        });
-
         return { ok: true as const };
       } catch (e) {
         await c.query("rollback").catch(() => null);
