@@ -57,8 +57,12 @@ export const listOrders = createServerFn({ method: "GET" })
       params.push(me.id);
       conds.push(`o.member_id = $${params.length}`);
     } else {
-      // manage scope: only managers
+      // manage scope: only the responsavel or superadmin
       if (!me?.is_manager) return [];
+      if (!me.is_superadmin) {
+        params.push(me.id);
+        conds.push(`o.responsavel_member_id = $${params.length}`);
+      }
     }
     if (data.statuses) {
       params.push(data.statuses);
@@ -286,7 +290,7 @@ export const transitionOrder = createServerFn({ method: "POST" })
       await c.query("begin");
       try {
         const beforeRes = await c.query(
-          `select o.status, o.member_id, o.item_id, o.quantity, i.name as item_name
+          `select o.status, o.member_id, o.item_id, o.quantity, i.name as item_name, o.responsavel_member_id
            from orders o left join items i on i.id = o.item_id where o.id = $1`,
           [data.id],
         );
@@ -297,9 +301,13 @@ export const transitionOrder = createServerFn({ method: "POST" })
               item_id: number | null;
               item_name: string | null;
               quantity: number;
+              responsavel_member_id: number | null;
             }
           | undefined;
         if (!before) throw new Error("Encomenda não encontrada");
+        if (!me?.is_superadmin && me?.id !== before.responsavel_member_id) {
+          throw new Error("Sem permissão — só o responsável pode alterar esta encomenda");
+        }
         const isFinal = data.to === "fulfilled";
         const isResolved = data.to !== "pending";
 

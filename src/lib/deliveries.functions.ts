@@ -40,6 +40,10 @@ export const listDeliveries = createServerFn({ method: "GET" })
       where += ` and r.requester_member_id = $${params.length}`;
     } else {
       if (!me?.is_manager) return [];
+      if (!me.is_superadmin) {
+        params.push(me.id);
+        where += ` and r.responsavel_member_id = $${params.length}`;
+      }
     }
     const rows = await pgQuery<DeliveryRow>(
       `select r.id, r.requester_member_id, m.display_name as requester_name,
@@ -198,11 +202,15 @@ export const decideDelivery = createServerFn({ method: "POST" })
       tipo: string;
       lines: DeliveryLine[];
       status: string;
+      responsavel_member_id: number | null;
     }>(
-      `select requester_member_id, requester_discord_id, tipo, lines, status from inventory_delivery_requests where id = $1`,
+      `select requester_member_id, requester_discord_id, tipo, lines, status, responsavel_member_id from inventory_delivery_requests where id = $1`,
       [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
+    if (!me?.is_superadmin && me?.id !== before.responsavel_member_id) {
+      throw new Error("Sem permissão — só o responsável pode tratar este pedido");
+    }
     if (before.status !== "pending") throw new Error("Já decidido");
     await pgQuery(
       `update inventory_delivery_requests set
