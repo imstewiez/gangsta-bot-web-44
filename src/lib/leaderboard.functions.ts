@@ -149,6 +149,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
            left join ops_agg o on o.member_id = m.id
            left join kills_agg k on k.member_id = m.id
           where m.deleted_at is null
+            and (m.status = 'ativo' or m.status is null)
             and coalesce(m.lifecycle_state, 'active') in ('active', 'promoted')
             and (coalesce(k.kills,0) + coalesce(o.ops,0) + coalesce(d.deliveries,0) + coalesce(s.sales,0) > 0)
           order by ${sortCol} ${sortDir} nulls last

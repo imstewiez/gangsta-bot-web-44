@@ -79,6 +79,7 @@ async function topForWeek(weekStart: string | null): Promise<RankRow[]> {
      join members m on m.id = wr.member_id
      where wr.week_start = $1
        and m.deleted_at is null
+       and (m.status = 'ativo' or m.status is null)
        and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
      order by coalesce(wr.hybrid_score, 0) desc nulls last
      limit 5`,
@@ -109,6 +110,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
         `select coalesce(tier, 'unknown') as tier, count(*)::text as count
          from members
          where deleted_at is null
+           and (status = 'ativo' or status is null)
            and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')
          group by 1 order by 2 desc`,
       ).catch(() => []),
@@ -118,12 +120,14 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          from members m
          left join all_time_stats s on s.member_id = m.id
          where m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
            and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
          order by m.tier, coalesce(s.kills_total * 3 + s.deliveries * 2 + s.sales * 2 + s.saidas_total * 2 + s.wins * 4 - s.deaths_total, 0) desc`,
       ).catch(() => []),
       pgOne<{ count: string }>(
         `select count(*)::text as count from members
          where deleted_at is null
+           and (status = 'ativo' or status is null)
            and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')
            and joined_at >= now() - interval '7 days'`,
       ).catch(() => ({ count: "0" })),
@@ -172,6 +176,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          join members m on m.id = wr.member_id
          where wr.week_start = (select max(week_start) from weekly_rankings)
            and m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
            and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
          group by m.display_name, m.tier
          having sum(coalesce(wr.operations_count,0)) > 0
@@ -253,6 +258,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          join members m on m.id = wr.member_id
          where wr.week_start >= date_trunc('month', current_date)::date
            and m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
            and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
          group by m.display_name, m.nickname
          having sum(coalesce(wr.hybrid_score, 0)) > 0
