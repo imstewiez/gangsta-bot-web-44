@@ -23,6 +23,7 @@ import {
   ARMORY_CAT_CONFIG,
   filterItemForDisplay,
 } from "@/lib/armory.catalog";
+import { getInventoryExcludedItems } from "@/lib/config.loader";
 
 export const Route = createFileRoute("/_authenticated/inventario")({
   head: () => ({
@@ -31,40 +32,12 @@ export const Route = createFileRoute("/_authenticated/inventario")({
   component: Page,
 });
 
-
-
-// Materiais que NÃO usamos nos crafts — esconder do stock
-const EXCLUDED_ITEMS = [
-  "nylon",
-  "embalagem",
-  "borracha",
-  "tecido",
-  "papel",
-  "kevlar",
-  "couro",
-  "cana de pesca",
-  "carreto",
-  "saco",
-  "lixo eletrónico",
-  "lixo eletronico",
-  "plástico velho",
-  "plastico velho",
-  "telemóvel estragado",
-  "telemovel estragado",
-  "rádio estragado",
-  "radio estragado",
-];
-
 function classifyRow(r: { category: string | null; subcategory: string | null; item_name: string }): string | null {
   const name = r.item_name.toLowerCase();
 
   // Esconder materiais que não usamos
-  if (EXCLUDED_ITEMS.some((h) => name.includes(h))) return null;
-
-  // Forçar cobre, peças estragadas e sucata para materiais craft
-  if (/\bcobre\b/.test(name)) return "materiais_craft";
-  if (/peças estragadas|pecas estragadas/.test(name)) return "materiais_craft";
-  if (/\bsucata\b/.test(name)) return "materiais_craft";
+  const excludedItems = getInventoryExcludedItems();
+  if (excludedItems.some((h) => name.includes(h.toLowerCase()))) return null;
 
   return filterItemForDisplay(r.item_name, r.category, r.subcategory);
 }

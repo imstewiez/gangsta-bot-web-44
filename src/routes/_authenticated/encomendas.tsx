@@ -44,6 +44,7 @@ import {
   ARMORY_CAT_CONFIG,
   filterItemForDisplay,
 } from "@/lib/armory.catalog";
+import { getOrderAllowedCategories } from "@/lib/config.loader";
 import { toast } from "sonner";
 import { Plus, ShoppingBag, Trash2, Package, Banknote, X, MessageSquare, Send } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
@@ -559,11 +560,12 @@ function NewOrder() {
     queryFn: () => catFn(),
     enabled: open,
   });
+  const allowedCategories = getOrderAllowedCategories();
   const items = (cat.data ?? []).filter((i: CatalogItem) => {
     const catKey = filterItemForDisplay(i.name, i.category, i.subcategory);
     if (!catKey) return false;
     // Only allow categories relevant for orders
-    return ["armas_orange", "armas_red", "carregadores", "prints", "corpos", "acessorios", "coletes"].includes(catKey);
+    return allowedCategories.includes(catKey);
   });
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([
     { item_id: "", qty: "1" },

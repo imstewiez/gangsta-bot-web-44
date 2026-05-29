@@ -24,6 +24,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import {
+  getAllowedAccessoryPatterns,
+  getAllowedMagazinePattern,
+  getColetePattern,
+  getBannedWeaponPatterns,
+  getItemByName,
+} from "./config.loader";
+
 export type ArmoryCategory =
   | "armas_orange"
   | "armas_red"
@@ -155,15 +163,12 @@ export const PRINT_BADGE_CLASS: Record<string, string> = {
 };
 
 // ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
-const BANNED_WEAPON_NAMES: string[] = [];
-
 function isBannedWeapon(name: string | null): boolean {
   if (!name) return false;
   const n = name.toLowerCase().trim();
-  return BANNED_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
+  const bannedPatterns = getBannedWeaponPatterns();
+  return bannedPatterns.some((w) => n.includes(w.toLowerCase().trim()));
 }
-
-import { getItemByName } from "./config.loader";
 
 export function isOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
@@ -187,8 +192,6 @@ export function filterItemForDisplay(
 
   // Banidas
   if (isBannedWeapon(itemName)) return null;
-  // MK2 — totalmente banido
-  if (/mk2/i.test(itemName)) return null;
 
   const cat = itemDisplayCategory(itemName, category, subcategory);
 
@@ -196,11 +199,15 @@ export function filterItemForDisplay(
   if (cat === "outros") return null;
 
   // Apenas colete padrão
-  if (cat === "coletes" && !/padrão/.test(name)) return null;
+  if (cat === "coletes") {
+    const coletePattern = getColetePattern();
+    if (coletePattern && !name.includes(coletePattern.toLowerCase())) return null;
+  }
 
   // Apenas acessórios permitidos explicitamente
   if (cat === "acessorios") {
-    const allowed = /silenciador|barrel|muzzle|grip|mira|extensivo|mag expandido/i;
+    const allowedPatterns = getAllowedAccessoryPatterns();
+    const allowed = new RegExp(allowedPatterns.join("|"), "i");
     if (!allowed.test(itemName)) return null;
   }
 
@@ -209,7 +216,8 @@ export function filterItemForDisplay(
   // Carregadores: apenas as 3 opções genéricas (Orange / Red / Especial).
   // Esconde carregadores específicos por arma (TEC-9 Carregador, PDW Carregador, etc.).
   if (cat === "carregadores") {
-    if (!/^carregador\s+(orange|red|especial|special)$/i.test(itemName.trim())) return null;
+    const magPattern = getAllowedMagazinePattern();
+    if (magPattern && !new RegExp(magPattern, "i").test(itemName.trim())) return null;
   }
 
   return cat;
@@ -250,18 +258,6 @@ export function itemDisplayCategory(
     return "armas_red";
   }
 
-  // Fallback: detectar armas pelo nome (apenas se não tiver categoria definida)
-  const isWeaponByName =
-    !name.includes("print") &&
-    !name.includes("corpo") &&
-    !name.includes("carregador") &&
-    /\b(carabina|combat|p90|\.50|smg|rifle|shotgun|sniper|fuzil|ak\b|m4|g36|scar|barrett|awp|deagle|glock|tec|uzi|mp5|mp7|vector|compact|assault|heavy|mini|micro|machine|ap\s|sns\s|revolver)\b/.test(
-      name,
-    );
-  if (isWeaponByName) {
-    return "armas_red"; // fallback genérico
-  }
-
   // 3. Corpos
   if (cat === "corpos" || sub === "corpos" || /corpo|chassi/.test(name))
     return "corpos";
@@ -295,5 +291,3 @@ export function itemSubLabel(
   if (category === "municoes") return "Craft Carregadores";
   return "—";
 }
-
-

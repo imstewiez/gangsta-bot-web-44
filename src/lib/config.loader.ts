@@ -233,29 +233,10 @@ export function getCategoryLabel(category: string | null): string {
 
 // ── Tier pricing helpers (compatibilidade com pricing antigo) ───────────────
 
-const TIER_WEAPON_SURCHARGE: Record<string, number> = {
-  young_blood: 30000,
-  o_gunao: 20000,
-  gangster_fodido: 10000,
-};
-
-const TIER_MAGAZINE_PRICES: Record<string, Record<string, number>> = {
-  orange: {
-    young_blood: 600,
-    o_gunao: 500,
-    gangster_fodido: 400,
-  },
-  red: {
-    young_blood: 800,
-    o_gunao: 700,
-    gangster_fodido: 600,
-  },
-  special: {
-    young_blood: 1000,
-    o_gunao: 900,
-    gangster_fodido: 800,
-  },
-};
+// Tier pricing lido do config.json
+const APP = (config as any).app ?? {};
+const TIER_WEAPON_SURCHARGE: Record<string, number> = APP.tierPricing?.weaponSurcharge ?? {};
+const TIER_MAGAZINE_PRICES: Record<string, Record<string, number>> = APP.tierPricing?.magazinePrices ?? {};
 
 /**
  * Devolve o preço de venda de uma arma consoante o tier do membro.
@@ -283,6 +264,39 @@ export function getMagazineSalePrice(
     0
   );
 }
+
+// ── App config helpers (tiers, XP, filtros, etc.) ───────────────────────────
+
+export function getAppConfig() { return APP; }
+
+// Tiers
+export function getTierOrder(): string[] { return APP.tiers?.order ?? []; }
+export function getTierLabels(): Record<string, string> { return APP.tiers?.labels ?? {}; }
+export function getTierGradients(): Record<string, string> { return APP.tiers?.gradients ?? {}; }
+export function getTierAccents(): Record<string, string> { return APP.tiers?.accents ?? {}; }
+export function getTierPositions(): Record<string, string> { return APP.tiers?.positions ?? {}; }
+export function getTierBenefits(): Record<string, string[]> { return APP.tiers?.benefits ?? {}; }
+export function isManagerTier(tier: string | null): boolean { return tier ? APP.tiers?.managerTiers?.includes(tier) ?? false : false; }
+export function isInventoryTier(tier: string | null): boolean { return tier ? APP.tiers?.inventoryTiers?.includes(tier) ?? false : false; }
+export function isSuperAdminTier(tier: string | null): boolean { return tier ? APP.tiers?.superadminTiers?.includes(tier) ?? false : false; }
+export function isAdminTier(tier: string | null): boolean { return tier ? APP.tiers?.adminTiers?.includes(tier) ?? false : false; }
+
+// XP
+export function getXpPoints(): Record<string, number> { return APP.xpPoints ?? {}; }
+export function getPromotions(): Array<{ from: string; to: string; threshold: number }> { return APP.promotions ?? []; }
+
+// Filtros
+export function getOrderAllowedCategories(): string[] { return APP.filters?.orderAllowedCategories ?? []; }
+export function getInventoryExcludedItems(): string[] { return APP.filters?.inventoryExcludedItems ?? []; }
+export function getBannedWeaponPatterns(): string[] { return APP.filters?.bannedWeaponPatterns ?? []; }
+export function getAllowedAccessoryPatterns(): string[] { return APP.filters?.allowedAccessoryPatterns ?? []; }
+export function getAllowedMagazinePattern(): string { return APP.filters?.allowedMagazinePattern ?? ""; }
+export function getColetePattern(): string { return APP.filters?.coletePattern ?? ""; }
+
+// Outros
+export function getPrizeTypes(): string[] { return APP.prizeTypes ?? []; }
+export function getOperationTypes(): Record<string, { label: string; color: string; bg: string }> { return APP.operationTypes ?? {}; }
+export function getOrderWorkflow() { return APP.orderWorkflow ?? {}; }
 
 /**
  * Devolve o preço de venda tierizado de um item pelo ID.

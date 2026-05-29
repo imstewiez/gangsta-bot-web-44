@@ -1,5 +1,14 @@
 // Hierarquia do bairro — labels bonitos com emoji para UI.
 // Nunca mostrar os IDs internos (young_blood, patrao_di_zona, etc) na UI.
+
+import {
+  getTierLabels,
+  getTierGradients,
+  getTierAccents,
+  getTierPositions,
+  getTierOrder,
+} from "./config.loader";
+
 export type Tier =
   | "young_blood"
   | "o_gunao"
@@ -13,64 +22,25 @@ export type Tier =
 export type MemberRole = Tier | "bairrista";
 
 // Etiquetas curtas (sem emoji) — para sítios densos/tabelas.
-export const TIER_LABELS: Record<string, string> = {
-  young_blood: "Young Blood",
-  o_gunao: "O Gunão",
-  gangster_fodido: "Gangster Fodido",
-  patrao_di_zona: "Patrão di Zona",
-  real_gangster: "Real Gangster",
-  og: "OG",
-  kingpin: "Kingpin",
-  manda_chuva: "Manda-Chuva",
-  bairrista: "Bairrista",
-};
+export const TIER_LABELS: Record<string, string> = getTierLabels();
 
 // (TIER_EMOJI removido — usar <TierIcon /> em todo o lado.)
 
 // Gradiente por tier — replicado do servidor de Discord.
 // Linear-gradient ~135deg, dois stops.
 // Gradients sincronizados com as cores dos roles do Discord.
-export const TIER_GRADIENT: Record<string, string> = {
-  manda_chuva: "linear-gradient(135deg, #f5dba0 0%, #eec16d 100%)",
-  kingpin: "linear-gradient(135deg, #d4d6d9 0%, #b3b5b8 100%)",
-  og: "linear-gradient(135deg, #7a0000 0%, #470000 100%)",
-  real_gangster: "linear-gradient(135deg, #c49fff 0%, #9e6bff 100%)",
-  patrao_di_zona: "linear-gradient(135deg, #0533c9 0%, #021e85 100%)",
-  gangster_fodido: "linear-gradient(135deg, #5ac4cc 0%, #3a8f97 100%)",
-  o_gunao: "linear-gradient(135deg, #9abf98 0%, #70966e 100%)",
-  young_blood: "linear-gradient(135deg, #7fd1f0 0%, #4cadd0 100%)",
-  bairrista: "linear-gradient(135deg, #a794d9 0%, #826bc2 100%)",
-};
+export const TIER_GRADIENT: Record<string, string> = getTierGradients();
 
 // Cor "principal" do tier — para textos e bordas.
 // Cores de texto/borda sincronizadas com as cores dos roles do Discord.
-export const TIER_ACCENT: Record<string, string> = {
-  manda_chuva: "#eec16d",
-  kingpin: "#b3b5b8",
-  og: "#a52a2a",
-  real_gangster: "#9e6bff",
-  patrao_di_zona: "#3b82f6",
-  gangster_fodido: "#3a8f97",
-  o_gunao: "#70966e",
-  young_blood: "#4cadd0",
-  bairrista: "#826bc2",
-};
+export const TIER_ACCENT: Record<string, string> = getTierAccents();
 
 // Tag "Chefia de Ballas" — roxo púrpura da firma.
 export const BALLAS_GRADIENT =
   "linear-gradient(135deg, #9b59b6 0%, #6c3483 100%)";
 
 // Ordem hierárquica (mais baixo → mais alto).
-export const TIER_ORDER: string[] = [
-  "young_blood",
-  "o_gunao",
-  "gangster_fodido",
-  "patrao_di_zona",
-  "real_gangster",
-  "og",
-  "kingpin",
-  "manda_chuva",
-];
+export const TIER_ORDER: string[] = getTierOrder();
 
 // Tag "Chefia de Ballas" — patrões di zona e acima representam a firma.
 export const CHEFIA_TIERS = new Set<string>([
@@ -93,18 +63,7 @@ export function tierLabel(tier: string | null | undefined): string {
 export const ROLE_LABELS = TIER_LABELS;
 
 // Posições hierárquicas — o que aparece na coluna "Posição" e no perfil.
-export const POSITION_LABELS: Record<string, string> = {
-  young_blood: "Bairrista-1",
-  o_gunao: "Bairrista-2",
-  gangster_fodido: "Bairrista-3",
-  patrao_di_zona: "Chefe Moradores",
-  real_gangster: "Oficial-1",
-  og: "Oficial-2",
-  kingpin: "Sub-Chefe",
-  manda_chuva: "Chefe",
-  bairrista: "Bairrista",
-  chefia: "Chefia",
-};
+export const POSITION_LABELS: Record<string, string> = getTierPositions();
 
 export function tierColor(tier: string | null | undefined): string {
   switch (tier) {

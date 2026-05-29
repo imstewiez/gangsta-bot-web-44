@@ -32,14 +32,15 @@ import { Trophy, Gift, Check, Home, Car, Sword, Banknote, Package } from "lucide
 import { useAuth } from "@/lib/auth";
 import { Reveal } from "@/components/layout/Reveal";
 import { cn } from "@/lib/utils";
+import { getPrizeTypes } from "@/lib/config.loader";
 
-const PRIZE_TYPE_OPTIONS: { value: PrizeType; label: string; icon: React.ReactNode }[] = [
-  { value: "Casa", label: "Casa", icon: <Home className="h-4 w-4" /> },
-  { value: "Arma", label: "Arma", icon: <Sword className="h-4 w-4" /> },
-  { value: "Carro", label: "Carro", icon: <Car className="h-4 w-4" /> },
-  { value: "Dinheiro", label: "Dinheiro", icon: <Banknote className="h-4 w-4" /> },
-  { value: "Outro", label: "Outro", icon: <Package className="h-4 w-4" /> },
-];
+const PRIZE_TYPE_ICONS: Record<string, React.ReactNode> = {
+  Casa: <Home className="h-4 w-4" />,
+  Arma: <Sword className="h-4 w-4" />,
+  Carro: <Car className="h-4 w-4" />,
+  Dinheiro: <Banknote className="h-4 w-4" />,
+  Outro: <Package className="h-4 w-4" />,
+};
 
 const STATUS_LABELS: Record<string, string> = {
   por_definir: "Por definir",
@@ -91,6 +92,13 @@ function Page() {
 
   const latest = prizes.data?.[0];
   const needsDefinition = latest?.prize_status === "por_definir";
+
+  const prizeTypes = getPrizeTypes();
+  const prizeTypeOptions = prizeTypes.map((type) => ({
+    value: type as PrizeType,
+    label: type,
+    icon: PRIZE_TYPE_ICONS[type] ?? <Package className="h-4 w-4" />,
+  }));
 
   return (
     <>
@@ -249,7 +257,7 @@ function Page() {
                 Tipo de prémio
               </label>
               <div className="grid grid-cols-5 gap-2 mt-1.5">
-                {PRIZE_TYPE_OPTIONS.map((opt) => (
+                {prizeTypeOptions.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => setPrizeType(opt.value)}

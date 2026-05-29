@@ -2,50 +2,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { getXpPoints, getPromotions, getTierOrder, getTierLabels } from "./config.loader";
 
 // ── Pontos por item (espelho do real-gangsta-bot) ───────────────────────────
-const ITEM_POINTS = new Map<string, number>([
-  // 4 pontos
-  ["molde de arma", 4],
-  ["carroçaria", 4],
-  // 3 pontos
-  ["plástico velho", 3],
-  ["plastico velho", 3],
-  ["plástico reciclado", 3],
-  ["plastico reciclado", 3],
-  ["lixo eletrónico", 3],
-  ["lixo eletronico", 3],
-  ["barra de cobre", 3],
-  ["pepita de cobre", 3],
-  ["pólvora", 3],
-  ["polvora", 3],
-  ["peças", 3],
-  ["pecas", 3],
-  // 2 pontos
-  ["sucata", 2],
-  ["sucata enferrujada", 2],
-  ["barra de ferro", 2],
-  ["telemóvel estragado", 2],
-  ["telemovel estragado", 2],
-  ["rádio estragado", 2],
-  ["radio estragado", 2],
-  ["carvão", 2],
-  ["carvao", 2],
-  ["minério de carvão", 2],
-  ["minero de carvao", 2],
-  ["borracha", 2],
-]);
-
 const ZERO_POINT_CATEGORIES = new Set(["quimicos_droga", "dinheiro"]);
 
 function pointsForItem(name: string, category: string | null): number {
   if (category && ZERO_POINT_CATEGORIES.has(category.toLowerCase())) return 0;
-  return ITEM_POINTS.get(name.toLowerCase().trim()) ?? 1;
+  const points = getXpPoints();
+  return points[name.toLowerCase().trim()] ?? 1;
 }
 
 function buildItemPointsCase(): string {
+  const points = getXpPoints();
   const cases: string[] = [];
-  for (const [name, pts] of ITEM_POINTS) {
+  for (const [name, pts] of Object.entries(points)) {
     cases.push(`WHEN LOWER(i.name) = '${name.replace(/'/g, "''")}' THEN ${pts}`);
   }
   const zeroCats = [...ZERO_POINT_CATEGORIES].map((c) => `'${c}'`).join(",");
@@ -59,12 +30,7 @@ function buildItemPointsCase(): string {
 }
 
 // ── Thresholds de promoção ─────────────────────────────────────────────────
-const PROMOTIONS = [
-  { from: "young_blood", to: "o_gunao", threshold: 50000 },
-  { from: "o_gunao", to: "gangster_fodido", threshold: 100000 },
-] as const;
-
-const BAIRRISTA_TIERS = ["young_blood", "o_gunao", "gangster_fodido"] as const;
+const BAIRRISTA_TIERS = getTierOrder().slice(0, 3);
 
 export type MemberXP = {
   totalPoints: number;
@@ -106,18 +72,10 @@ export const getMemberXP = createServerFn({ method: "GET" })
     );
     const currentTier = member?.tier ?? "young_blood";
 
-    const tierNames: Record<string, string> = {
-      young_blood: "Young Blood",
-      o_gunao: "O Gunão",
-      gangster_fodido: "Gangster Fodido",
-      patrao_di_zona: "Patrão di Zona",
-      real_gangster: "Real Gangster",
-      og: "OG",
-      kingpin: "Kingpin",
-      manda_chuva: "Manda-Chuva",
-    };
+    const tierNames = getTierLabels();
 
-    const promotion = PROMOTIONS.find((p) => p.from === currentTier);
+    const promotions = getPromotions();
+    const promotion = promotions.find((p) => p.from === currentTier);
 
     if (!promotion || !BAIRRISTA_TIERS.includes(currentTier as any)) {
       return {
