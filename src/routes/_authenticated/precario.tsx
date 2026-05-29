@@ -266,7 +266,8 @@ function SellTable({
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2 text-left">Item</th>
-              <th className="px-3 py-2 text-right">Preço</th>
+              <th className="px-3 py-2 text-right">Sem material</th>
+              <th className="px-3 py-2 text-right">Com material</th>
               <th className="px-3 py-2 text-center w-10"></th>
             </tr>
           </thead>
@@ -370,24 +371,27 @@ function SellRow({
             {it.name}
           </span>
         </td>
-        <td className="px-3 py-2 text-right font-mono">
-          {isManager && editMode ? (
-            editingBase ? (
-              <div className="flex items-center justify-end gap-1">
-                <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={baseVal} onChange={(e) => setBaseVal(e.target.value)} autoFocus />
-                <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, Number(baseVal)); setEditingBase(false); }}><Check className="h-3 w-3" /></button>
-                <button className="text-muted-foreground" onClick={() => { setBaseVal(String(it.min_sale_price ?? 0)); setEditingBase(false); }}><X className="h-3 w-3" /></button>
-              </div>
-            ) : (
-              <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingBase(true)}>
-                {fmtPrice(it.min_sale_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-              </button>
-            )
+        <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+        {isManager && editMode ? (
+          editingBase ? (
+            <div className="flex items-center justify-end gap-1">
+              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={baseVal} onChange={(e) => setBaseVal(e.target.value)} autoFocus />
+              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, Number(baseVal)); setEditingBase(false); }}><Check className="h-3 w-3" /></button>
+              <button className="text-muted-foreground" onClick={() => { setBaseVal(String(it.min_sale_price ?? 0)); setEditingBase(false); }}><X className="h-3 w-3" /></button>
+            </div>
           ) : (
-            <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span>
-          )}
-        </td>
-        <td className="px-3 py-2 text-center">
+            <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingBase(true)}>
+              {fmtPrice(it.min_sale_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          )
+        ) : (
+          <span>{fmtPrice(it.purchase_price)}</span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-right font-mono">
+        <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span>
+      </td>
+      <td className="px-3 py-2 text-center">
           {recipe && recipe.ingredients.length > 0 && (
             <button onClick={() => setExpanded((v) => !v)} className="text-muted-foreground hover:text-foreground transition-colors">
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -397,7 +401,7 @@ function SellRow({
       </tr>
       {expanded && recipe && recipe.ingredients.length > 0 && (
         <tr>
-          <td colSpan={3} className="px-3 py-2 bg-muted/20 border-t border-border/50">
+          <td colSpan={4} className="px-3 py-2 bg-muted/20 border-t border-border/50">
             <div className="text-xs space-y-1">
               <div className="text-muted-foreground font-medium mb-1.5 flex items-center gap-1.5">
                 <Package className="h-3 w-3" />
