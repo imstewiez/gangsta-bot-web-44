@@ -187,7 +187,8 @@ export const createOrder = createServerFn({ method: "POST" })
 
       if (paymentMode === 'money_only') {
         const base = dbItem.base ?? 0;
-        unit = Math.round(base + materialCostPerUnit + base * 0.20);
+        const subtotal = base + materialCostPerUnit;
+        unit = Math.round(subtotal + subtotal * 0.30);
         total = unit * line.quantity;
         dirtyMoney = 0;
         materialCost = Math.round(materialCostPerUnit * line.quantity);
