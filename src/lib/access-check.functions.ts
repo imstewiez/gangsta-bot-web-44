@@ -66,7 +66,7 @@ export const checkChefiaAccess = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) return { allowed: false, reason: "not_member" };
-    const isChefia = isAdminTier(me.tier) || isSuperAdminTier(me.tier) || me.role_label === "kingpin" || me.role_label === "manda_chuva";
+    const isChefia = isAdminTier(me.tier) || me.role_label === "kingpin" || me.role_label === "manda_chuva";
     if (!isChefia) return { allowed: false, reason: "not_chefia" };
     return { allowed: true };
   });

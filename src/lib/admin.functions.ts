@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { isSuperAdminTier, isAdminTier } from "./config.loader";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { pgOne, pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { UuidSchema } from "./security";
+import { isAdminTier, isSuperAdminTier } from "./config.loader";
 
 async function getEffectiveRoles(userId: string): Promise<string[]> {
   const { data: roleRows, error: rErr } = await supabaseAdmin
@@ -103,11 +103,11 @@ export const listAppUsers = createServerFn({ method: "GET" })
     return rows.map((r) => {
       const roles = new Set(r.explicit_roles ?? []);
       // Add implicit roles from tier
-      if (r.tier === "manda_chuva" || r.member_role === "manda_chuva") {
+      if (isSuperAdminTier(r.tier) || r.member_role === "manda_chuva") {
         roles.add("superadmin");
         roles.add("admin");
       }
-      if (r.tier === "kingpin" || r.member_role === "kingpin" || r.member_role === "chefia") {
+      if (isAdminTier(r.tier) || r.member_role === "kingpin" || r.member_role === "chefia") {
         roles.add("admin");
       }
       return {
