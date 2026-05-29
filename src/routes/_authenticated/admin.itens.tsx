@@ -171,8 +171,9 @@ function AdminItemsPage() {
         </Reveal>
       )}
 
-      {items.isLoading && <p className="text-sm text-muted-foreground">A carregar items...</p>}
-      {items.error && <p className="text-sm text-destructive">Erro: {(items.error as Error).message}</p>}
+      <div className="text-xs text-muted-foreground mb-2">
+        {items.isLoading ? "A carregar..." : items.error ? `Erro: ${(items.error as any)?.message ?? JSON.stringify(items.error)}` : `Items: ${(items.data ?? []).length}`}
+      </div>
 
       <Reveal direction="up" delay={150}>
         <Card className="interactive-card">
