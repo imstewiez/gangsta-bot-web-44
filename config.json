@@ -10,7 +10,7 @@
   },
   "items": {
     "weapon_orange_sns_pistol": {
-      "name": "SNS PISTOL",
+      "name": "SNS Pistol",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 15000,
@@ -24,7 +24,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_espingarda_assalto": {
-      "name": "ESPINGARDA DE ASSALTO",
+      "name": "Espingarda de Assalto",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 0,
@@ -38,7 +38,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_minismg": {
-      "name": "MINI SMG",
+      "name": "Mini SMG",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 20000,
@@ -52,7 +52,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_xm3": {
-      "name": "XM3 PISTOL",
+      "name": "XM3 Pistol",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 20000,
@@ -66,7 +66,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_micro_smg": {
-      "name": "MICRO SMG",
+      "name": "Micro SMG",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 22000,
@@ -80,7 +80,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_tec9": {
-      "name": "TEC9",
+      "name": "Tec 9",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 22000,
@@ -94,7 +94,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_tec_pistol": {
-      "name": "TEC PISTOL",
+      "name": "Tec Pistol",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 27000,
@@ -108,7 +108,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_ap_pistol": {
-      "name": "AP PISTOL",
+      "name": "AP Pistol",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 27000,
@@ -122,7 +122,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_compact_rifle": {
-      "name": "COMPACT RIFLE (DRAKO)",
+      "name": "Compact Rifle (Drako)",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 60000,
@@ -134,6 +134,90 @@
       "side": "venda",
       "category": "armas_orange",
       "subcategory": "armas_orange"
+    },
+    "weapon_red_heavy_pistol": {
+      "name": "Heavy Pistol",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 30000,
+      "sellPrice": 30000,
+      "estimatedValue": 30000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_50_pistol": {
+      "name": ".50 Pistol",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 50000,
+      "sellPrice": 50000,
+      "estimatedValue": 50000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_p90": {
+      "name": "P90",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 60000,
+      "sellPrice": 60000,
+      "estimatedValue": 60000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_pdw": {
+      "name": "PDW",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 60000,
+      "sellPrice": 60000,
+      "estimatedValue": 60000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_bullpup": {
+      "name": "Bullpup",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 85000,
+      "sellPrice": 85000,
+      "estimatedValue": 85000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_carabina": {
+      "name": "Carabina",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 100000,
+      "sellPrice": 100000,
+      "estimatedValue": 100000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
     },
     "magazine_orange": {
       "name": "Carregador Orange",
@@ -1145,6 +1229,60 @@
         "material_aco": 3,
         "material_pecas": 15,
         "print_laranja": 1
+      }
+    },
+    "recipe_heavy_pistol": {
+      "output": "weapon_red_heavy_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 25,
+        "print_azul": 1
+      }
+    },
+    "recipe_50_pistol": {
+      "output": "weapon_red_50_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 40,
+        "print_azul": 1
+      }
+    },
+    "recipe_p90": {
+      "output": "weapon_red_p90",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 45,
+        "print_azul": 1
+      }
+    },
+    "recipe_pdw": {
+      "output": "weapon_red_pdw",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 45,
+        "print_azul": 1
+      }
+    },
+    "recipe_bullpup": {
+      "output": "weapon_red_bullpup",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 8,
+        "material_pecas": 60,
+        "print_vermelha": 1
+      }
+    },
+    "recipe_carabina": {
+      "output": "weapon_red_carabina",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 8,
+        "material_pecas": 65,
+        "print_vermelha": 1
       }
     }
   },
