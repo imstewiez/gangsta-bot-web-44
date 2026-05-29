@@ -183,6 +183,29 @@ npx wrangler deploy
 
 ---
 
+## 🤖 Instruções para o Agente (Kimi / Claude / etc.)
+
+> **Regra de ouro:** Sempre que fizeres alterações de código que afetem o comportamento da aplicação (bug fixes, features, configurações de deploy, etc.), **deves fazer commit, push e deploy automaticamente**, a menos que o utilizador diga explicitamente para não o fazer.
+
+### Workflow automático padrão
+1. `git add -A`
+2. `git commit -m "<mensagem descritiva>"`
+3. `git push origin main`
+4. `npm run build`
+5. `npx wrangler deploy`
+
+### Excepções (não fazer deploy)
+- Alterações puramente de documentação (`.md`, comentários) que não afetem o runtime.
+- Alterações em ficheiros de configuração local (`.env.local`, scripts de debug).
+- Quando o utilizador pedir explicitamente para "só guardar" ou "não deployar ainda".
+
+### Notas
+- O deploy usa **Cloudflare Workers** via Wrangler CLI.
+- Secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, etc.) já estão configurados no Cloudflare; não é necessário reconfigurá-los.
+- O `.env` NÃO deve ser commitado (está no `.gitignore`). Variáveis públicas seguras devem ir para `wrangler.jsonc`.
+
+---
+
 ## 🔮 Próximos Passos Potenciais (ideias futuras)
 
 - [ ] Migrar restantes chamadas `withClient` para Stored Procedures
