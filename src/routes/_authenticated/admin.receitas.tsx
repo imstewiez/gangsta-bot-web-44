@@ -38,10 +38,8 @@ export const Route = createFileRoute("/_authenticated/admin/receitas")({
 function Page() {
   const managerFn = useAuthedServerFn(checkManagerAccess);
   const managerCheck = useQuery({ queryKey: ["managerCheck"], queryFn: () => managerFn() });
-  useRealtimeSync([
-    { table: "craft_recipes", queryKeys: [["adminRecipes"]] },
-    { table: "recipe_ingredients", queryKeys: [["adminRecipes"]] },
-  ]);
+  // Nota: receitas agora vêm de config.json (fonte única de verdade).
+  // Subscrições realtime removidas — para ver alterações, recarrega a página.
   const fn = useAuthedServerFn(listRecipesAdmin);
   const updateFn = useAuthedServerFn(updateRecipeIngredientQty);
   const qc = useQueryClient();

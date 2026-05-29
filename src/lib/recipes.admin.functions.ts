@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import {
+  getAllRecipes,
+  getItemById,
+  getNumericId,
+  getAllItems,
+} from "./config.loader";
 
 export type AdminRecipeRow = {
   recipe_id: number;
@@ -35,58 +41,38 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
-    const rows = await pgQuery<{
-      recipe_id: number;
-      item_id: number;
-      item_name: string;
-      category: string | null;
-      subcategory: string | null;
-      recipe_category: string | null;
-      tier: string | null;
-      ing_item_id: number | null;
-      ing_name: string | null;
-      quantity: number | null;
-      unit_cost: string | null;
-    }>(
-      `select r.id as recipe_id, r.item_id, i.name as item_name, i.category, i.subcategory, r.category as recipe_category, r.tier,
-              ri.ingredient_item_id as ing_item_id,
-              ii.name as ing_name,
-              ri.quantity,
-              coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost
-         from craft_recipes r
-         join items i on i.id = r.item_id
-         left join recipe_ingredients ri on ri.recipe_id = r.id
-         left join items ii on ii.id = ri.ingredient_item_id
-        where i.deleted_at is null
-        order by i.name, ri.id`,
-    );
+    const recipes = getAllRecipes();
+    const result: AdminRecipeRow[] = [];
 
-    const map = new Map<number, AdminRecipeRow>();
-    for (const r of rows) {
-      let recipe = map.get(r.recipe_id);
-      if (!recipe) {
-        recipe = {
-          recipe_id: r.recipe_id,
-          item_id: r.item_id,
-          item_name: r.item_name,
-          category: r.category,
-          subcategory: r.subcategory,
-          recipe_category: r.recipe_category,
-          tier: r.tier,
-          ingredients: [],
-        };
-        map.set(r.recipe_id, recipe);
-      }
-      if (r.ing_item_id) {
-        recipe.ingredients.push({
-          item_id: r.ing_item_id,
-          name: r.ing_name ?? "?",
-          quantity: Number(r.quantity ?? 0),
-          unit_cost: Number(r.unit_cost ?? 0),
+    for (const [recipeId, recipe] of Object.entries(recipes)) {
+      const outputItem = getItemById(recipe.output);
+      if (!outputItem) continue;
+
+      const ingredients: AdminRecipeRow["ingredients"] = [];
+      for (const [ingId, qty] of Object.entries(recipe.inputs)) {
+        const ingItem = getItemById(ingId);
+        if (!ingItem) continue;
+        ingredients.push({
+          item_id: getNumericId(ingId),
+          name: ingItem.name,
+          quantity: qty,
+          unit_cost: ingItem.buyPrice ?? ingItem.estimatedValue ?? 0,
         });
       }
+
+      result.push({
+        recipe_id: getNumericId(recipeId),
+        item_id: getNumericId(recipe.output),
+        item_name: outputItem.name,
+        category: outputItem.category,
+        subcategory: outputItem.subcategory,
+        recipe_category: outputItem.type === "weapon" ? "craft_weapons" : outputItem.type === "magazine" ? "craft_carregadores" : "outros",
+        tier: outputItem.tier,
+        ingredients,
+      });
     }
-    return [...map.values()].sort((a, b) => a.item_name.localeCompare(b.item_name));
+
+    return result.sort((a, b) => a.item_name.localeCompare(b.item_name));
   });
 
 export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
@@ -120,15 +106,18 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
-    return pgQuery<AdminItemRow>(
-      `select id, name, category, subcategory,
-              estimated_value::float as estimated_value,
-              purchase_price::float as purchase_price,
-              unit
-         from items
-        where deleted_at is null
-        order by category, name`,
-    );
+    const items = getAllItems();
+    return Object.entries(items)
+      .map(([id, item]) => ({
+        id: getNumericId(id),
+        name: item.name,
+        category: item.category,
+        subcategory: item.subcategory,
+        estimated_value: item.estimatedValue,
+        purchase_price: item.buyPrice,
+        unit: "unidade",
+      }))
+      .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name));
   });
 
 export const updateItemPrice = createServerFn({ method: "POST" })

@@ -5,6 +5,7 @@ import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, OrderStatusSchema, IdSchema, NotesSchema } from "./security";
 import { logger } from "./logger.server";
+import { getAllItems, getRecipeForItemName } from "./config.loader";
 
 
 type OrderRow = {
@@ -129,7 +130,9 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
-    // Preço de encomenda = min_sale_price direto (já inclui markup da firma na DB)
+    const cfgItems = getAllItems();
+
+    // Fetch DB items for names + sides (DB é espelho do config.json)
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
       id: number;
@@ -142,53 +145,37 @@ export const createOrder = createServerFn({ method: "POST" })
     );
     const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    // Pre-fetch recipes + ingredients for all ordered items
-    const recipes = await pgQuery<{
-      item_id: number;
-      recipe_id: number;
-      item_name: string;
-      tier: string | null;
-      subcategory: string | null;
-    }>(
-      `select i.id as item_id, r.id as recipe_id, i.name as item_name, r.tier, i.subcategory
-       from craft_recipes r join items i on i.id = r.item_id where i.id = ANY($1)`,
-      [itemIds],
-    );
-    const recipeMap = new Map(recipes.map((r) => [r.item_id, r]));
-
     const paymentMode = (data.payment_mode as string) || 'materials_money';
     const batchId = crypto.randomUUID();
     const results: { id: number; item_name: string; quantity: number }[] = [];
     for (const line of data.lines) {
-      const item = itemMap.get(line.item_id);
-      if (!item) throw new Error(`Item não encontrado: ${line.item_id}`);
-      if (item.side !== "venda")
-        throw new Error(`Esse item não está disponível para encomenda: ${item.name}`);
+      const dbItem = itemMap.get(line.item_id);
+      if (!dbItem) throw new Error(`Item não encontrado: ${line.item_id}`);
+      if (dbItem.side !== "venda")
+        throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
 
-      // Compute ingredients for this line
-      const recipe = recipeMap.get(line.item_id);
+      // Receitas e ingredientes do config.json (fonte única de verdade)
+      const recipe = getRecipeForItemName(dbItem.name);
       let ingredientsJson: Array<{ name: string; needed: number }> | null = null;
       let materialCostPerUnit = 0;
       if (recipe) {
-        const isOrange = (recipe.tier === "orange") || (recipe.subcategory === "armas_orange");
-        const ings = await pgQuery<{
-          name: string;
-          quantity: number;
-          unit_cost: number;
-        }>(
-          `select ii.name, ri.quantity, coalesce(ii.purchase_price, ii.estimated_value, 0)::float as unit_cost
-           from recipe_ingredients ri
-           join items ii on ii.id = ri.ingredient_item_id
-           where ri.recipe_id = $1`,
-          [recipe.recipe_id],
-        );
-        // For money_only: compute material cost from ALL ingredients (regardless of orange filter)
-        materialCostPerUnit = ings.reduce((sum, ing) => sum + (Number(ing.quantity) * Number(ing.unit_cost ?? 0)), 0);
-        // For materials_money: keep the filtered ingredients list
+        const isOrange = recipe.output.toLowerCase().includes("orange");
+        // Custo material = soma dos buyPrice dos ingredientes
+        materialCostPerUnit = Object.entries(recipe.inputs).reduce((sum, [ingId, qty]) => {
+          const ingItem = cfgItems[ingId];
+          return sum + (Number(ingItem?.buyPrice ?? 0) * Number(qty));
+        }, 0);
         if (paymentMode === 'materials_money') {
-          ingredientsJson = ings
-            .filter((ing) => !(isOrange && !ing.name.toLowerCase().includes("peça")))
-            .map((ing) => ({ name: ing.name, needed: Number(ing.quantity) * line.quantity }));
+          ingredientsJson = Object.entries(recipe.inputs)
+            .filter(([ingId]) => {
+              if (!isOrange) return true;
+              const ingItem = cfgItems[ingId];
+              return ingItem?.name?.toLowerCase().includes("peça");
+            })
+            .map(([ingId, qty]) => {
+              const ingItem = cfgItems[ingId];
+              return { name: ingItem?.name ?? ingId, needed: Number(qty) * line.quantity };
+            });
         }
       }
 
@@ -199,8 +186,7 @@ export const createOrder = createServerFn({ method: "POST" })
       let moneyCost: number | null = null;
 
       if (paymentMode === 'money_only') {
-        const base = item.base ?? 0;
-        // unit = base + material_cost_per_unit + 20% of base
+        const base = dbItem.base ?? 0;
         unit = Math.round(base + materialCostPerUnit + base * 0.20);
         total = unit * line.quantity;
         dirtyMoney = 0;
@@ -208,10 +194,9 @@ export const createOrder = createServerFn({ method: "POST" })
         moneyCost = total;
         ingredientsJson = [];
       } else {
-        // materials_money: usa preço final hardcoded ou DB
-        unit = item.base ?? 0;
+        unit = dbItem.base ?? 0;
         total = unit * line.quantity;
-        dirtyMoney = (item.base ?? 0) * line.quantity;
+        dirtyMoney = (dbItem.base ?? 0) * line.quantity;
       }
 
       const ingredientsJsonStr = ingredientsJson ? JSON.stringify(ingredientsJson) : null;
@@ -240,7 +225,7 @@ export const createOrder = createServerFn({ method: "POST" })
         ],
       );
       if (row) {
-        results.push({ id: row.id, item_name: item.name, quantity: line.quantity });
+        results.push({ id: row.id, item_name: dbItem.name, quantity: line.quantity });
       }
     }
     return { ids: results.map((r) => r.id) };

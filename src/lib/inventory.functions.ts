@@ -4,23 +4,22 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { IdSchema } from "./security";
+import { getSaleItems } from "./config.loader";
 
-// Categorias que interessam ao armazém
-const INV_CATEGORIES = [
-  "armas",
-  "armas_fogo",
-  "municoes",
-  "acessorios",
-  "corpos",
-  "prints",
-];
-
-// Subcategorias extra para o armazém (além das categorias principais)
-const INV_SUBCATEGORIES = [
-  "carregadores",
-  "corpos",
-  "prints",
-];
+// Categorias/subcategorias de armazém derivadas do config.json (evita hardcode)
+function getInventoryCategories(): { categories: string[]; subcategories: string[] } {
+  const items = getSaleItems();
+  const categories = new Set<string>();
+  const subcategories = new Set<string>();
+  for (const item of Object.values(items)) {
+    if (item.category) categories.add(item.category);
+    if (item.subcategory) subcategories.add(item.subcategory);
+  }
+  return {
+    categories: Array.from(categories),
+    subcategories: Array.from(subcategories),
+  };
+}
 
 async function gateInventory(supabase: unknown, userId: string) {
   const me = await resolveCurrentMember(supabase as never, userId);
@@ -41,6 +40,7 @@ export const getStock = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<StockRow[]> => {
     await gateInventory(context.supabase, context.userId);
+    const { categories, subcategories } = getInventoryCategories();
     return pgQuery<StockRow>(
       `select i.id as item_id, i.name as item_name, i.category, i.subcategory,
               coalesce(ib.balance, 0)::float as qty,
@@ -54,7 +54,7 @@ export const getStock = createServerFn({ method: "GET" })
            or i.subcategory = any($2::text[])
          )
        order by unit_price desc nulls last`,
-      [INV_CATEGORIES, INV_SUBCATEGORIES],
+      [categories, subcategories],
     );
   });
 
@@ -80,7 +80,6 @@ export const adjustStock = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await gateInventory(context.supabase, context.userId);
-    // Atomic adjustment via stored procedure (delta computed in SQL, no race condition)
     const result = await pgOne<{ sp_adjust_stock: number }>(
       `SELECT public.sp_adjust_stock($1, $2, $3, $4) as sp_adjust_stock`,
       [data.item_id, data.new_qty, `web:${context.userId}`, null],
@@ -96,7 +95,8 @@ export const getLedger = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const params: unknown[] = [data.limit, INV_CATEGORIES, INV_SUBCATEGORIES];
+    const { categories, subcategories } = getInventoryCategories();
+    const params: unknown[] = [data.limit, categories, subcategories];
     let where = "where (i.category = any($2::text[]) or i.subcategory = any($3::text[]))";
     if (data.type) {
       params.push(data.type);
@@ -116,5 +116,3 @@ export const getLedger = createServerFn({ method: "GET" })
       params,
     );
   });
-
-

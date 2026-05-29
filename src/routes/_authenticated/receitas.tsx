@@ -257,7 +257,7 @@ function Page() {
   useRealtimeSync([
     "recipes",
     { table: "items", queryKeys: [["catalog"], ["adminItems"]] },
-    { table: "recipe_ingredients", queryKeys: [["recipes"], ["adminRecipes"]] },
+    // Nota: recipe_ingredients removido — receitas vêm de config.json estático
   ]);
   const qc = useQueryClient();
   const fn = useAuthedServerFn(listRecipes);
