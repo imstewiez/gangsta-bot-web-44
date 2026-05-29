@@ -107,14 +107,13 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
       category: string | null;
       subcategory: string | null;
       side: string | null;
-      tier: string | null;
       purchase_price: number | null;
       min_sale_price: number | null;
       estimated_value: number | null;
       xp_points: number | null;
       active: boolean;
     }>(
-      `select id, name, category, subcategory, side, tier,
+      `select id, name, category, subcategory, side,
               purchase_price::float as purchase_price,
               min_sale_price::float as min_sale_price,
               estimated_value::float as estimated_value,

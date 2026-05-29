@@ -98,7 +98,7 @@ function AdminItemsPage() {
       category: it.category ?? "",
       subcategory: it.subcategory ?? "",
       side: it.side ?? "venda",
-      tier: it.tier ?? "",
+      tier: "",
       purchase_price: it.purchase_price ?? 0,
       min_sale_price: it.min_sale_price ?? 0,
       estimated_value: it.estimated_value ?? 0,
@@ -228,7 +228,7 @@ function AdminItemsPage() {
                         <>
                           <td className="px-3 py-2 font-medium">{it.name}</td>
                           <td className="px-3 py-2 text-muted-foreground">{it.category}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{it.tier ?? "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{it.category === "armas_orange" ? "orange" : it.category === "armas_red" ? "red" : "—"}</td>
                           <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.purchase_price)}</td>
                           <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.min_sale_price)}</td>
                           <td className="px-3 py-2 text-center">{it.xp_points}</td>
