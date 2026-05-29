@@ -7,7 +7,6 @@ import { listRecipes, type RecipeRow } from "@/lib/recipes.functions";
 import { updateItemPrice } from "@/lib/recipes.admin.functions";
 
 import {
-  TIER_LABELS,
   itemPoints,
   type CatalogItem,
   type CurrentMember,
