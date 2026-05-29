@@ -13,6 +13,7 @@
   // Public vars (non-sensitive)
   "vars": {
     "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdWN2Ymtvenh0YWN3enZnZ2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDAwMjcsImV4cCI6MjA5NDE3NjAyN30.Rf7AHVSigbdQxkvMSwHY2pDYgjoLyG2oqSAw4E-v2Lc"
   },
   // Secrets to configure via dashboard or `wrangler secret put`:
   //   SUPABASE_SERVICE_ROLE_KEY  - Supabase service_role key (Database access)

@@ -6,6 +6,23 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
 function createSupabaseAdminClient() {
+  // Guard: this module is server-only. If it leaks into the client bundle
+  // (e.g. via a non-.server import), return a safe stub instead of crashing
+  // on module evaluation.
+  if (typeof window !== "undefined") {
+    console.warn("[supabaseAdmin] Server-only module loaded in browser. Returning no-op stub.");
+    return new Proxy(
+      {} as ReturnType<typeof createClient<Database>>,
+      {
+        get(_, prop) {
+          throw new Error(
+            `supabaseAdmin is server-only. Cannot access "${String(prop)}" in the browser.`
+          );
+        },
+      }
+    );
+  }
+
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -14,7 +31,7 @@ function createSupabaseAdminClient() {
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
       ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }

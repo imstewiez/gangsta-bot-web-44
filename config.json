@@ -1,0 +1,1033 @@
+{
+  "_meta": {
+    "description": "Configuração centralizada de itens, preços e receitas para ballasgang.eu — partilhada por Armazém, Preçário, Encomendas e Receitas.",
+    "version": "1.0.0",
+    "last_updated": "2026-05-29",
+    "source_projects": [
+      "gangsta-bot-web-44-github",
+      "real-gangsta-bot"
+    ]
+  },
+  "items": {
+    "weapon_orange_minismg": {
+      "name": "Mini SMG",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 2500,
+      "sellPrice": 3000,
+      "estimatedValue": 2500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_orange_xm3": {
+      "name": "XM3",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 3000,
+      "sellPrice": 3600,
+      "estimatedValue": 3000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_orange_micro_smg": {
+      "name": "Micro SMG",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 2800,
+      "sellPrice": 3300,
+      "estimatedValue": 2800,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_orange_tec9": {
+      "name": "Tec 9",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 2200,
+      "sellPrice": 2600,
+      "estimatedValue": 2200,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_orange_tec_pistol": {
+      "name": "Tec Pistol",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 2000,
+      "sellPrice": 2400,
+      "estimatedValue": 2000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_orange_ap_pistol": {
+      "name": "AP Pistol",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 3500,
+      "sellPrice": 4200,
+      "estimatedValue": 3500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_orange_compact_rifle": {
+      "name": "Compact Rifle",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 5500,
+      "sellPrice": 6600,
+      "estimatedValue": 5500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
+    "weapon_red_heavy_pistol": {
+      "name": "Heavy Pistol",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 3200,
+      "sellPrice": 3800,
+      "estimatedValue": 3200,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_50_pistol": {
+      "name": ".50 Pistol",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 4000,
+      "sellPrice": 4800,
+      "estimatedValue": 4000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_p90": {
+      "name": "P90",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 4500,
+      "sellPrice": 5400,
+      "estimatedValue": 4500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_pdw": {
+      "name": "PDW",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 4200,
+      "sellPrice": 5000,
+      "estimatedValue": 4200,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_bullpup": {
+      "name": "Bullpup",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 5000,
+      "sellPrice": 6000,
+      "estimatedValue": 5000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "weapon_red_carabina": {
+      "name": "Carabina",
+      "type": "weapon",
+      "tier": "red",
+      "buyPrice": 4800,
+      "sellPrice": 5700,
+      "estimatedValue": 4800,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_red",
+      "subcategory": "armas_red"
+    },
+    "magazine_orange": {
+      "name": "Carregador Orange",
+      "type": "magazine",
+      "tier": "orange",
+      "buyPrice": 150,
+      "sellPrice": 200,
+      "estimatedValue": 150,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "municoes",
+      "subcategory": "carregadores"
+    },
+    "magazine_red": {
+      "name": "Carregador Red",
+      "type": "magazine",
+      "tier": "red",
+      "buyPrice": 100,
+      "sellPrice": 150,
+      "estimatedValue": 100,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "municoes",
+      "subcategory": "carregadores"
+    },
+    "magazine_special": {
+      "name": "Carregador Special",
+      "type": "magazine",
+      "tier": "special",
+      "buyPrice": 300,
+      "sellPrice": 400,
+      "estimatedValue": 300,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "municoes",
+      "subcategory": "carregadores"
+    },
+    "print_laranja": {
+      "name": "Print Laranja",
+      "type": "print",
+      "tier": "orange",
+      "buyPrice": 200,
+      "sellPrice": 250,
+      "estimatedValue": 200,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "prints"
+    },
+    "print_azul": {
+      "name": "Print Azul",
+      "type": "print",
+      "tier": "red",
+      "buyPrice": 100,
+      "sellPrice": 150,
+      "estimatedValue": 100,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "prints"
+    },
+    "print_vermelha": {
+      "name": "Print Vermelha",
+      "type": "print",
+      "tier": "red",
+      "buyPrice": 100,
+      "sellPrice": 150,
+      "estimatedValue": 100,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "prints"
+    },
+    "print_amarela": {
+      "name": "Print Amarela",
+      "type": "print",
+      "tier": "red",
+      "buyPrice": 100,
+      "sellPrice": 150,
+      "estimatedValue": 100,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "prints"
+    },
+    "body_minismg": {
+      "name": "Corpo de Mini SMG",
+      "type": "body",
+      "tier": "orange",
+      "buyPrice": 500,
+      "sellPrice": 600,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "corpos"
+    },
+    "body_xm3": {
+      "name": "Corpo de XM3",
+      "type": "body",
+      "tier": "orange",
+      "buyPrice": 500,
+      "sellPrice": 600,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "corpos"
+    },
+    "body_micro_smg": {
+      "name": "Corpo de Micro SMG",
+      "type": "body",
+      "tier": "orange",
+      "buyPrice": 500,
+      "sellPrice": 600,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "corpos"
+    },
+    "body_tec9": {
+      "name": "Corpo de Tec 9",
+      "type": "body",
+      "tier": "orange",
+      "buyPrice": 500,
+      "sellPrice": 600,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "corpos"
+    },
+    "body_tec_pistol": {
+      "name": "Corpo de Tec Pistol",
+      "type": "body",
+      "tier": "orange",
+      "buyPrice": 500,
+      "sellPrice": 600,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "corpos"
+    },
+    "body_ap_pistol": {
+      "name": "Corpo de AP Pistol",
+      "type": "body",
+      "tier": "orange",
+      "buyPrice": 500,
+      "sellPrice": 600,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "outros",
+      "subcategory": "corpos"
+    },
+    "accessory_colete_leve": {
+      "name": "Colete Leve",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 400,
+      "sellPrice": 500,
+      "estimatedValue": 400,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "coletes"
+    },
+    "accessory_colete_medio": {
+      "name": "Colete Médio",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 600,
+      "sellPrice": 750,
+      "estimatedValue": 600,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "coletes"
+    },
+    "accessory_colete_pesado": {
+      "name": "Colete Pesado",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 800,
+      "sellPrice": 1000,
+      "estimatedValue": 800,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "coletes"
+    },
+    "accessory_mag": {
+      "name": "Mag",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 350,
+      "sellPrice": 450,
+      "estimatedValue": 350,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_extensivo": {
+      "name": "Extensivo",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 350,
+      "sellPrice": 450,
+      "estimatedValue": 350,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_silenciador": {
+      "name": "Silenciador",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 350,
+      "sellPrice": 450,
+      "estimatedValue": 350,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_muzzle": {
+      "name": "Muzzle",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 300,
+      "sellPrice": 380,
+      "estimatedValue": 300,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_mira": {
+      "name": "Mira",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 300,
+      "sellPrice": 380,
+      "estimatedValue": 300,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_lanterna": {
+      "name": "Lanterna",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 200,
+      "sellPrice": 250,
+      "estimatedValue": 200,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_grip": {
+      "name": "Grip",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 300,
+      "sellPrice": 380,
+      "estimatedValue": 300,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "accessory_mag_expandido": {
+      "name": "Mag Expandido",
+      "type": "accessory",
+      "tier": null,
+      "buyPrice": 500,
+      "sellPrice": 650,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "venda",
+      "category": "acessorios",
+      "subcategory": "acessorios"
+    },
+    "material_molde_arma": {
+      "name": "Molde de Arma",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 500,
+      "sellPrice": null,
+      "estimatedValue": 500,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 4,
+      "side": "compra",
+      "category": "equipamento",
+      "subcategory": null
+    },
+    "material_cobre": {
+      "name": "Cobre",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 65,
+      "sellPrice": null,
+      "estimatedValue": 65,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 3,
+      "side": "compra",
+      "category": "metais",
+      "subcategory": null
+    },
+    "material_polvora": {
+      "name": "Pólvora",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 20,
+      "sellPrice": null,
+      "estimatedValue": 20,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 3,
+      "side": "compra",
+      "category": "materiais",
+      "subcategory": null
+    },
+    "material_pecas": {
+      "name": "Peças",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 50,
+      "sellPrice": null,
+      "estimatedValue": 50,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 4,
+      "side": "compra",
+      "category": "materiais",
+      "subcategory": null
+    },
+    "material_pecas_estragadas": {
+      "name": "Peças Estragadas",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 20,
+      "sellPrice": null,
+      "estimatedValue": 20,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 3,
+      "side": "compra",
+      "category": "sucata_industria",
+      "subcategory": null
+    },
+    "material_aco": {
+      "name": "Aço",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 30,
+      "sellPrice": null,
+      "estimatedValue": 30,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "compra",
+      "category": "materiais",
+      "subcategory": null
+    },
+    "material_plastico": {
+      "name": "Plástico",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 15,
+      "sellPrice": null,
+      "estimatedValue": 15,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "compra",
+      "category": "materiais",
+      "subcategory": null
+    },
+    "material_papel": {
+      "name": "Papel",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 100,
+      "sellPrice": null,
+      "estimatedValue": 100,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "compra",
+      "category": "componentes",
+      "subcategory": null
+    },
+    "material_sucata": {
+      "name": "Sucata",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 40,
+      "sellPrice": null,
+      "estimatedValue": 40,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 2,
+      "side": "compra",
+      "category": "sucata_industria",
+      "subcategory": null
+    },
+    "material_kevlar": {
+      "name": "Kevlar",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 600,
+      "sellPrice": null,
+      "estimatedValue": 600,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "compra",
+      "category": "componentes",
+      "subcategory": null
+    },
+    "material_dinheiro_sujo": {
+      "name": "Dinheiro Sujo",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 1,
+      "sellPrice": null,
+      "estimatedValue": 1,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 0,
+      "side": "compra",
+      "category": "dinheiro",
+      "subcategory": null
+    },
+    "material_barra_ouro": {
+      "name": "Barra de Ouro",
+      "type": "material",
+      "tier": null,
+      "buyPrice": 5000,
+      "sellPrice": null,
+      "estimatedValue": 5000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 1,
+      "side": "compra",
+      "category": "metais",
+      "subcategory": null
+    }
+  },
+  "recipes": {
+    "recipe_minismg": {
+      "output": "weapon_orange_minismg",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 2,
+        "material_pecas": 10,
+        "body_minismg": 1,
+        "print_laranja": 1
+      }
+    },
+    "recipe_xm3": {
+      "output": "weapon_orange_xm3",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 2,
+        "material_pecas": 10,
+        "body_xm3": 1,
+        "print_laranja": 1
+      }
+    },
+    "recipe_micro_smg": {
+      "output": "weapon_orange_micro_smg",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 2,
+        "material_pecas": 15,
+        "body_micro_smg": 1,
+        "print_laranja": 1
+      }
+    },
+    "recipe_tec9": {
+      "output": "weapon_orange_tec9",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 2,
+        "material_pecas": 15,
+        "body_tec9": 1,
+        "print_laranja": 1
+      }
+    },
+    "recipe_tec_pistol": {
+      "output": "weapon_orange_tec_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 2,
+        "material_pecas": 20,
+        "body_tec_pistol": 1,
+        "print_laranja": 1
+      }
+    },
+    "recipe_ap_pistol": {
+      "output": "weapon_orange_ap_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 2,
+        "material_pecas": 20,
+        "body_ap_pistol": 1,
+        "print_laranja": 1
+      }
+    },
+    "recipe_compact_rifle": {
+      "output": "weapon_orange_compact_rifle",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 30,
+        "print_laranja": 1
+      }
+    },
+    "recipe_heavy_pistol": {
+      "output": "weapon_red_heavy_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 25,
+        "print_azul": 1
+      }
+    },
+    "recipe_50_pistol": {
+      "output": "weapon_red_50_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 40,
+        "print_azul": 1
+      }
+    },
+    "recipe_p90": {
+      "output": "weapon_red_p90",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 45,
+        "print_azul": 1
+      }
+    },
+    "recipe_pdw": {
+      "output": "weapon_red_pdw",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 5,
+        "material_pecas": 45,
+        "print_azul": 1
+      }
+    },
+    "recipe_bullpup": {
+      "output": "weapon_red_bullpup",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 8,
+        "material_pecas": 60,
+        "print_vermelha": 1
+      }
+    },
+    "recipe_carabina": {
+      "output": "weapon_red_carabina",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 8,
+        "material_pecas": 65,
+        "print_vermelha": 1
+      }
+    },
+    "recipe_magazine_orange": {
+      "output": "magazine_orange",
+      "quantity": 1,
+      "inputs": {
+        "material_polvora": 2,
+        "material_cobre": 2,
+        "material_molde_arma": 1,
+        "material_pecas": 5
+      }
+    },
+    "recipe_magazine_red": {
+      "output": "magazine_red",
+      "quantity": 1,
+      "inputs": {
+        "material_polvora": 3,
+        "material_cobre": 3,
+        "material_molde_arma": 1,
+        "material_pecas": 10
+      }
+    },
+    "recipe_magazine_special": {
+      "output": "magazine_special",
+      "quantity": 1,
+      "inputs": {
+        "material_polvora": 4,
+        "material_cobre": 4,
+        "material_molde_arma": 1,
+        "material_pecas": 15,
+        "material_aco": 1,
+        "print_amarela": 1
+      }
+    },
+    "recipe_print_laranja": {
+      "output": "print_laranja",
+      "quantity": 1,
+      "inputs": {
+        "material_dinheiro_sujo": 5000,
+        "material_papel": 1
+      }
+    },
+    "recipe_print_azul": {
+      "output": "print_azul",
+      "quantity": 1,
+      "inputs": {
+        "material_dinheiro_sujo": 25000,
+        "material_papel": 1
+      }
+    },
+    "recipe_print_vermelha": {
+      "output": "print_vermelha",
+      "quantity": 1,
+      "inputs": {
+        "material_dinheiro_sujo": 40000,
+        "material_papel": 1
+      }
+    },
+    "recipe_print_amarela": {
+      "output": "print_amarela",
+      "quantity": 1,
+      "inputs": {
+        "material_dinheiro_sujo": 60000,
+        "material_papel": 1
+      }
+    },
+    "recipe_body_minismg": {
+      "output": "body_minismg",
+      "quantity": 1,
+      "inputs": {
+        "material_molde_arma": 1,
+        "material_sucata": 10
+      }
+    },
+    "recipe_body_xm3": {
+      "output": "body_xm3",
+      "quantity": 1,
+      "inputs": {
+        "material_molde_arma": 1,
+        "material_sucata": 10
+      }
+    },
+    "recipe_body_micro_smg": {
+      "output": "body_micro_smg",
+      "quantity": 1,
+      "inputs": {
+        "material_molde_arma": 1,
+        "material_sucata": 15
+      }
+    },
+    "recipe_body_tec9": {
+      "output": "body_tec9",
+      "quantity": 1,
+      "inputs": {
+        "material_molde_arma": 1,
+        "material_sucata": 15
+      }
+    },
+    "recipe_body_tec_pistol": {
+      "output": "body_tec_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_molde_arma": 1,
+        "material_sucata": 20
+      }
+    },
+    "recipe_body_ap_pistol": {
+      "output": "body_ap_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_molde_arma": 1,
+        "material_sucata": 20
+      }
+    },
+    "recipe_colete_leve": {
+      "output": "accessory_colete_leve",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 5,
+        "material_kevlar": 2,
+        "material_plastico": 1
+      }
+    },
+    "recipe_colete_medio": {
+      "output": "accessory_colete_medio",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 10,
+        "material_kevlar": 3,
+        "material_plastico": 2
+      }
+    },
+    "recipe_colete_pesado": {
+      "output": "accessory_colete_pesado",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 15,
+        "material_kevlar": 5,
+        "material_plastico": 3
+      }
+    },
+    "recipe_silenciador": {
+      "output": "accessory_silenciador",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 5,
+        "material_aco": 2,
+        "material_plastico": 1
+      }
+    },
+    "recipe_mira": {
+      "output": "accessory_mira",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 5,
+        "material_aco": 2,
+        "material_plastico": 1
+      }
+    },
+    "recipe_lanterna": {
+      "output": "accessory_lanterna",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 3,
+        "material_aco": 1,
+        "material_plastico": 1
+      }
+    },
+    "recipe_grip": {
+      "output": "accessory_grip",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 5,
+        "material_aco": 2
+      }
+    },
+    "recipe_muzzle": {
+      "output": "accessory_muzzle",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 5,
+        "material_aco": 2
+      }
+    },
+    "recipe_extensivo": {
+      "output": "accessory_extensivo",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 10,
+        "material_aco": 3,
+        "material_plastico": 2
+      }
+    },
+    "recipe_mag": {
+      "output": "accessory_mag",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 5,
+        "material_aco": 1,
+        "material_plastico": 1
+      }
+    },
+    "recipe_mag_expandido": {
+      "output": "accessory_mag_expandido",
+      "quantity": 1,
+      "inputs": {
+        "material_pecas": 10,
+        "material_aco": 2,
+        "material_plastico": 2
+      }
+    }
+  }
+}

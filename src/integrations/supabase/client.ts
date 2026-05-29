@@ -2,15 +2,24 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
+// Project defaults (public values — safe to expose in client bundle)
+const DEFAULT_SUPABASE_URL = "https://zducvbkozxtacwzvggli.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdWN2Ymtvenh0YWN3enZnZ2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDAwMjcsImV4cCI6MjA5NDE3NjAyN30.Rf7AHVSigbdQxkvMSwHY2pDYgjoLyG2oqSAw4E-v2Lc";
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
+  // Final fallback to hardcoded defaults so the app works even without .env in production builds
   const SUPABASE_URL =
-    import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    import.meta.env.VITE_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    DEFAULT_SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY =
     import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
     process.env.SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_ANON_KEY;
+    process.env.SUPABASE_ANON_KEY ||
+    DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
