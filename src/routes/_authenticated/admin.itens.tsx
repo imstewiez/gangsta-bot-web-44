@@ -48,7 +48,8 @@ function AdminItemsPage() {
   const items = useQuery({ queryKey: ["dbItemsAdmin"], queryFn: () => listFn() });
   const [filter, setFilter] = useState("");
   const [catFilter, setCatFilter] = useState<string>("");
-  const [orphanFilter, setOrphanFilter] = useState<string>(""); // "", "orphan", "config"
+  const [orphanFilter, setOrphanFilter] = useState<string>("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [showAdd, setShowAdd] = useState(false);
@@ -79,7 +80,19 @@ function AdminItemsPage() {
     mutationFn: (id: number) => deleteFn({ data: { item_id: id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
-      toast.success("Item removido");
+      setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkDeleteM = useMutation({
+    mutationFn: async (ids: number[]) => {
+      for (const id of ids) await deleteFn({ data: { item_id: id } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
+      setSelected(new Set());
+      toast.success(`${bulkDeleteM.variables?.length ?? 0} items removidos`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -91,6 +104,28 @@ function AdminItemsPage() {
       orphanFilter === "orphan" ? !it.in_config : it.in_config;
     return matchesName && matchesCat && matchesOrphan;
   });
+
+  function toggleSelect(id: number) {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  function selectAll() {
+    const allIds = filtered.map((it: any) => it.id);
+    const allSelected = allIds.every((id: number) => selected.has(id));
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (allSelected) {
+        allIds.forEach((id: number) => n.delete(id));
+      } else {
+        allIds.forEach((id: number) => n.add(id));
+      }
+      return n;
+    });
+  }
 
   function startEdit(it: any) {
     setEditingId(it.id);
@@ -104,6 +139,8 @@ function AdminItemsPage() {
       estimated_value: it.estimated_value ?? 0,
       xp_points: it.xp_points ?? 0,
       active: it.active,
+      orderable: it.orderable ?? true,
+      counts_for_stock: it.counts_for_stock ?? true,
     });
   }
 
@@ -149,8 +186,15 @@ function AdminItemsPage() {
         </div>
       </Reveal>
 
-      <div className="text-xs text-muted-foreground mb-2">
-        Total: {(items.data ?? []).length} | Filtrados: {filtered.length}
+      <div className="text-xs text-muted-foreground mb-2 flex justify-between items-center">
+        <span>Total: {(items.data ?? []).length} | Filtrados: {filtered.length} | Seleccionados: {selected.size}</span>
+        {selected.size > 0 && (
+          <Button size="sm" variant="destructive" onClick={() => {
+            if (confirm(`Remover ${selected.size} items?`)) bulkDeleteM.mutate(Array.from(selected));
+          }}>
+            <Trash2 className="mr-1 h-4 w-4" /> Remover {selected.size}
+          </Button>
+        )}
       </div>
 
       {showAdd && (
@@ -188,6 +232,9 @@ function AdminItemsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <tr>
+                    <th className="px-2 py-2 text-center w-8">
+                      <input type="checkbox" onChange={selectAll} checked={filtered.length > 0 && filtered.every((it: any) => selected.has(it.id))} />
+                    </th>
                     <th className="px-3 py-2 text-left">Nome</th>
                     <th className="px-3 py-2 text-left">Categoria</th>
                     <th className="px-3 py-2 text-right">Sem mat.</th>
@@ -200,12 +247,13 @@ function AdminItemsPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 && !items.isLoading && (
-                    <tr><td colSpan={8} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
+                    <tr><td colSpan={9} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
                   )}
                   {filtered.map((it: any) => (
                     <tr key={it.id} className={`border-t border-border interactive-row ${!it.in_config ? "opacity-60" : ""}`}>
                       {editingId === it.id ? (
                         <>
+                          <td className="px-2 py-2 text-center"><input type="checkbox" disabled /></td>
                           <td className="px-3 py-2"><Input className="h-7 text-xs" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></td>
                           <td className="px-3 py-2">
                             <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground">
@@ -228,6 +276,9 @@ function AdminItemsPage() {
                         </>
                       ) : (
                         <>
+                          <td className="px-2 py-2 text-center">
+                            <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggleSelect(it.id)} />
+                          </td>
                           <td className="px-3 py-2 font-medium">{it.name}</td>
                           <td className="px-3 py-2 text-muted-foreground">{it.category}</td>
                           <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.purchase_price)}</td>
