@@ -173,7 +173,7 @@ function Page() {
                   recipeMap={recipeMap}
                   isManager={isManager}
                   editMode={editMode && isManager}
-                  onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, min_sale_price: val })}
+                  onUpdatePrice={(id, field, val) => updatePrice.mutate({ item_id: id, [field]: val })}
                   pending={updatePrice.isPending}
                 />
               ))}
@@ -250,7 +250,7 @@ function SellTable({
   recipeMap: Map<number, RecipeRow>;
   isManager: boolean;
   editMode: boolean;
-  onUpdatePrice: (id: number, val: number) => void;
+  onUpdatePrice: (id: number, field: "purchase_price" | "min_sale_price", val: number) => void;
   pending: boolean;
 }) {
   if (!items.length) return null;
@@ -355,11 +355,13 @@ function SellRow({
 }: {
   it: CatalogItem; catKey: string; recipe: RecipeRow | null;
   isManager: boolean;
-  editMode: boolean; onUpdatePrice: (id: number, val: number) => void; pending: boolean;
+  editMode: boolean; onUpdatePrice: (id: number, field: "purchase_price" | "min_sale_price", val: number) => void; pending: boolean;
 }) {
-  const [editingBase, setEditingBase] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState(false);
+  const [editingSale, setEditingSale] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [baseVal, setBaseVal] = useState(String(it.min_sale_price ?? 0));
+  const [purchaseVal, setPurchaseVal] = useState(String(it.purchase_price ?? 0));
+  const [saleVal, setSaleVal] = useState(String(it.min_sale_price ?? 0));
   const finalPrice = it.tier_price ?? it.min_sale_price ?? 0;
 
   return (
@@ -373,15 +375,15 @@ function SellRow({
         </td>
         <td className="px-3 py-2 text-right font-mono text-muted-foreground">
         {isManager && editMode ? (
-          editingBase ? (
+          editingPurchase ? (
             <div className="flex items-center justify-end gap-1">
-              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={baseVal} onChange={(e) => setBaseVal(e.target.value)} autoFocus />
-              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, Number(baseVal)); setEditingBase(false); }}><Check className="h-3 w-3" /></button>
-              <button className="text-muted-foreground" onClick={() => { setBaseVal(String(it.min_sale_price ?? 0)); setEditingBase(false); }}><X className="h-3 w-3" /></button>
+              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={purchaseVal} onChange={(e) => setPurchaseVal(e.target.value)} autoFocus />
+              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, "purchase_price", Number(purchaseVal)); setEditingPurchase(false); }}><Check className="h-3 w-3" /></button>
+              <button className="text-muted-foreground" onClick={() => { setPurchaseVal(String(it.purchase_price ?? 0)); setEditingPurchase(false); }}><X className="h-3 w-3" /></button>
             </div>
           ) : (
-            <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingBase(true)}>
-              {fmtPrice(it.min_sale_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingPurchase(true)}>
+              {fmtPrice(it.purchase_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
             </button>
           )
         ) : (
@@ -389,7 +391,21 @@ function SellRow({
         )}
       </td>
       <td className="px-3 py-2 text-right font-mono">
-        <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span>
+        {isManager && editMode ? (
+          editingSale ? (
+            <div className="flex items-center justify-end gap-1">
+              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={saleVal} onChange={(e) => setSaleVal(e.target.value)} autoFocus />
+              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, "min_sale_price", Number(saleVal)); setEditingSale(false); }}><Check className="h-3 w-3" /></button>
+              <button className="text-muted-foreground" onClick={() => { setSaleVal(String(it.min_sale_price ?? 0)); setEditingSale(false); }}><X className="h-3 w-3" /></button>
+            </div>
+          ) : (
+            <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingSale(true)}>
+              <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span> <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          )
+        ) : (
+          <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span>
+        )}
       </td>
       <td className="px-3 py-2 text-center">
           {recipe && recipe.ingredients.length > 0 && (

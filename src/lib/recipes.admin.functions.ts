@@ -72,32 +72,7 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
       });
     }
 
-    return result.sort((a, b) => a.item_name.localeCompare(b.item_name));
-  });
-
-export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { recipe_id: number; ingredient_item_id: number; quantity: number }) => {
-    if (!Number.isFinite(d.recipe_id)) throw new Error("recipe_id inválido");
-    if (!Number.isFinite(d.ingredient_item_id)) throw new Error("ingredient_item_id inválido");
-    if (!Number.isFinite(d.quantity) || d.quantity < 0) throw new Error("quantidade inválida");
-    return d;
-  })
-  .handler(async ({ context, data }): Promise<void> => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
-
-    // Upsert: delete then insert to handle unique constraint
-    await pgQuery(
-      `delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`,
-      [data.recipe_id, data.ingredient_item_id],
-    );
-    if (data.quantity > 0) {
-      await pgQuery(
-        `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
-        [data.recipe_id, data.ingredient_item_id, data.quantity],
-      );
-    }
+    return result.sort((a, b) => (a.recipe_category ?? "").localeCompare(b.recipe_category ?? "") || a.item_name.localeCompare(b.item_name));
   });
 
 export const listItemsAdmin = createServerFn({ method: "GET" })
@@ -118,6 +93,36 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
         unit: "unidade",
       }))
       .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name));
+  });
+
+export const listDbItemsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    return pgQuery<{
+      id: number;
+      name: string;
+      category: string | null;
+      subcategory: string | null;
+      side: string | null;
+      tier: string | null;
+      purchase_price: number | null;
+      min_sale_price: number | null;
+      estimated_value: number | null;
+      xp_points: number | null;
+      active: boolean;
+    }>(
+      `select id, name, category, subcategory, side, tier,
+              purchase_price::float as purchase_price,
+              min_sale_price::float as min_sale_price,
+              estimated_value::float as estimated_value,
+              xp_points, active
+       from items
+       where coalesce(deleted_at, 'epoch'::timestamptz) = 'epoch'::timestamptz
+       order by active desc, category, name`,
+    );
   });
 
 export const updateItemPrice = createServerFn({ method: "POST" })
@@ -163,5 +168,130 @@ export const updateItemPrice = createServerFn({ method: "POST" })
     await pgQuery(
       `update items set ${sets.join(", ")}, updated_at = now() where id = $${vals.length}`,
       vals,
+    );
+  });
+
+export const updateItemAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    item_id: number;
+    name?: string;
+    category?: string;
+    subcategory?: string;
+    side?: string;
+    tier?: string;
+    purchase_price?: number;
+    min_sale_price?: number;
+    estimated_value?: number;
+    xp_points?: number;
+    active?: boolean;
+  }) => {
+    if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
+    return d;
+  })
+  .handler(async ({ context, data }): Promise<void> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    const sets: string[] = [];
+    const vals: (number | string | boolean)[] = [];
+
+    if (data.name !== undefined) { sets.push(`name = $${sets.length + 1}`); vals.push(data.name); }
+    if (data.category !== undefined) { sets.push(`category = $${sets.length + 1}`); vals.push(data.category); }
+    if (data.subcategory !== undefined) { sets.push(`subcategory = $${sets.length + 1}`); vals.push(data.subcategory); }
+    if (data.side !== undefined) { sets.push(`side = $${sets.length + 1}`); vals.push(data.side); }
+    if (data.tier !== undefined) { sets.push(`tier = $${sets.length + 1}`); vals.push(data.tier); }
+    if (data.purchase_price !== undefined) { sets.push(`purchase_price = $${sets.length + 1}`); vals.push(data.purchase_price); }
+    if (data.min_sale_price !== undefined) { sets.push(`min_sale_price = $${sets.length + 1}`); vals.push(data.min_sale_price); }
+    if (data.estimated_value !== undefined) { sets.push(`estimated_value = $${sets.length + 1}`); vals.push(data.estimated_value); }
+    if (data.xp_points !== undefined) { sets.push(`xp_points = $${sets.length + 1}`); vals.push(data.xp_points); }
+    if (data.active !== undefined) { sets.push(`active = $${sets.length + 1}`); vals.push(data.active); }
+
+    if (sets.length === 0) return;
+    vals.push(data.item_id);
+    await pgQuery(
+      `update items set ${sets.join(", ")}, updated_at = now() where id = $${vals.length}`,
+      vals,
+    );
+  });
+
+export const createItemAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    name: string;
+    category: string;
+    subcategory?: string;
+    side?: string;
+    tier?: string;
+    purchase_price?: number;
+    min_sale_price?: number;
+    estimated_value?: number;
+    xp_points?: number;
+  }) => {
+    if (!d.name || d.name.length < 1) throw new Error("Nome obrigatório");
+    if (!d.category) throw new Error("Categoria obrigatória");
+    return d;
+  })
+  .handler(async ({ context, data }): Promise<{ id: number }> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    const result = await pgOne<{ id: number }>(
+      `insert into items (name, category, subcategory, side, tier, purchase_price, min_sale_price, estimated_value, xp_points, unit, active)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'unidade', true)
+       returning id`,
+      [
+        data.name,
+        data.category,
+        data.subcategory ?? data.category,
+        data.side ?? "venda",
+        data.tier ?? null,
+        data.purchase_price ?? 0,
+        data.min_sale_price ?? 0,
+        data.estimated_value ?? 0,
+        data.xp_points ?? 0,
+      ],
+    );
+    if (!result) throw new Error("Erro ao criar item");
+    return { id: result.id };
+  });
+
+export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { recipe_id: number; ingredient_item_id: number; quantity: number }) => {
+    if (!Number.isFinite(d.recipe_id)) throw new Error("recipe_id inválido");
+    if (!Number.isFinite(d.ingredient_item_id)) throw new Error("ingredient_item_id inválido");
+    if (!Number.isFinite(d.quantity) || d.quantity < 0) throw new Error("quantidade inválida");
+    return d;
+  })
+  .handler(async ({ context, data }): Promise<void> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    await pgQuery(
+      `delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`,
+      [data.recipe_id, data.ingredient_item_id],
+    );
+    if (data.quantity > 0) {
+      await pgQuery(
+        `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
+        [data.recipe_id, data.ingredient_item_id, data.quantity],
+      );
+    }
+  });
+
+export const deleteItemAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { item_id: number }) => {
+    if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
+    return d;
+  })
+  .handler(async ({ context, data }): Promise<void> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    await pgQuery(
+      `update items set deleted_at = now(), active = false where id = $1`,
+      [data.item_id],
     );
   });
