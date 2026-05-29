@@ -9,6 +9,20 @@
     ]
   },
   "items": {
+    "weapon_orange_sns_pistol": {
+      "name": "SNS Pistol",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 15000,
+      "sellPrice": 25000,
+      "estimatedValue": 15000,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
     "weapon_orange_minismg": {
       "name": "Mini SMG",
       "type": "weapon",
@@ -106,90 +120,6 @@
       "side": "venda",
       "category": "armas_orange",
       "subcategory": "armas_orange"
-    },
-    "weapon_red_heavy_pistol": {
-      "name": "Heavy Pistol",
-      "type": "weapon",
-      "tier": "red",
-      "buyPrice": 30000,
-      "sellPrice": 30000,
-      "estimatedValue": 30000,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_red",
-      "subcategory": "armas_red"
-    },
-    "weapon_red_50_pistol": {
-      "name": ".50 Pistol",
-      "type": "weapon",
-      "tier": "red",
-      "buyPrice": 50000,
-      "sellPrice": 50000,
-      "estimatedValue": 50000,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_red",
-      "subcategory": "armas_red"
-    },
-    "weapon_red_p90": {
-      "name": "P90",
-      "type": "weapon",
-      "tier": "red",
-      "buyPrice": 60000,
-      "sellPrice": 60000,
-      "estimatedValue": 60000,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_red",
-      "subcategory": "armas_red"
-    },
-    "weapon_red_pdw": {
-      "name": "PDW",
-      "type": "weapon",
-      "tier": "red",
-      "buyPrice": 60000,
-      "sellPrice": 60000,
-      "estimatedValue": 60000,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_red",
-      "subcategory": "armas_red"
-    },
-    "weapon_red_bullpup": {
-      "name": "Bullpup",
-      "type": "weapon",
-      "tier": "red",
-      "buyPrice": 85000,
-      "sellPrice": 85000,
-      "estimatedValue": 85000,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_red",
-      "subcategory": "armas_red"
-    },
-    "weapon_red_carabina": {
-      "name": "Carabina",
-      "type": "weapon",
-      "tier": "red",
-      "buyPrice": 100000,
-      "sellPrice": 100000,
-      "estimatedValue": 100000,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_red",
-      "subcategory": "armas_red"
     },
     "magazine_orange": {
       "name": "Carregador Orange",
@@ -921,6 +851,15 @@
     }
   },
   "recipes": {
+    "recipe_sns_pistol": {
+      "output": "weapon_orange_sns_pistol",
+      "quantity": 1,
+      "inputs": {
+        "material_aco": 1,
+        "material_pecas": 5,
+        "print_laranja": 1
+      }
+    },
     "recipe_minismg": {
       "output": "weapon_orange_minismg",
       "quantity": 1,
@@ -988,60 +927,6 @@
         "material_aco": 5,
         "material_pecas": 30,
         "print_laranja": 1
-      }
-    },
-    "recipe_heavy_pistol": {
-      "output": "weapon_red_heavy_pistol",
-      "quantity": 1,
-      "inputs": {
-        "material_aco": 5,
-        "material_pecas": 25,
-        "print_azul": 1
-      }
-    },
-    "recipe_50_pistol": {
-      "output": "weapon_red_50_pistol",
-      "quantity": 1,
-      "inputs": {
-        "material_aco": 5,
-        "material_pecas": 40,
-        "print_azul": 1
-      }
-    },
-    "recipe_p90": {
-      "output": "weapon_red_p90",
-      "quantity": 1,
-      "inputs": {
-        "material_aco": 5,
-        "material_pecas": 45,
-        "print_azul": 1
-      }
-    },
-    "recipe_pdw": {
-      "output": "weapon_red_pdw",
-      "quantity": 1,
-      "inputs": {
-        "material_aco": 5,
-        "material_pecas": 45,
-        "print_azul": 1
-      }
-    },
-    "recipe_bullpup": {
-      "output": "weapon_red_bullpup",
-      "quantity": 1,
-      "inputs": {
-        "material_aco": 8,
-        "material_pecas": 60,
-        "print_vermelha": 1
-      }
-    },
-    "recipe_carabina": {
-      "output": "weapon_red_carabina",
-      "quantity": 1,
-      "inputs": {
-        "material_aco": 8,
-        "material_pecas": 65,
-        "print_vermelha": 1
       }
     },
     "recipe_magazine_orange": {
