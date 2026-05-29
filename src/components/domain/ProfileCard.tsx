@@ -8,28 +8,7 @@ import {
 } from "lucide-react";
 import type { MemberXP } from "@/lib/xp.functions";
 import type { CurrentMember } from "@/lib/pricing.shared";
-
-const TIER_BENEFITS: Record<string, string[]> = {
-  young_blood: ["Acesso ao arsenal básico", "Preços de bairrista N1"],
-  o_gunao: ["Desconto nas armas (-10k€)", "Acesso à casa dos bairristas", "Considerado para Mini Gang"],
-  gangster_fodido: ["Desconto máximo nas armas (-20k€)", "Acesso total à casa dos bairristas", "Membro da Mini Gang", "Sorteios extra", "Respeito de oficial"],
-  patrao_di_zona: ["Gestão de zona", "Acesso a canais de comando"],
-  real_gangster: ["Status de oficial eminente", "Acesso a ops avançadas"],
-  og: ["Mentoria de bairristas", "Veto em decisões estratégicas"],
-  kingpin: ["Acesso ao painel Chefia", "Gestão de encomendas e stock"],
-  manda_chuva: ["Controlo total da firma", "Superadmin da web app"],
-};
-
-const NEXT_TIER_MAP: Record<string, string | null> = {
-  young_blood: "o_gunao",
-  o_gunao: "gangster_fodido",
-  gangster_fodido: null,
-  patrao_di_zona: null,
-  real_gangster: "og",
-  og: null,
-  kingpin: "manda_chuva",
-  manda_chuva: null,
-};
+import { getTierBenefits, getPromotions } from "@/lib/config.loader";
 
 export function ProfileCard({
   member,
@@ -54,8 +33,11 @@ export function ProfileCard({
   if (!member) return null;
   const tier = member.tier ?? "young_blood";
   const tierLabel = TIER_LABELS[tier] ?? tier;
-  const nextTier = NEXT_TIER_MAP[tier];
-  const nextBenefits = nextTier ? TIER_BENEFITS[nextTier] ?? [] : [];
+
+  const promotions = getPromotions();
+  const nextTier = promotions.find((p) => p.from === tier)?.to ?? null;
+  const benefits = getTierBenefits();
+  const nextBenefits = nextTier ? benefits[nextTier] ?? [] : [];
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card interactive-card overflow-hidden">

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { isSuperAdminTier, isAdminTier } from "./config.loader";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { pgOne, pgQuery } from "./pg.server";
@@ -30,11 +31,11 @@ async function getEffectiveRoles(userId: string): Promise<string[]> {
     );
     const tier = member?.tier ?? null;
     const roleLabel = member?.role ?? null;
-    if (tier === "manda_chuva" || roleLabel === "manda_chuva") {
+    if (isSuperAdminTier(tier) || roleLabel === "manda_chuva") {
       roles.add("superadmin");
       roles.add("admin");
     }
-    if (tier === "kingpin" || roleLabel === "kingpin" || roleLabel === "chefia") {
+    if (isAdminTier(tier) || roleLabel === "kingpin" || roleLabel === "chefia") {
       roles.add("admin");
     }
   }

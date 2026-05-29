@@ -1142,12 +1142,12 @@
     },
     "prizeTypes": ["Casa", "Arma", "Carro", "Dinheiro", "Outro"],
     "operationTypes": {
-      "bagueta": { "label": "Baguetada", "color": "text-yellow-400", "bg": "bg-yellow-500/10" },
-      "monte": { "label": "Monte", "color": "text-emerald-400", "bg": "bg-emerald-500/10" },
-      "labs": { "label": "Labs", "color": "text-blue-400", "bg": "bg-blue-500/10" },
-      "guetto": { "label": "Guetto", "color": "text-red-400", "bg": "bg-red-500/10" },
-      "treino": { "label": "Treino", "color": "text-orange-400", "bg": "bg-orange-500/10" },
-      "outro": { "label": "Outro", "color": "text-muted-foreground", "bg": "bg-muted/40" }
+      "bagueta": { "label": "Baguetada", "color": "text-red-400", "bg": "bg-red-500/10", "border": "border-red-500/30" },
+      "monte": { "label": "Monte", "color": "text-orange-400", "bg": "bg-orange-500/10", "border": "border-orange-500/30" },
+      "labs": { "label": "Labs", "color": "text-purple-400", "bg": "bg-purple-500/10", "border": "border-purple-500/30" },
+      "guetto": { "label": "Guetto", "color": "text-emerald-400", "bg": "bg-emerald-500/10", "border": "border-emerald-500/30" },
+      "treino": { "label": "Treino", "color": "text-blue-400", "bg": "bg-blue-500/10", "border": "border-blue-500/30" },
+      "outro": { "label": "Outro", "color": "text-muted-foreground", "bg": "bg-muted", "border": "border-border" }
     },
     "orderWorkflow": {
       "statuses": ["pending", "approved", "in_progress", "ready", "fulfilled", "denied", "cancelled"],

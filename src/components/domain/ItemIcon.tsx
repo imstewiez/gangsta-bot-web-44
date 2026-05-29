@@ -33,10 +33,11 @@ const NAME_OVERRIDE: Array<[RegExp, LucideIcon]> = [
 const VALID_CATEGORIES = new Set(Object.keys(ARMORY_CAT_CONFIG));
 
 export function inferCategory(name: string, raw?: string | null): CatKey {
-  const n = (name ?? "").toLowerCase();
   const c = (raw ?? "").toLowerCase();
 
   if (c && VALID_CATEGORIES.has(c)) return c as CatKey;
+
+  const n = (name ?? "").toLowerCase();
 
   if (/colete|kevlar|vest|armor/.test(n)) return "coletes";
   if (/carregador|magazine|\bmag\b/.test(n)) return "carregadores";

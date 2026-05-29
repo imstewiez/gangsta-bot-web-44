@@ -4,17 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyBot } from "./discord.server";
+import { getTierOrder, isAdminTier, isSuperAdminTier } from "./config.loader";
 
-const TIERS = [
-  "young_blood",
-  "o_gunao",
-  "gangster_fodido",
-  "patrao_di_zona",
-  "real_gangster",
-  "og",
-  "kingpin",
-  "manda_chuva",
-] as const;
+const TIERS = getTierOrder();
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -89,25 +81,25 @@ async function syncUserRolesForMember(memberId: number, newTier: string, oldTier
   const userId = profile.user_id;
 
   // Add superadmin for manda_chuva
-  if (newTier === "manda_chuva") {
+  if (isSuperAdminTier(newTier)) {
     await pgQuery(
       `insert into user_roles (user_id, role) values ($1, 'superadmin') on conflict (user_id, role) do nothing`,
       [userId],
     );
   }
   // Add admin for kingpin/manda_chuva
-  if (newTier === "kingpin" || newTier === "manda_chuva") {
+  if (isAdminTier(newTier)) {
     await pgQuery(
       `insert into user_roles (user_id, role) values ($1, 'admin') on conflict (user_id, role) do nothing`,
       [userId],
     );
   }
   // Remove superadmin if demoted from manda_chuva
-  if (oldTier === "manda_chuva" && newTier !== "manda_chuva") {
+  if (isSuperAdminTier(oldTier) && !isSuperAdminTier(newTier)) {
     await pgQuery(`delete from user_roles where user_id = $1 and role = 'superadmin'`, [userId]);
   }
   // Remove admin if demoted from kingpin/manda_chuva to non-admin
-  if ((oldTier === "kingpin" || oldTier === "manda_chuva") && newTier !== "kingpin" && newTier !== "manda_chuva") {
+  if (isAdminTier(oldTier) && !isAdminTier(newTier)) {
     await pgQuery(`delete from user_roles where user_id = $1 and role = 'admin'`, [userId]);
   }
 }
@@ -117,13 +109,13 @@ export const adminSetTier = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       id: z.number().int().positive(),
-      tier: z.enum(TIERS),
+      tier: z.enum(TIERS as [string, ...string[]]),
     }).parse,
   )
   .handler(async ({ data, context }) => {
     const targetTier = await getMemberTier(data.id);
-    const isPromotingToHighCommand = ["kingpin", "manda_chuva"].includes(data.tier);
-    const isDemotingFromHighCommand = targetTier ? ["kingpin", "manda_chuva"].includes(targetTier) : false;
+    const isPromotingToHighCommand = isAdminTier(data.tier);
+    const isDemotingFromHighCommand = targetTier ? isAdminTier(targetTier) : false;
 
     if (isPromotingToHighCommand || isDemotingFromHighCommand) {
       await assertSuperAdminMember(context.supabase, context.userId);
@@ -141,10 +133,9 @@ export const adminSetTier = createServerFn({ method: "POST" })
     // Sync user_roles automatically (no more manual syncRolesFromTiers needed)
     await syncUserRolesForMember(data.id, data.tier, before?.tier ?? null);
     if (before?.discord_id) {
-      const fromIdx = TIERS.indexOf(
-        (before.tier ?? "young_blood") as (typeof TIERS)[number],
-      );
-      const toIdx = TIERS.indexOf(data.tier as (typeof TIERS)[number]);
+      const tierList = getTierOrder();
+      const fromIdx = tierList.indexOf(before.tier ?? "young_blood");
+      const toIdx = tierList.indexOf(data.tier);
       const action = toIdx >= fromIdx ? "promote" : "demote";
       await notifyBot({
         action,
@@ -167,7 +158,7 @@ export const adminKickMember = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const targetTier = await getMemberTier(data.id);
-    if (targetTier && ["kingpin", "manda_chuva"].includes(targetTier)) {
+    if (targetTier && isAdminTier(targetTier)) {
       await assertSuperAdminMember(context.supabase, context.userId);
     } else {
       await assertManager(context.supabase, context.userId);

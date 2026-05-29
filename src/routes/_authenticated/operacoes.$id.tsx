@@ -54,19 +54,37 @@ import {
   Truck,
   Package,
 } from "lucide-react";
+import { getOperationTypes } from "@/lib/config.loader";
 
 export const Route = createFileRoute("/_authenticated/operacoes/$id")({
   component: Page,
 });
 
-const TYPE_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
-  bagueta: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/30" },
-  monte: { bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/30" },
-  labs: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/30" },
-  guetto: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30" },
-  treino: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30" },
-  outro: { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" },
-};
+function getTypeConfig(): Record<string, { bg: string; text: string; border: string }> {
+  const types = getOperationTypes();
+  const config: Record<string, { bg: string; text: string; border: string }> = {};
+  const colorMap: Record<string, string> = {
+    yellow: "yellow-400",
+    emerald: "emerald-400",
+    blue: "blue-400",
+    red: "red-400",
+    orange: "orange-400",
+    muted: "muted-foreground",
+  };
+  for (const [key, val] of Object.entries(types)) {
+    const colorClass = val.color.replace("text-", "");
+    const baseColor = colorClass.replace(/-\d+$/, "");
+    const shade = colorClass.match(/-(\d+)$/)?.[1] ?? "500";
+    config[key] = {
+      bg: `bg-${baseColor}-${shade}/10`,
+      text: val.color,
+      border: `border-${baseColor}-${shade}/30`,
+    };
+  }
+  // Fallback for any missing keys
+  config.outro = config.outro ?? { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" };
+  return config;
+}
 
 function Page() {
   const { id } = useParams({ from: "/_authenticated/operacoes/$id" });
@@ -164,7 +182,8 @@ function Page() {
   const canLiquidate =
     isManager && (op.status === "concluida" || op.status === "em_liquidacao");
   const isFinalized = op.status === "concluida" || op.status === "cancelada";
-  const typeStyle = TYPE_CONFIG[(op.operation_type ?? "outro").toLowerCase()] ?? TYPE_CONFIG.outro;
+  const TYPE_CONFIG = getTypeConfig();
+  const typeStyle = getTypeConfig((op.operation_type ?? "outro").toLowerCase());
 
   const activeParticipants = participants.filter((p) => p.participant_type !== "pending");
   const pendingParticipants = participants.filter((p) => p.participant_type === "pending");

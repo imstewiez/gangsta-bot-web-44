@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { isAdminTier, isSuperAdminTier } from "./config.loader";
 
 export const checkMemberAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -65,7 +66,7 @@ export const checkChefiaAccess = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) return { allowed: false, reason: "not_member" };
-    const isChefia = me.tier === "kingpin" || me.tier === "manda_chuva" || me.role_label === "kingpin" || me.role_label === "manda_chuva";
+    const isChefia = isAdminTier(me.tier) || isSuperAdminTier(me.tier) || me.role_label === "kingpin" || me.role_label === "manda_chuva";
     if (!isChefia) return { allowed: false, reason: "not_chefia" };
     return { allowed: true };
   });
