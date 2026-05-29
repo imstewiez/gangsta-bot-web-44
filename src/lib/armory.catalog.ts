@@ -75,15 +75,6 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-red-400",
     tone: "destructive",
   },
-  armas_brancas: {
-    label: "Armas Brancas",
-    icon: Sword,
-    color: "text-cyan-400",
-    bg: "bg-cyan-500/10",
-    border: "border-cyan-500/30",
-    headerColor: "text-cyan-400",
-    tone: "info",
-  },
   carregadores: {
     label: "Carregadores",
     icon: Cylinder,
@@ -255,6 +246,12 @@ export function filterItemForDisplay(
   // Armas red/orange só se permitidas
   if (cat === "armas_red" && !isAllowedRedWeapon(itemName, subcategory)) return null;
   if (cat === "armas_orange" && !isAllowedOrangeWeapon(itemName, subcategory)) return null;
+
+  // Carregadores: apenas as 3 opções genéricas (Orange / Red / Especial).
+  // Esconde carregadores específicos por arma (TEC-9 Carregador, PDW Carregador, etc.).
+  if (cat === "carregadores") {
+    if (!/^carregador\s+(orange|red|especial|special)$/i.test(itemName.trim())) return null;
+  }
 
   return cat;
 }
