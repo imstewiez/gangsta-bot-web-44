@@ -154,31 +154,6 @@ export const PRINT_BADGE_CLASS: Record<string, string> = {
   red: "bg-red-500/15 text-red-400 border-red-500/40",
 };
 
-// ── Armas permitidas por categoria ──────────────────────────────────────────
-// Apenas estas armas aparecem nas secções Red / Orange. Tudo o resto é escondido.
-
-const RED_WEAPON_NAMES = [
-  "Heavy Pistol",
-  "Pistol .50",
-  ".50 Pistol",
-  "Combat PDW",
-  "P90",
-  "Bullpup Rifle",
-  "Carabina Rifle",
-];
-
-const ORANGE_WEAPON_NAMES = [
-  "Mini SMG",
-  "Pistol XM3",
-  "Micro SMG",
-  "TEC 9",
-  "TEC-9",
-  "Tec 9",
-  "TEC Pistol",
-  "AP Pistol",
-  "Compact Rifle",
-];
-
 // ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
 const BANNED_WEAPON_NAMES: string[] = [];
 
@@ -188,30 +163,16 @@ function isBannedWeapon(name: string | null): boolean {
   return BANNED_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
 }
 
-function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
-  if (!name) return false;
-  const n = name.toLowerCase().trim();
-  // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
-  if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
-  return RED_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
-}
-
-function isAllowedOrangeWeapon(name: string | null, subcategory?: string | null): boolean {
-  if (!name) return false;
-  const n = name.toLowerCase().trim();
-  // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
-  if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
-  return ORANGE_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
-}
+import { getItemByName } from "./config.loader";
 
 export function isOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
+  const item = getItemByName(name);
+  if (item) return item.tier === "orange";
+  // fallback para nomes que não estão no config
   const n = name.toLowerCase().trim();
-  return ORANGE_WEAPON_NAMES.some((o) => n === o.toLowerCase().trim());
-}
-
-function isAllowedWeapon(name: string | null, subcategory?: string | null): boolean {
-  return isAllowedRedWeapon(name, subcategory) || isAllowedOrangeWeapon(name, subcategory);
+  if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
+  return false;
 }
 
 // ── Filtro UNIFICADO para TODAS as páginas ─────────────────────────────────
@@ -243,9 +204,7 @@ export function filterItemForDisplay(
     if (!allowed.test(itemName)) return null;
   }
 
-  // Armas red/orange só se permitidas
-  if (cat === "armas_red" && !isAllowedRedWeapon(itemName, subcategory)) return null;
-  if (cat === "armas_orange" && !isAllowedOrangeWeapon(itemName, subcategory)) return null;
+  // Armas red/orange — já filtradas pela categoria acima, não precisam de whitelist
 
   // Carregadores: apenas as 3 opções genéricas (Orange / Red / Especial).
   // Esconde carregadores específicos por arma (TEC-9 Carregador, PDW Carregador, etc.).
@@ -282,28 +241,16 @@ export function itemDisplayCategory(
     return "carregadores";
   }
 
-  // 2. Armas (ANTES de corpos/prints — algumas armas têm category="prints" na DB)
-  // Verificar primeiro pelo nome se é uma arma permitida
-  if (isAllowedWeapon(itemName, sub)) {
-    if (isOrangeWeapon(itemName)) return "armas_orange";
-    return "armas_red";
-  }
-
-  if (sub === "armas_orange" || cat === "armas_orange") return "armas_orange";
-  if (sub === "armas_red" || cat === "armas_red") {
-    if (isOrangeWeapon(itemName)) return "armas_orange";
-    return "armas_red";
-  }
-  if (sub === "azul" || sub === "vermelha" || sub === "amarela") {
-    if (isOrangeWeapon(itemName)) return "armas_orange";
-    return "armas_red";
-  }
+  // 2. Armas — usar categorias do config.json como fonte de verdade
+  if (cat === "armas_orange" || sub === "armas_orange") return "armas_orange";
+  if (cat === "armas_red" || sub === "armas_red") return "armas_red";
   if (sub === "craft_weapons" || cat === "craft_weapons") {
-    if (isOrangeWeapon(itemName)) return "armas_orange";
+    // Neste caso, usamos o tier se disponível
+    if (sub === "armas_orange" || cat === "armas_orange") return "armas_orange";
     return "armas_red";
   }
 
-  // Fallback: detectar armas pelo nome
+  // Fallback: detectar armas pelo nome (apenas se não tiver categoria definida)
   const isWeaponByName =
     !name.includes("print") &&
     !name.includes("corpo") &&
@@ -312,8 +259,7 @@ export function itemDisplayCategory(
       name,
     );
   if (isWeaponByName) {
-    if (isOrangeWeapon(itemName)) return "armas_orange";
-    return "armas_red";
+    return "armas_red"; // fallback genérico
   }
 
   // 3. Corpos
