@@ -10,7 +10,7 @@
   },
   "items": {
     "weapon_orange_sns_pistol": {
-      "name": "SNS Pistol",
+      "name": "SNS PISTOL",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 15000,
@@ -23,8 +23,22 @@
       "category": "armas_orange",
       "subcategory": "armas_orange"
     },
+    "weapon_orange_espingarda_assalto": {
+      "name": "ESPINGARDA DE ASSALTO",
+      "type": "weapon",
+      "tier": "orange",
+      "buyPrice": 0,
+      "sellPrice": 30000,
+      "estimatedValue": 0,
+      "stackable": true,
+      "weight": 0,
+      "xpPoints": 5,
+      "side": "venda",
+      "category": "armas_orange",
+      "subcategory": "armas_orange"
+    },
     "weapon_orange_minismg": {
-      "name": "Mini SMG",
+      "name": "MINI SMG",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 20000,
@@ -38,7 +52,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_xm3": {
-      "name": "XM3",
+      "name": "XM3 PISTOL",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 20000,
@@ -52,7 +66,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_micro_smg": {
-      "name": "Micro SMG",
+      "name": "MICRO SMG",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 22000,
@@ -66,7 +80,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_tec9": {
-      "name": "Tec 9",
+      "name": "TEC9",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 22000,
@@ -80,7 +94,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_tec_pistol": {
-      "name": "Tec Pistol",
+      "name": "TEC PISTOL",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 27000,
@@ -94,7 +108,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_ap_pistol": {
-      "name": "AP Pistol",
+      "name": "AP PISTOL",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 27000,
@@ -108,7 +122,7 @@
       "subcategory": "armas_orange"
     },
     "weapon_orange_compact_rifle": {
-      "name": "Compact Rifle",
+      "name": "COMPACT RIFLE (DRAKO)",
       "type": "weapon",
       "tier": "orange",
       "buyPrice": 60000,
@@ -624,20 +638,6 @@
       "side": "compra",
       "category": "metais",
       "subcategory": null
-    },
-    "weapon_orange_espingarda_assalto": {
-      "name": "Espingarda de Assalto",
-      "type": "weapon",
-      "tier": "orange",
-      "buyPrice": 0,
-      "sellPrice": 30000,
-      "estimatedValue": 0,
-      "stackable": true,
-      "weight": 0,
-      "xpPoints": 5,
-      "side": "venda",
-      "category": "armas_orange",
-      "subcategory": "armas_orange"
     },
     "material_taninos": {
       "name": "Taninos",
