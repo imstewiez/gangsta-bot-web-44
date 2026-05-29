@@ -233,8 +233,9 @@ function OrdersList({
       toast.error(_e.message);
     },
     onSuccess: (res, vars, ctx) => {
-      if (res && "ok" in res && res.ok === false) {
-        toast.error(res.error);
+      const r = res as any;
+      if (r && "ok" in r && r.ok === false) {
+        toast.error(r.error ?? "Erro");
         if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
         return;
       }
