@@ -290,8 +290,18 @@ export const deleteItemAdmin = createServerFn({ method: "POST" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
-    await pgQuery(
-      `update items set deleted_at = now(), active = false where id = $1`,
-      [data.item_id],
-    );
+    const id = data.item_id;
+
+    // Delete related records manually (foreign keys without CASCADE)
+    await pgQuery(`delete from orders where item_id = $1`, [id]);
+    await pgQuery(`delete from inventory_movements where item_id = $1`, [id]);
+    await pgQuery(`delete from operation_materials where item_id = $1`, [id]);
+    await pgQuery(`delete from operation_participants where weapon_item_id = $1`, [id]);
+    await pgQuery(`delete from recipe_ingredients where ingredient_item_id = $1`, [id]);
+    // These have CASCADE but we delete explicitly for safety
+    await pgQuery(`delete from craft_recipes where item_id = $1`, [id]);
+    await pgQuery(`delete from inventory_balance where item_id = $1`, [id]);
+    await pgQuery(`delete from item_price_history where item_id = $1`, [id]);
+    // Finally delete the item itself
+    await pgQuery(`delete from items where id = $1`, [id]);
   });
