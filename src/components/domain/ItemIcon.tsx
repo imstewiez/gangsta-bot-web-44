@@ -153,12 +153,12 @@ export function ItemIcon({
     tone = "destructive";
   }
 
-  // Cores específicas para carregadores — usar displayCat também
-  if (displayCat === "carregadores_orange" || displayCat === "carregadores_red" || displayCat === "carregadores_especial" || cat === "carregadores" || n.includes("carregador")) {
-    if (displayCat === "carregadores_orange" || n.includes("orange")) tone = "orange";
-    else if (displayCat === "carregadores_red" || n.includes("red")) tone = "destructive";
-    else if (displayCat === "carregadores_especial" || n.includes("especial")) tone = "warning";
-    else tone = "destructive"; // default
+  // Cores específicas para carregadores
+  if (cat === "carregadores" || n.includes("carregador")) {
+    if (n.includes("especial") || n.includes("special")) tone = "warning";
+    else if (n.includes("red")) tone = "destructive";
+    else if (n.includes("orange")) tone = "orange";
+    else tone = "destructive";
   }
 
   if (withPuck) {
