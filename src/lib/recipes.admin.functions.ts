@@ -120,7 +120,7 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
               estimated_value::float as estimated_value,
               xp_points, active
        from items
-       where coalesce(deleted_at, 'epoch'::timestamptz) = 'epoch'::timestamptz
+       where deleted_at is null
        order by active desc, category, name`,
     );
   });

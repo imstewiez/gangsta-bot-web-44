@@ -171,6 +171,9 @@ function AdminItemsPage() {
         </Reveal>
       )}
 
+      {items.isLoading && <p className="text-sm text-muted-foreground">A carregar items...</p>}
+      {items.error && <p className="text-sm text-destructive">Erro: {(items.error as Error).message}</p>}
+
       <Reveal direction="up" delay={150}>
         <Card className="interactive-card">
           <CardContent className="p-0">
@@ -189,6 +192,9 @@ function AdminItemsPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {filtered.length === 0 && !items.isLoading && (
+                    <tr><td colSpan={8} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
+                  )}
                   {filtered.map((it: any) => (
                     <tr key={it.id} className="border-t border-border interactive-row">
                       {editingId === it.id ? (
