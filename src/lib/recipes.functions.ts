@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveCurrentMember } from "./pricing.server";
 import { logger } from "./logger.server";
+import { pgQuery } from "./pg.server";
 import {
   getAllRecipes,
   getRecipeById,
@@ -39,6 +40,15 @@ export type RecipeRow = {
   recipe_category: string | null;
 };
 
+// Cache de mapeamento nome -> ID da DB (evita queries repetidas no mesmo request)
+async function getDbIdMap(names: string[]): Promise<Map<string, number>> {
+  const dbItems = await pgQuery<{ id: number; name: string }>(
+    `select id, name from items where name = any($1::text[]) and active = true`,
+    [names],
+  );
+  return new Map(dbItems.map((i) => [i.name, i.id]));
+}
+
 export const listRecipes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<RecipeRow[]> => {
@@ -47,6 +57,18 @@ export const listRecipes = createServerFn({ method: "GET" })
 
     const recipes = getAllRecipes();
     const result: RecipeRow[] = [];
+
+    // Colect all item names to map to DB IDs
+    const allNames = new Set<string>();
+    for (const [, recipe] of Object.entries(recipes)) {
+      const out = getItemById(recipe.output);
+      if (out) allNames.add(out.name);
+      for (const [ingId] of Object.entries(recipe.inputs)) {
+        const ing = getItemById(ingId);
+        if (ing) allNames.add(ing.name);
+      }
+    }
+    const dbIdMap = await getDbIdMap(Array.from(allNames));
 
     for (const [recipeId, recipe] of Object.entries(recipes)) {
       const outputItem = getItemById(recipe.output);
@@ -61,7 +83,7 @@ export const listRecipes = createServerFn({ method: "GET" })
         const unit_cost = ingItem.buyPrice ?? ingItem.estimatedValue ?? 0;
         const line_cost = qty * unit_cost;
         ingredients.push({
-          item_id: getNumericId(ingId),
+          item_id: dbIdMap.get(ingItem.name) ?? getNumericId(ingId),
           name: ingItem.name,
           quantity: qty,
           unit_cost,
@@ -78,8 +100,8 @@ export const listRecipes = createServerFn({ method: "GET" })
       const margin_pct = total_cost > 0 ? (margin / total_cost) * 100 : null;
 
       result.push({
-        recipe_id: getNumericId(recipeId),
-        item_id: getNumericId(recipe.output),
+        recipe_id: dbIdMap.get(outputItem.name) ?? getNumericId(recipeId),
+        item_id: dbIdMap.get(outputItem.name) ?? getNumericId(recipe.output),
         item_name: outputItem.name,
         category: outputItem.category,
         subcategory: outputItem.subcategory,
@@ -125,9 +147,6 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<CraftFeasibility> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    // recipe_id aqui é o numericId — precisamos de mapear para string ID
-    // Como os numericIds são sequenciais e as receitas têm IDs próprios,
-    // vamos encontrar a receita pelo item_id numeric
     const allRecipes = getAllRecipes();
     let targetRecipe: ReturnType<typeof getRecipeById> = undefined;
     let targetRecipeId = "";
