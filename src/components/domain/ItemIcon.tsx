@@ -2,6 +2,7 @@ import {
   Zap,
   Flame,
   Skull,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -28,45 +29,33 @@ const NAME_OVERRIDE: Array<[RegExp, LucideIcon]> = [
   [/morto|cad[aá]ver|corpo\s*humano/, Skull],
 ];
 
+// Categorias válidas no sistema atual
+const VALID_CATEGORIES = new Set(Object.keys(ARMORY_CAT_CONFIG));
+
 export function inferCategory(name: string, raw?: string | null): CatKey {
   const n = (name ?? "").toLowerCase();
   const c = (raw ?? "").toLowerCase();
 
-  if (c && (CATEGORY_ICON as Record<string, LucideIcon>)[c]) return c as CatKey;
+  if (c && VALID_CATEGORIES.has(c)) return c as CatKey;
 
-  if (
-    /coca|metanfet|meta\b|crystal|erva|maconha|haxixe|haxix|ecstasy|mdma|lsd|heroina|opio|ópio/.test(n)
-  )
-    return "drogas";
   if (/colete|kevlar|vest|armor/.test(n)) return "coletes";
   if (/carregador|magazine|\bmag\b/.test(n)) return "carregadores";
   if (
     /silenciador|supressor|mira|red\s*dot|holo|scope|telesc|lanterna|flash|punho|grip|coronha|cano|barrel/.test(n)
   )
-    return "acessorios_armas";
-  if (
-    /faca|machete|katana|punh[aã]l|navalha|estilete|taco|cassetete|martelo|p[eé]-de-cabra|barra/.test(n)
-  )
-    return "armas_brancas";
-  // Armas Red (apenas as 6 permitidas: Heavy Pistol, .50, PDW, P90, Bullpup, Carabina)
+    return "acessorios";
+  // Armas Red
   if (
     /heavy pistol|\.50|pdw|p90|bullpup|carabina/.test(n)
   )
     return "armas_red";
-  // Armas Orange (apenas as 6 permitidas: Mini SMG, XM3, Micro SMG, TEC 9, TEC Pistol, AP Pistol)
+  // Armas Orange
   if (
     /mini smg|pistol xm3|micro smg|tec\s*9|tec[-\s]9|tec pistol|ap pistol/.test(n)
   )
     return "armas_orange";
   if (/print|esquema|blueprint/.test(n)) return "prints";
   if (/corpo|chassi/.test(n)) return "corpos";
-  if (/madeira|tronco|tora|pinho|carvalho/.test(n)) return "madeiras";
-  if (/min[ée]rio|pedra|cristal|cobre|ferro|a[çc]o|metal|ouro|prata/.test(n))
-    return "minerios";
-  if (/lixo|sucata|trash|chatarra/.test(n)) return "lixo";
-  if (/\bpe[çc]as\b/.test(n)) return "materiais_craft";
-  if (/\bpe[çc]a\b/.test(n)) return "craft_armas";
-  if (/\bp[oó]lvora\b/.test(n)) return "materiais_craft";
 
   return "outros";
 }
@@ -75,7 +64,7 @@ export function pickItemIcon(name: string, category?: string | null): LucideIcon
   const n = (name ?? "").toLowerCase();
   for (const [re, ic] of NAME_OVERRIDE) if (re.test(n)) return ic;
   const cat = inferCategory(name, category ?? undefined);
-  return CATEGORY_ICON[cat];
+  return CATEGORY_ICON[cat] ?? Package;
 }
 
 // Classes Tailwind por tom — texto + bg + border do "puck" do ícone.
