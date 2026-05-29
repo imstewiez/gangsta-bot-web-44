@@ -101,7 +101,9 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
-    return pgQuery<{
+    const configNames = new Set(Object.values(getAllItems()).map((i) => i.name));
+
+    const rows = await pgQuery<{
       id: number;
       name: string;
       category: string | null;
@@ -121,6 +123,8 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
        from items
        order by active desc, category, name`,
     );
+
+    return rows.map((r) => ({ ...r, in_config: configNames.has(r.name) }));
   });
 
 export const updateItemPrice = createServerFn({ method: "POST" })
@@ -177,7 +181,6 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
     category?: string;
     subcategory?: string;
     side?: string;
-    tier?: string;
     purchase_price?: number;
     min_sale_price?: number;
     estimated_value?: number;
@@ -198,7 +201,6 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
     if (data.category !== undefined) { sets.push(`category = $${sets.length + 1}`); vals.push(data.category); }
     if (data.subcategory !== undefined) { sets.push(`subcategory = $${sets.length + 1}`); vals.push(data.subcategory); }
     if (data.side !== undefined) { sets.push(`side = $${sets.length + 1}`); vals.push(data.side); }
-    if (data.tier !== undefined) { sets.push(`tier = $${sets.length + 1}`); vals.push(data.tier); }
     if (data.purchase_price !== undefined) { sets.push(`purchase_price = $${sets.length + 1}`); vals.push(data.purchase_price); }
     if (data.min_sale_price !== undefined) { sets.push(`min_sale_price = $${sets.length + 1}`); vals.push(data.min_sale_price); }
     if (data.estimated_value !== undefined) { sets.push(`estimated_value = $${sets.length + 1}`); vals.push(data.estimated_value); }
