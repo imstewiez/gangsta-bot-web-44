@@ -4,7 +4,7 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyBot } from "./discord.server";
 
-export type PrizeRow = {
+type PrizeRow = {
   id: number;
   week_start: string;
   week_end: string;

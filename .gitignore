@@ -9,3 +9,9 @@ dist
 
 # Local wrangler state
 .wrangler/
+
+# Data dumps & backups
+data_dump/
+db-export/
+.env.backup.pre-deploy
+bun.lock

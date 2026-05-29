@@ -353,11 +353,7 @@ type RankRow = {
   wins_count: number;
 };
 
-const MEDAL_ICONS = [
-  { Cmp: Trophy, cls: "text-warning" },
-  { Cmp: Medal, cls: "text-muted-foreground" },
-  { Cmp: Award, cls: "text-orange-400" },
-] as const;
+import { MEDAL_ICONS } from "@/lib/leaderboard.config";
 
 function TopList({ title, icon, subtitle, rows, loading, compact }: {
   title: string; icon?: React.ReactNode; subtitle?: string | null; rows?: RankRow[]; loading?: boolean; compact?: boolean;

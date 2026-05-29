@@ -4,13 +4,13 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
 
-export type DeliveryLine = {
+type DeliveryLine = {
   item_id: number;
   item_name?: string;
   qty: number;
   unit_value?: number;
 };
-export type DeliveryRow = {
+type DeliveryRow = {
   id: string;
   requester_member_id: number;
   requester_name: string | null;
@@ -158,25 +158,6 @@ export const createDelivery = createServerFn({ method: "POST" })
       ],
     );
     return { id: row?.id };
-  });
-
-export const fixMissingDeliveryMemberIds = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.is_manager) throw new Error("Sem permissão");
-    // Fix inventory_movements linked to web deliveries where member_id is null
-    const fixed = await pgQuery<{ movement_id: number; requester_member_id: number }>(
-      `update inventory_movements im
-       set member_id = r.requester_member_id
-       from inventory_delivery_requests r
-       where im.notes like 'delivery:%'
-         and r.id = substring(im.notes from 10)::uuid
-         and im.member_id is null
-         and r.requester_member_id is not null
-       returning im.id as movement_id, r.requester_member_id`,
-    );
-    return { rows_fixed: fixed.length };
   });
 
 export const decideDelivery = createServerFn({ method: "POST" })

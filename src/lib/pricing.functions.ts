@@ -25,11 +25,6 @@ export const getCatalog = createServerFn({ method: "GET" })
               coalesce(xp_points, 1) as xp_points
        from items
        where active = true and deleted_at is null
-         and (
-           side in ('compra','venda')
-           or category in ('corpos','prints','armas_red','armas_orange')
-           or subcategory in ('carregadores','municoes','armas_red','armas_orange','corpos','prints')
-         )
        order by side, subcategory, purchase_price desc`,
     );
 

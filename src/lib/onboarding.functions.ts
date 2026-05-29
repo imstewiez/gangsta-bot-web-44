@@ -5,7 +5,7 @@ import { enqueueNotification } from "./notifier.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { IdSchema, StatusSchema } from "./security";
 
-export type TagRequestRow = {
+type TagRequestRow = {
   id: number;
   discord_id: string | null;
   username: string | null;

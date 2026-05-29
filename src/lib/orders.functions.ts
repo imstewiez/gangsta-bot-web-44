@@ -4,7 +4,7 @@ import { pgQuery, pgOne, withClient } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
 
-export type OrderRow = {
+type OrderRow = {
   id: number;
   member_id: number | null;
   member_name: string | null;
@@ -304,22 +304,8 @@ export const transitionOrder = createServerFn({ method: "POST" })
         const isFinal = data.to === "fulfilled";
         const isResolved = data.to !== "pending";
 
-        // Stock check + decrement on fulfillment
+        // Decrement stock on fulfillment (allow negative — no shortage errors)
         if (isFinal && before.status !== "fulfilled" && before.item_id) {
-          const balRes = await c.query(
-            `select coalesce(balance, 0) as balance from inventory_balance where item_id = $1`,
-            [before.item_id],
-          );
-          const have = Number(
-            (balRes.rows[0] as { balance: number } | undefined)?.balance ?? 0,
-          );
-          if (have < before.quantity) {
-            await c.query("rollback");
-            return {
-              ok: false as const,
-              error: `Sem stock que chegue: ${before.item_name ?? "item"} (${have} em casa, ${before.quantity} pedidos)`,
-            };
-          }
           await c.query(
             `insert into inventory_movements
                (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
@@ -369,7 +355,7 @@ export const transitionOrder = createServerFn({ method: "POST" })
     });
   });
 
-export type OrderCommentRow = {
+type OrderCommentRow = {
   id: number;
   order_id: number;
   author_name: string | null;
@@ -446,10 +432,14 @@ export const addOrderComment = createServerFn({ method: "POST" })
 export const cancelOwnOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { id: number }) => {
-      const id = Number(d.id);
-      if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
-      return { id };
+    (d: { ids?: number[]; id?: number }) => {
+      const ids = Array.isArray(d.ids) && d.ids.length > 0
+        ? d.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+        : d.id != null
+          ? [Number(d.id)]
+          : [];
+      if (ids.length === 0) throw new Error("ID inválido");
+      return { ids };
     },
   )
   .handler(async ({ data, context }) => {
@@ -460,39 +450,60 @@ export const cancelOwnOrder = createServerFn({ method: "POST" })
       await c.query("begin");
       try {
         const beforeRes = await c.query(
-          `select o.status, o.member_id, o.item_id, i.name as item_name
-           from orders o left join items i on i.id = o.item_id where o.id = $1`,
-          [data.id],
+          `select o.id, o.status, o.member_id
+           from orders o where o.id = ANY($1)`,
+          [data.ids],
         );
-        const before = beforeRes.rows[0] as
-          | {
-              status: string;
-              member_id: number;
-              item_id: number | null;
-              item_name: string | null;
-            }
-          | undefined;
-        if (!before) throw new Error("Encomenda não encontrada");
-        if (before.member_id !== me.id) throw new Error("Não podes cancelar encomendas de outrem.");
+        const rows = beforeRes.rows as Array<{
+          id: number;
+          status: string;
+          member_id: number;
+        }>;
+        if (rows.length === 0) throw new Error("Encomenda(s) não encontrada(s)");
 
-        const alreadyFinal = ["fulfilled", "denied", "cancelled"].includes(before.status);
-        if (alreadyFinal) throw new Error("Esta encomenda já está finalizada.");
+        const notOwn = rows.find((r) => r.member_id !== me.id);
+        if (notOwn) throw new Error("Não podes cancelar encomendas de outrem.");
 
+        const finalRows = rows.filter((r) =>
+          ["fulfilled", "denied", "cancelled"].includes(r.status),
+        );
+        // Cancel only non-final rows; ignore already-final ones silently
+        const toCancel = rows.filter(
+          (r) => !["fulfilled", "denied", "cancelled"].includes(r.status),
+        );
+        if (toCancel.length === 0) {
+          await c.query("commit");
+          return { ok: true as const, cancelled: 0 };
+        }
+
+        const ids = toCancel.map((r) => r.id);
         await c.query(
           `update orders set status='cancelled', updated_at=now(), updated_by=$2,
              resolved_at = now()
-           where id=$1`,
-          [data.id, `web:${context.userId}`],
+           where id = ANY($1)`,
+          [ids, `web:${context.userId}`],
         );
+        const values = toCancel
+          .map(
+            (r, i) =>
+              `($${i * 5 + 1}, $${i * 5 + 2}, 'cancelled', $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`,
+          )
+          .join(",");
+        const flat = toCancel.flatMap((r) => [
+          r.id,
+          r.status,
+          `web:${context.userId}`,
+          "Cancelado pelo utilizador",
+          new Date().toISOString(),
+        ]);
         await c.query(
           `insert into order_status_history (order_id, old_status, new_status, changed_by, notes, created_at)
-           values ($1, $2, 'cancelled', $3, $4, now())`,
-          [data.id, before.status, `web:${context.userId}`, "Cancelado pelo utilizador"],
+           values ${values}`,
+          flat,
         );
         await c.query("commit");
 
-        // notify managers
-        return { ok: true as const };
+        return { ok: true as const, cancelled: toCancel.length };
       } catch (e) {
         await c.query("rollback").catch(() => null);
         throw e;

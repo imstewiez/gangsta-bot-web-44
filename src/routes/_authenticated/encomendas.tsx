@@ -91,13 +91,20 @@ const NEXT_STATES: Record<
   pending: [
     { to: "approved", label: "Aceitar" },
     { to: "denied", label: "Recusar", variant: "destructive" },
+    { to: "cancelled", label: "Cancelar", variant: "destructive" },
   ],
   approved: [
     { to: "in_progress", label: "Pôr a tratar" },
     { to: "cancelled", label: "Cancelar", variant: "destructive" },
   ],
-  in_progress: [{ to: "ready", label: "Marcar pronta" }],
-  ready: [{ to: "fulfilled", label: "Entregue" }],
+  in_progress: [
+    { to: "ready", label: "Marcar pronta" },
+    { to: "cancelled", label: "Cancelar", variant: "destructive" },
+  ],
+  ready: [
+    { to: "fulfilled", label: "Entregue" },
+    { to: "cancelled", label: "Cancelar", variant: "destructive" },
+  ],
 };
 
 const ACTIVE_STATUSES = ["pending", "approved", "in_progress", "ready"];
@@ -225,9 +232,10 @@ function OrdersList({
       if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
       toast.error(_e.message);
     },
-    onSuccess: (res) => {
+    onSuccess: (res, vars, ctx) => {
       if (res && "ok" in res && res.ok === false) {
         toast.error(res.error);
+        if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
         return;
       }
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -237,24 +245,24 @@ function OrdersList({
   });
 
   const cancelM = useMutation({
-    mutationFn: (id: number) => cancelFn({ data: { id } }),
-    onMutate: async (id) => {
+    mutationFn: (ids: number[]) => cancelFn({ data: { ids } }),
+    onMutate: async (ids) => {
       await qc.cancelQueries({ queryKey: ["orders"] });
       const prev = qc.getQueryData(["orders", scope, statusFilter]);
       qc.setQueryData(["orders", scope, statusFilter], (old: any) =>
         old?.map((o: any) =>
-          o.id === id ? { ...o, status: "cancelled" } : o
+          ids.includes(o.id) ? { ...o, status: "cancelled" } : o
         )
       );
       return { prev };
     },
-    onError: (_e, _id, ctx) => {
+    onError: (_e, _ids, ctx) => {
       if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
       toast.error(_e.message);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
-      toast.success("Encomenda cancelada");
+      toast.success("Encomenda cancelada — verifica o Histórico");
     },
   });
 
@@ -303,7 +311,7 @@ function OrdersList({
         const totalBatch = lines.reduce((s, l) => s + (l.total_price ?? 0), 0);
         const totalDirtyMoney = lines.reduce((s, l) => s + (l.dirty_money ?? 0), 0);
         const isOwn = meId != null && first.member_id === meId;
-        const canCancel = isOwn && statusFilter === "active" && ["pending", "approved"].includes(first.status);
+        const canCancel = isOwn && statusFilter === "active";
 
         // Agregar materiais de todas as linhas
         const agg = new Map<string, number>();
@@ -319,7 +327,7 @@ function OrdersList({
         };
         const handleCancel = async () => {
           if (!confirm("Tens a certeza que queres cancelar esta encomenda?")) return;
-          await Promise.all(lines.map((l) => cancelM.mutateAsync(l.id)));
+          await cancelM.mutateAsync(lines.map((l) => l.id));
         };
 
         return (
@@ -551,55 +559,10 @@ function NewOrder() {
     enabled: open,
   });
   const items = (cat.data ?? []).filter((i: CatalogItem) => {
-    const n = i.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-    // Armas Orange (whitelist rigorosa)
-    if (
-      /\bmini smg\b/.test(n) ||
-      /\bpistol xm3\b/.test(n) || /\bxm3\b/.test(n) ||
-      /\bmicro smg\b/.test(n) ||
-      /\btec[-\s]?9\b/.test(n) || /\btec9\b/.test(n) ||
-      /\btec[-\s]?pistol\b/.test(n) || /\btecpistol\b/.test(n) ||
-      /\bap[-\s]?pistol\b/.test(n) || /\bappistol\b/.test(n)
-    ) {
-      return true;
-    }
-
-    // Armas Red (whitelist rigorosa)
-    if (
-      /\bheavy[-\s]?pistol\b/.test(n) || /\bheavypistol\b/.test(n) ||
-      /\bpistol[-\s]?\.50\b/.test(n) || /\bpistol50\b/.test(n) || /\b\.50\b/.test(n) ||
-      /\bp90\b/.test(n) ||
-      /\bcombat[-\s]?pdw\b/.test(n) || /\bpdw\b/.test(n) ||
-      /\bbullpup[-\s]?rifle\b/.test(n) || /\bbullpup\b/.test(n) ||
-      /\bcarabina[-\s]?rifle\b/.test(n) || /\bcarabina\b/.test(n)
-    ) {
-      return true;
-    }
-
-    // Carregadores
-    if (/\bcarregador\b/.test(n) || /\bmagazine\b/.test(n)) {
-      if (/orange/.test(n) || /red/.test(n) || /especial/.test(n) || /special/.test(n)) return true;
-      return false;
-    }
-
-    // Prints
-    if (/\bprint\b/.test(n) || /\bblueprint\b/.test(n) || /\besquema\b/.test(n)) {
-      if (/laranja|orange/.test(n) || /azul|blue/.test(n) || /vermelh|red/.test(n) || /amarel|yellow|dourad/.test(n)) return true;
-      return false;
-    }
-
-    // Corpos
-    if (/\bcorpo\b/.test(n) || /\bchassi\b/.test(n)) {
-      if (/mini[-\s]?smg|micro[-\s]?smg|xm3|pistol[-\s]?xm3|tec[-\s]?9|tec9|tec[-\s]?pistol|tecpistol|ap[-\s]?pistol|appistol/.test(n)) return true;
-      return false;
-    }
-
-    // Extras: apenas Colete Padrão e attachments básicos
-    if (/\bcolete[-\s]?padr[aã]o\b/.test(n)) return true;
-    if (/\bmira\b/.test(n) || /\bsilenciador\b/.test(n) || /\bscope\b/.test(n) || /\bgrip\b/.test(n) || /\bbarrel\b/.test(n) || /\bmuzzle\b/.test(n) || /\bextensivo\b/.test(n) || /\bmag[-\s]?expandido\b/.test(n)) return true;
-
-    return false;
+    const catKey = filterItemForDisplay(i.name, i.category, i.subcategory);
+    if (!catKey) return false;
+    // Only allow categories relevant for orders
+    return ["armas_orange", "armas_red", "carregadores", "prints", "corpos", "acessorios", "coletes"].includes(catKey);
   });
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([
     { item_id: "", qty: "1" },
@@ -669,6 +632,8 @@ function NewOrder() {
     const list = groups.get(cat);
     if (!list) continue;
     const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
+    // ordenar por preço ascendente
+    list.sort((a, b) => (a.tier_price ?? a.min_sale_price ?? 0) - (b.tier_price ?? b.min_sale_price ?? 0));
     options.push(
       ...list.map((i) => ({
         value: String(i.id),

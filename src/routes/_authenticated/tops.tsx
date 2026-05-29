@@ -13,8 +13,6 @@ import { fmtNum } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
 import {
   Trophy,
-  Medal,
-  Award,
   Skull,
   Crosshair,
   Truck,
@@ -36,11 +34,7 @@ export const Route = createFileRoute("/_authenticated/tops")({
   component: Page,
 });
 
-const MEDAL_ICONS = [
-  { Cmp: Trophy, cls: "text-warning" },
-  { Cmp: Medal, cls: "text-muted-foreground" },
-  { Cmp: Award, cls: "text-orange-400" },
-] as const;
+import { MEDAL_ICONS } from "@/lib/leaderboard.config";
 
 const COLUMNS: {
   key: LeaderboardSortBy;

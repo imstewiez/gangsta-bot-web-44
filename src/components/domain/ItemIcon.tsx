@@ -51,7 +51,7 @@ export function inferCategory(name: string, raw?: string | null): CatKey {
     return "armas_red";
   // Armas Orange
   if (
-    /mini smg|pistol xm3|micro smg|tec\s*9|tec[-\s]9|tec pistol|ap pistol/.test(n)
+    /mini smg|pistol xm3|micro smg|tec\s*9|tec[-\s]9|tec pistol|ap pistol|compact rifle/.test(n)
   )
     return "armas_orange";
   if (/print|esquema|blueprint/.test(n)) return "prints";

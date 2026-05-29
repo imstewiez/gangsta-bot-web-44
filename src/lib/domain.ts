@@ -90,11 +90,6 @@ export function tierLabel(tier: string | null | undefined): string {
   return TIER_LABELS[tier] ?? tier;
 }
 
-/** @deprecated usar <TierIcon /> + tierLabel(). Mantido só para retro-compat. */
-export function tierLabelWithEmoji(tier: string | null | undefined): string {
-  return tierLabel(tier);
-}
-
 export const ROLE_LABELS = TIER_LABELS;
 
 // Posições hierárquicas — o que aparece na coluna "Posição" e no perfil.
@@ -142,12 +137,6 @@ export function tierColor(tier: string | null | undefined): string {
       return "bg-muted text-muted-foreground border-border";
   }
 }
-
-// Cor da tag "Chefia de Ballas" — sempre roxo Ballas.
-export const BALLAS_BADGE_CLASS =
-  "bg-purple-500/15 text-purple-400 border-purple-500/45";
-export const BAIRRISTA_BADGE_CLASS =
-  "bg-muted text-muted-foreground border-border";
 
 export function fmtNum(n: number | string | null | undefined): string {
   if (n == null) return "—";

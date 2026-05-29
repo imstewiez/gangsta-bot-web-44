@@ -85,7 +85,7 @@ export const listManagers = createServerFn({ method: "GET" })
     }
   });
 
-export type MemberWithStats = MemberRow & {
+type MemberWithStats = MemberRow & {
   kills: number;
   deaths: number;
   saidas: number;
@@ -129,7 +129,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
     }
   });
 
-export type MemberDetail = {
+type MemberDetail = {
   member: MemberRow | null;
   contributions: { type: string; total: number }[];
   recentMovements: {

@@ -166,20 +166,17 @@ export const PRINT_BADGE_CLASS: Record<string, string> = {
 // ── Armas permitidas por categoria ──────────────────────────────────────────
 // Apenas estas armas aparecem nas secções Red / Orange. Tudo o resto é escondido.
 
-export const RED_WEAPON_NAMES = [
+const RED_WEAPON_NAMES = [
   "Heavy Pistol",
   "Pistol .50",
   ".50 Pistol",
   "Combat PDW",
-  "PDW",
   "P90",
   "Bullpup Rifle",
-  "Bullpup",
   "Carabina Rifle",
-  "Carabina",
 ];
 
-export const ORANGE_WEAPON_NAMES = [
+const ORANGE_WEAPON_NAMES = [
   "Mini SMG",
   "Pistol XM3",
   "Micro SMG",
@@ -188,42 +185,41 @@ export const ORANGE_WEAPON_NAMES = [
   "Tec 9",
   "TEC Pistol",
   "AP Pistol",
+  "Compact Rifle",
 ];
 
 // ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
-export const BANNED_WEAPON_NAMES: string[] = [
-];
+const BANNED_WEAPON_NAMES: string[] = [];
 
-export function isBannedWeapon(name: string | null): boolean {
+function isBannedWeapon(name: string | null): boolean {
   if (!name) return false;
   const n = name.toLowerCase().trim();
-  // Exact match only — "Combat PDW" is allowed, "PDW" alone is banned
   return BANNED_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
 }
 
-export function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
+function isAllowedRedWeapon(name: string | null, subcategory?: string | null): boolean {
   if (!name) return false;
-  const n = name.toLowerCase();
+  const n = name.toLowerCase().trim();
   // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
   if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
-  return RED_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
+  return RED_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
 }
 
-export function isAllowedOrangeWeapon(name: string | null, subcategory?: string | null): boolean {
+function isAllowedOrangeWeapon(name: string | null, subcategory?: string | null): boolean {
   if (!name) return false;
-  const n = name.toLowerCase();
+  const n = name.toLowerCase().trim();
   // Bodies, prints and blueprints are NOT weapons even if their names contain weapon words
   if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
-  return ORANGE_WEAPON_NAMES.some((w) => n.includes(w.toLowerCase()));
+  return ORANGE_WEAPON_NAMES.some((w) => n === w.toLowerCase().trim());
 }
 
 export function isOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
-  const n = name.toLowerCase();
-  return ORANGE_WEAPON_NAMES.some((o) => n.includes(o.toLowerCase()));
+  const n = name.toLowerCase().trim();
+  return ORANGE_WEAPON_NAMES.some((o) => n === o.toLowerCase().trim());
 }
 
-export function isAllowedWeapon(name: string | null, subcategory?: string | null): boolean {
+function isAllowedWeapon(name: string | null, subcategory?: string | null): boolean {
   return isAllowedRedWeapon(name, subcategory) || isAllowedOrangeWeapon(name, subcategory);
 }
 
@@ -357,21 +353,4 @@ export function itemSubLabel(
   return "—";
 }
 
-// Ingredient unit prices (from DB) — single source of truth
-export const INGREDIENT_UNIT_PRICE: Record<string, number> = {
-  "Aço": 1000,
-  "Peças": 1400,
-  "Cobre": 65,
-  "Pólvora": 100,
-  "Barra de Ouro": 500,
-  "Print Azul": 50000,
-  "Print Amarela": 100000,
-  "Print Vermelha": 70000,
-  "Print Laranja": 10000,
-  "Corpo Mini SMG": 20000,
-  "Corpo Pistol XM3": 20000,
-  "Corpo Micro SMG": 20000,
-  "Corpo TEC-9": 20000,
-  "Corpo TEC Pistol": 20000,
-  "Corpo AP Pistol": 20000,
-};
+

@@ -69,7 +69,7 @@ export function GlobalSearch() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg" style={{ maxWidth: "32rem" }}>
+      <DialogContent className="overflow-hidden p-0 shadow-lg max-w-lg">
         <DialogTitle className="sr-only">Pesquisar</DialogTitle>
         <Command>
           <CommandInput placeholder="Pesquisar páginas e ações..." />

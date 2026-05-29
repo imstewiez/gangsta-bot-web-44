@@ -118,47 +118,6 @@ export const listAppUsers = createServerFn({ method: "GET" })
     });
   });
 
-export const syncRolesFromTiers = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertSuperAdmin(context.userId);
-
-    // 1. Ensure enum has superadmin
-    await pgQuery(`ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'superadmin'`).catch(() => []);
-
-    // 2. Sync superadmin for manda-chuva
-    await pgQuery(
-      `INSERT INTO public.user_roles (user_id, role)
-       SELECT p.user_id, 'superadmin'::public.app_role
-       FROM public.profiles p
-       JOIN public.members m ON m.discord_id = p.discord_id
-       WHERE m.deleted_at IS NULL
-         AND (m.tier = 'manda_chuva' OR m.role = 'manda_chuva')
-         AND NOT EXISTS (
-           SELECT 1 FROM public.user_roles ur
-           WHERE ur.user_id = p.user_id AND ur.role = 'superadmin'
-         )
-       ON CONFLICT (user_id, role) DO NOTHING`
-    );
-
-    // 3. Sync admin for kingpin/chefia
-    await pgQuery(
-      `INSERT INTO public.user_roles (user_id, role)
-       SELECT p.user_id, 'admin'::public.app_role
-       FROM public.profiles p
-       JOIN public.members m ON m.discord_id = p.discord_id
-       WHERE m.deleted_at IS NULL
-         AND (m.tier = 'kingpin' OR m.role = 'kingpin' OR m.role = 'chefia')
-         AND NOT EXISTS (
-           SELECT 1 FROM public.user_roles ur
-           WHERE ur.user_id = p.user_id AND ur.role = 'admin'
-         )
-       ON CONFLICT (user_id, role) DO NOTHING`
-    );
-
-    return { ok: true, message: "Roles sincronizados com sucesso." };
-  });
-
 export const setUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(

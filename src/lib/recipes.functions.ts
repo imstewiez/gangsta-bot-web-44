@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { REAL_UNIT_COST, getWeaponSalePrice, getMagazineSalePrice, getTierPrice } from "./pricing.catalog";
+import { isOrangeWeapon } from "./armory.catalog";
 
 export type RecipeRow = {
   recipe_id: number;
@@ -133,7 +134,7 @@ export const listRecipes = createServerFn({ method: "GET" })
         r.category === "armas_orange" ||
         r.subcategory === "armas_red" ||
         r.subcategory === "armas_orange" ||
-        /mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|heavy|\.50|p90|pdw|bullpup|carabina/i.test(r.item_name)
+        /mini smg|xm3|micro smg|tec-9|tec pistol|ap pistol|compact rifle|heavy|\.50|p90|pdw|bullpup|carabina/i.test(r.item_name)
       )) {
         tierPrice = getWeaponSalePrice(basePrice, me?.tier ?? null);
       }
@@ -233,63 +234,6 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     };
   });
 
-export const computeCraftFeasibilityByItemId = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { item_id: number; quantity: number }) => {
-    if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
-    if (!Number.isFinite(d.quantity) || d.quantity <= 0)
-      throw new Error("quantidade inválida");
-    return d;
-  })
-  .handler(async ({ data, context }): Promise<CraftFeasibility | null> => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    const recipe = await pgOne<{ recipe_id: number; item_name: string; tier: string | null; subcategory: string | null; estimated_value: number | null; min_sale_price: number | null }>(
-      `select r.id as recipe_id, i.name as item_name, r.tier, i.subcategory, i.estimated_value::float as estimated_value, i.min_sale_price::float as min_sale_price
-       from craft_recipes r join items i on i.id = r.item_id where r.item_id = $1 limit 1`,
-      [data.item_id],
-    );
-    if (!recipe) return null;
-    const isOrange = (recipe.tier === "orange") || (recipe.subcategory === "armas_orange");
-    const ings = await pgQuery<{
-      name: string;
-      quantity: number;
-      unit_cost: string | null;
-    }>(
-      `select ii.name, ri.quantity, coalesce(ii.purchase_price, ii.estimated_value, 0) as unit_cost
-         from recipe_ingredients ri
-         join items ii on ii.id = ri.ingredient_item_id
-        where ri.recipe_id = $1`,
-      [recipe.recipe_id],
-    );
-    let total_cost = 0;
-    const ingredients: CraftFeasibility["ingredients"] = [];
-    for (const ing of ings) {
-      const needed = Number(ing.quantity) * data.quantity;
-      const unitCost = Number(ing.unit_cost ?? 0);
-      const lineCost = needed * unitCost;
-      total_cost += lineCost;
-      if (isOrange) {
-        if (ing.name.toLowerCase().includes("peça")) {
-          ingredients.push({ name: ing.name, needed, qty_per_recipe: Number(ing.quantity), unit_cost: unitCost, line_cost: lineCost });
-        }
-      } else {
-        ingredients.push({ name: ing.name, needed, qty_per_recipe: Number(ing.quantity), unit_cost: unitCost, line_cost: lineCost });
-      }
-    }
-    const itemPrice = (recipe.estimated_value ?? 0) * data.quantity;
-    const dirty_money = itemPrice;
-    const tier_price = getTierPrice(recipe.item_name, recipe.min_sale_price ?? 0, me?.tier ?? null);
-    return {
-      recipe_id: recipe.recipe_id,
-      item_name: recipe.item_name,
-      requested_qty: data.quantity,
-      dirty_money,
-      min_sale_price: recipe.min_sale_price ?? null,
-      tier_price,
-      ingredients,
-    };
-  });
-
 export type CraftFeasibilityBatch = {
   dirty_money: number;
   full_material_cost: number;
@@ -356,7 +300,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         const recipe = recipeRows[0];
         items.push({ item_name: recipe.item_name, requested_qty: line.quantity });
 
-        const isOrange = (recipe.tier === "orange") || (recipe.subcategory === "armas_orange");
+        const isOrange = (recipe.tier === "orange") || (recipe.subcategory === "armas_orange") || isOrangeWeapon(recipe.item_name);
         const itemPrice = (recipe.estimated_value ?? 0) * line.quantity;
         dirty_money += itemPrice;
 

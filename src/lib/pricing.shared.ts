@@ -1,16 +1,5 @@
 // Pure helpers + types — safe for client AND server. NO server-only imports.
 
-export const TIER_LABELS: Record<string, string> = {
-  young_blood: "YB (Bairrista N1)",
-  o_gunao: "GN (Bairrista N2)",
-  gangster_fodido: "GF (Bairrista N3)",
-  patrao_di_zona: "Patrão di Zona",
-  real_gangster: "Real Gangster",
-  og: "OG",
-  kingpin: "Kingpin",
-  manda_chuva: "Manda-Chuva",
-};
-
 const MANAGER_TIERS = new Set(["patrao_di_zona", "kingpin", "manda_chuva"]);
 const INVENTORY_TIERS = new Set([
   "patrao_di_zona",
@@ -127,9 +116,4 @@ export function itemPoints(name: string, category: string | null, xpPoints?: num
   if (category && ZERO_POINT_CATEGORIES.has(category.toLowerCase())) return 0;
   return ITEM_POINTS.get(name.toLowerCase().trim()) ?? 1;
 }
-
-export function getFinalPrice(itemName: string, dbPrice?: number | null): number {
-  return dbPrice ?? 0;
-}
-
 

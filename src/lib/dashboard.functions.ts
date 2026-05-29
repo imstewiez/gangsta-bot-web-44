@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
-export type RankRow = {
+type RankRow = {
   display_name: string | null;
   nick: string | null;
   score: number;
@@ -17,7 +17,7 @@ export type RankRow = {
   wins_count: number;
 };
 
-export type PrizeHighlight = {
+type PrizeHighlight = {
   winner_name: string | null;
   winner_tier: string | null;
   score: number | null;
@@ -28,7 +28,7 @@ export type PrizeHighlight = {
   status: "defined" | "in_progress" | "closed" | null;
 };
 
-export type HomeKpis = {
+type HomeKpis = {
   // public-safe stats — visible to every member
   newMembersWeek: number;
   totalSaidasWeek: number; // operações fechadas/finalizadas na semana
