@@ -256,6 +256,12 @@ export function filterItemForDisplay(
   if (cat === "armas_red" && !isAllowedRedWeapon(itemName, subcategory)) return null;
   if (cat === "armas_orange" && !isAllowedOrangeWeapon(itemName, subcategory)) return null;
 
+  // Carregadores: apenas as 3 opções genéricas (Orange / Red / Especial).
+  // Esconde carregadores específicos por arma (TEC-9 Carregador, PDW Carregador, etc.).
+  if (cat === "carregadores") {
+    if (!/^carregador\s+(orange|red|especial|special)$/i.test(itemName.trim())) return null;
+  }
+
   return cat;
 }
 
