@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { z } from "zod";
+import { IdSchema } from "./security";
 
 // Categorias que interessam ao armazém
 const INV_CATEGORIES = [
@@ -71,39 +73,26 @@ export type LedgerRow = {
 export const adjustStock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { item_id: number; new_qty: number }) => {
-    if (!d?.item_id || typeof d.new_qty !== "number") throw new Error("Dados inválidos.");
-    return { item_id: d.item_id, new_qty: d.new_qty };
+    return z.object({
+      item_id: IdSchema,
+      new_qty: z.number().finite(),
+    }).parse(d);
   })
   .handler(async ({ data, context }) => {
     await gateInventory(context.supabase, context.userId);
-    // buscar qty atual
-    const current = await pgOne<{ balance: number }>(
-      `select coalesce(balance, 0)::float as balance from inventory_balance where item_id = $1`,
-      [data.item_id],
+    // Atomic adjustment via stored procedure (delta computed in SQL, no race condition)
+    const result = await pgOne<{ sp_adjust_stock: number }>(
+      `SELECT public.sp_adjust_stock($1, $2, $3, $4) as sp_adjust_stock`,
+      [data.item_id, data.new_qty, `web:${context.userId}`, null],
     );
-    const currentQty = current?.balance ?? 0;
-    const delta = data.new_qty - currentQty;
-    if (delta === 0) return { ok: true };
-    await pgQuery(
-      `insert into inventory_movements
-         (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
-       values ('ajuste_manual', $1, $2, $3, 'armazem', $4, $5, now())`,
-      [
-        data.item_id,
-        delta,
-        null,
-        `ajuste: ${currentQty} → ${data.new_qty}`,
-        `web:${context.userId}`,
-      ],
-    );
-    return { ok: true };
+    return { ok: true, delta: result?.sp_adjust_stock ?? 0 };
   });
 
 export const getLedger = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { limit?: number; type?: string | null }) => ({
     limit: Math.min(Math.max(d?.limit ?? 100, 1), 500),
-    type: d?.type ?? null,
+    type: z.string().max(50).nullable().optional().parse(d?.type) ?? null,
   }))
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);

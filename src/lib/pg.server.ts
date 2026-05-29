@@ -3,6 +3,9 @@
 // NEVER import this file from client code.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { escapeSqlParam } from "./security";
+import { logger } from "./logger.server";
+
+const MAX_QUERY_LEN = 500000;
 
 /**
  * Execute a SQL query via Supabase RPC (exec_sql).
@@ -25,9 +28,17 @@ export async function pgQuery<T = any>(
       query = query.split(placeholder).join(val);
     }
 
+    if (query.length > MAX_QUERY_LEN) {
+      throw new Error(`Query exceeds maximum length of ${MAX_QUERY_LEN}`);
+    }
+
     // Safety: reject multi-statement queries at runtime
     // Strip both '...' and $$...$$ literals before counting statements
-    const normalized = query
+    // Also strip SQL comments (-- and /* */)
+    const strippedComments = query
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/--[^\n]*/g, " ");
+    const normalized = strippedComments
       .replace(/'[^']*'/g, "''")
       .replace(/\$\$[^$]*\$\$/g, "''")
       .toLowerCase();
@@ -49,7 +60,7 @@ export async function pgQuery<T = any>(
     } else {
       err = String(e);
     }
-    console.error("[pgQuery] ERROR", { text: text.slice(0, 200), error: err });
+    logger.error("pgQuery_error", { text: text.slice(0, 200), error: err });
     throw e;
   }
 }
@@ -66,9 +77,17 @@ type PgClientLike = {
   query: (text: string, params?: unknown[]) => Promise<{ rows: any[] }>;
 };
 
+/**
+ * @deprecated withClient is DEPRECATED and UNSAFE. It simulates transactions
+ * that do not actually exist because exec_sql does not support multi-statement.
+ * Each query inside the callback is an independent RPC call.
+ *
+ * Use stored procedures (sp_*) for atomic cross-table operations instead.
+ */
 export async function withClient<T>(
   fn: (c: PgClientLike) => Promise<T>,
 ): Promise<T> {
+  logger.warn("withClient_deprecated", { note: "withClient does NOT provide real transactions" });
   const client: PgClientLike = {
     query: async (text: string, params?: unknown[]) => {
       const upper = text.trim().toLowerCase();

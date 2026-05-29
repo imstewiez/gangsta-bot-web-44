@@ -10,9 +10,15 @@
   "observability": {
     "enabled": true,
   },
+  // Public vars (non-sensitive)
   "vars": {
     "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
   },
+  // Secrets to configure via dashboard or `wrangler secret put`:
+  //   SUPABASE_SERVICE_ROLE_KEY  - Supabase service_role key (Database access)
+  //   CRON_SECRET                - Random secret for /api/cron/recalc endpoint
+  //   UPSTASH_REDIS_REST_URL     - Optional: Upstash Redis REST URL (distributed rate limiting)
+  //   UPSTASH_REDIS_REST_TOKEN   - Optional: Upstash Redis REST token
   "workers_dev": true,
   "routes": [
     { "pattern": "ballasgang.eu", "custom_domain": true },

@@ -13,7 +13,7 @@ export type SaidaFilter = {
 
 const STATUS_TABS = [
   { key: null, label: "Todas" },
-  { key: "criada", label: "Plan" },
+  { key: "criada", label: "Criadas" },
   { key: "em_curso", label: "Em curso" },
   { key: "fechadas", label: "Fechadas" },
 ];

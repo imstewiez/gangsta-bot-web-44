@@ -26,8 +26,8 @@ const TYPE_OPTIONS = [
   },
   {
     key: "craft",
-    label: "Craft",
-    desc: "Sessão de crafting",
+    label: "Fabricação",
+    desc: "Sessão de fabricação",
     icon: Crosshair,
     color: "text-emerald-400",
     bg: "bg-emerald-500/10",

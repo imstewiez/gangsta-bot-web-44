@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { IdSchema } from "./security";
+import { IdSchema, NicknameSchema } from "./security";
+import { logger } from "./logger.server";
 import { notifyBot } from "./discord.server";
 
 
@@ -50,7 +51,7 @@ export const listMembers = createServerFn({ method: "GET" })
       );
       return rows;
     } catch (err) {
-      console.error("[listMembers] failed:", err);
+      logger.error("listMembers_failed", { error: err instanceof Error ? err.message : String(err) });
       throw new Error(err instanceof Error ? err.message : "DB error");
     }
   });
@@ -80,7 +81,7 @@ export const listManagers = createServerFn({ method: "GET" })
       );
       return rows;
     } catch (err) {
-      console.error("[listManagers] failed:", err);
+      logger.error("listManagers_failed", { error: err instanceof Error ? err.message : String(err) });
       throw new Error(err instanceof Error ? err.message : "DB error");
     }
   });
@@ -124,7 +125,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
       );
       return rows;
     } catch (err) {
-      console.error("[listMembersWithStats] failed:", err);
+      logger.error("listMembersWithStats_failed", { error: err instanceof Error ? err.message : String(err) });
       throw new Error(err instanceof Error ? err.message : "DB error");
     }
   });
@@ -291,7 +292,8 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .inputValidator((d: { display_name?: string; nickname?: string | null }) => {
     const name = d.display_name?.trim();
     if (!name || name.length < 1 || name.length > 80) throw new Error("Nome inválido");
-    return { display_name: name, nickname: d.nickname?.trim() ?? null };
+    const nickname = NicknameSchema.parse(d.nickname);
+    return { display_name: name, nickname };
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);

@@ -80,7 +80,7 @@ const MOV_LABEL: Record<string, string> = {
   ajuste_manual: "Ajuste",
   perda_saida: "Perdido",
   apreendido: "Apreendido",
-  craftado: "Craftado",
+  fabricado: "Fabricado",
 };
 
 function Page() {

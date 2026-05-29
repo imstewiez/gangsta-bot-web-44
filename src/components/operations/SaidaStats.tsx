@@ -126,7 +126,7 @@ export function SaidaStats({ saidas }: { saidas: SaidaRow[] }) {
       />
       <StatCard
         icon={Trophy}
-        label="Win Rate"
+        label="Taxa de Vitórias"
         value={`${winRate}%`}
         subtext={`${wins}/${withResult.length} vitórias`}
         accent={winRate >= 60 ? "success" : winRate >= 40 ? "warning" : "destructive"}
@@ -134,9 +134,9 @@ export function SaidaStats({ saidas }: { saidas: SaidaRow[] }) {
       />
       <StatCard
         icon={Skull}
-        label="Kills/Saída"
+        label="Abates/Saída"
         value={avgKills}
-        subtext={`${fmtNum(totalKills)} kills totais`}
+        subtext={`${fmtNum(totalKills)} abates totais`}
         accent="success"
         delay={200}
       />

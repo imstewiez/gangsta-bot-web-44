@@ -182,3 +182,8 @@ export function fmtCategoryLabel(raw: string | null | undefined): string {
   };
   return map[raw] ?? raw;
 }
+
+/** Portuguese pluralization: returns singular if n === 1, plural otherwise. */
+export function pluralPT(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
+}

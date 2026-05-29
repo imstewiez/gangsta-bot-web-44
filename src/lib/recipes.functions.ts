@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { REAL_UNIT_COST, getWeaponSalePrice, getMagazineSalePrice, getTierPrice } from "./pricing.catalog";
+import { logger } from "./logger.server";
 import { isOrangeWeapon } from "./armory.catalog";
 
 export type RecipeRow = {
@@ -337,7 +338,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
       };
       return result;
     } catch (e: any) {
-      console.error("[computeCraftFeasibilityBatch] ERROR:", e?.message ?? e);
+      logger.error("computeCraftFeasibilityBatch_error", { error: e instanceof Error ? e.message : String(e) });
       throw new Error("Erro ao calcular materiais: " + (e?.message ?? "Erro desconhecido"));
     }
   });

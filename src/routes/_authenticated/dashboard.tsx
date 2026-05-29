@@ -91,8 +91,8 @@ function Dashboard() {
       <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" staggerDelay={70} baseDelay={100}>
         <Kpi icon={UserPlus} label="Entradas (7d)" value={data?.newMembersWeek} loading={isLoading} accent />
         <Kpi icon={Crosshair} label="Saídas (7d)" value={data?.totalSaidasWeek} loading={isLoading} subtext={`${data?.totalOpsWeek ?? 0} iniciadas`} />
-        <Kpi icon={Trophy} label="Win Rate" value={`${data?.winRate ?? 0}%`} loading={isLoading} tone={data?.winRate && data.winRate >= 60 ? "success" : data?.winRate && data.winRate >= 40 ? "warning" : "destructive"} />
-        <Kpi icon={Swords} label="Kills/Saída" value={data?.avgKillsPerSaida ?? 0} loading={isLoading} tone="destructive" />
+        <Kpi icon={Trophy} label="Taxa de Vitórias" value={`${data?.winRate ?? 0}%`} loading={isLoading} tone={data?.winRate && data.winRate >= 60 ? "success" : data?.winRate && data.winRate >= 40 ? "warning" : "destructive"} />
+        <Kpi icon={Swords} label="Abates/Saída" value={data?.avgKillsPerSaida ?? 0} loading={isLoading} tone="destructive" />
       </Stagger>
 
       <ProfileCard
@@ -116,7 +116,7 @@ function Dashboard() {
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">{data.lastSaida.spot ?? "Spot não definido"}</span>
+                      <span className="truncate">{data.lastSaida.spot ?? "Local não definido"}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {data.lastSaida.tipo ?? "Saída"} ·{" "}
@@ -224,7 +224,7 @@ function Dashboard() {
                   <TierIcon tier={data.prize.winner_tier} size="sm" />
                   <span className="truncate">{data.prize.winner_name}</span>
                   {data.prize.score != null && (
-                    <span className="text-sm font-mono text-muted-foreground">· {fmtNum(Math.round(data.prize.score))} pts</span>
+                    <span className="text-sm font-mono text-muted-foreground">· {fmtNum(Math.round(data.prize.score))} pontos</span>
                   )}
                 </div>
 
@@ -302,7 +302,7 @@ function Dashboard() {
                                 {topMembers.map((m, i) => (
                                   <span key={i} className="inline-flex items-center gap-1 rounded-sm bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                     <span className="truncate max-w-[80px]">{m.name ?? "—"}</span>
-                                    <span className="font-mono text-[9px] opacity-60">{fmtNum(Math.round(m.score))} pts</span>
+                                    <span className="font-mono text-[9px] opacity-60">{fmtNum(Math.round(m.score))} pontos</span>
                                   </span>
                                 ))}
                               </div>

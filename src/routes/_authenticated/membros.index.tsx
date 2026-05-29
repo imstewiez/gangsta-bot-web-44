@@ -47,7 +47,7 @@ function Page() {
   });
   return (
     <>
-      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} membros`}
+      <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} membro${list.length !== 1 ? "s" : ""}`}
         icon={Users}
         action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
       {error && (

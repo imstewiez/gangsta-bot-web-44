@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { pgQuery, pgOne, withClient } from "./pg.server";
+import { pgQuery, pgOne } from "./pg.server";
 import { enqueueNotification } from "./notifier.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { IdSchema, StatusSchema } from "./security";
+import { z } from "zod";
+import { IdSchema, ReasonSchema, StatusSchema } from "./security";
 
 type TagRequestRow = {
   id: number;
@@ -48,67 +49,31 @@ export const approveTagRequest = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
-    return withClient(async (c) => {
-      await c.query("begin");
-      try {
-        const r = await c.query(
-          `select * from tag_requests where id = $1 for update`,
-          [data.id],
-        );
-        const tr = r.rows[0];
-        if (!tr) throw new Error("Pedido não encontrado");
-        if (tr.status !== "pending") throw new Error("Pedido já resolvido");
+    // Atomic tag request approval via stored procedure
+    const result = await pgOne<{ sp_approve_tag_request: number }>(
+      `SELECT public.sp_approve_tag_request($1, $2) as sp_approve_tag_request`,
+      [data.id, `web:${context.userId}`],
+    );
 
-        // Upsert member by discord_id
-        const existing = await c.query(
-          `select id from members where discord_id = $1 and deleted_at is null`,
-          [tr.discord_id],
-        );
-        let memberId = existing.rows[0]?.id;
-        if (!memberId) {
-          const ins = await c.query(
-            `insert into members (discord_id, username, display_name, full_name, nickname,
-                                  role, status, joined_at, lifecycle_state, created_at, updated_at)
-             values ($1, $2, $3, $4, $5, 'bairrista', 'active', now(), 'active', now(), now())
-             returning id`,
-            [
-              tr.discord_id,
-              tr.username,
-              tr.full_name ?? tr.username,
-              tr.full_name,
-              tr.nickname,
-            ],
-          );
-          memberId = ins.rows[0].id;
-        }
+    if (!result?.sp_approve_tag_request) throw new Error("Falha ao aprovar tag");
 
-        await c.query(
-          `update tag_requests
-             set status = 'approved', approved_by = $2, resolved_at = now(), processed_at = now()
-           where id = $1`,
-          [data.id, `web:${context.userId}`],
-        );
-        await c.query("commit");
-        await enqueueNotification({
-          embed: {
-            title: "Tag aprovada",
-            description: `<@${tr.discord_id}> · ${tr.full_name ?? tr.username ?? ""}`,
-            color: 0x16a34a,
-          },
-        });
-        return { member_id: memberId };
-      } catch (e) {
-        await c.query("rollback");
-        throw e;
-      }
+    await enqueueNotification({
+      embed: {
+        title: "Tag aprovada",
+        description: `Pedido #${data.id} aprovado`,
+        color: 0x16a34a,
+      },
     });
+    return { member_id: result.sp_approve_tag_request };
   });
 
 export const denyTagRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number; reason: string }) => {
-    if (!d.reason?.trim()) throw new Error("Razão obrigatória");
-    return d;
+    return z.object({
+      id: IdSchema,
+      reason: ReasonSchema,
+    }).parse(d);
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);

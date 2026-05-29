@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { pgQuery, pgOne, withClient } from "./pg.server";
+import { pgQuery, pgOne } from "./pg.server";
 import { enqueueNotification } from "./notifier.server";
 import { resolveCurrentMember } from "./pricing.server";
 
@@ -56,8 +56,9 @@ export type SaidaDetail = {
 export const getSaidaDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number }) => {
-    if (!Number.isFinite(d.id)) throw new Error("id inválido");
-    return d;
+    const id = Number(d?.id);
+    if (!Number.isFinite(id) || id <= 0) throw new Error("id inválido");
+    return { id };
   })
   .handler(async ({ data }): Promise<SaidaDetail | null> => {
     const op = await pgOne<SaidaDetail["operation"]>(
@@ -127,122 +128,22 @@ export const liquidateSaida = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
-    const result = await withClient(async (c) => {
-      await c.query("begin");
-      try {
-        const op = await c.query(
-          `select id, operation_type, spot, status from operations where id = $1 and deleted_at is null for update`,
-          [data.id],
-        );
-        if (!op.rows[0]) throw new Error("Saída não encontrada");
-        if (op.rows[0].status === "concluida")
-          throw new Error("Saída já concluída");
+    // Atomic liquidation via stored procedure
+    const result = await pgOne<{
+      supplied: number;
+      returned: number;
+      lost: number;
+      consumed: number;
+      gross: number;
+      net: number;
+      operation_type: string | null;
+      spot: string | null;
+    }>(
+      `SELECT * FROM public.sp_liquidate_saida($1, $2)`,
+      [data.id, `web:${context.userId}`],
+    );
 
-        // Aggregate per participant from operation_materials, joining unit price from items
-        const perPart = await c.query(
-          `select om.member_id,
-                  sum(case when om.direction in ('fornecido') then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as issued_v,
-                  sum(case when om.direction in ('devolvido') then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as returned_v,
-                  sum(case when om.direction = 'perdido' then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as lost_v,
-                  sum(case when om.direction = 'consumido' then om.quantity * coalesce(i.purchase_price, i.estimated_value, 0) else 0 end) as consumed_v
-             from operation_materials om
-             left join items i on i.id = om.item_id
-            where om.operation_id = $1 and om.member_id is not null
-            group by om.member_id`,
-          [data.id],
-        );
-
-        for (const r of perPart.rows) {
-          const issued = Number(r.issued_v ?? 0);
-          const returned = Number(r.returned_v ?? 0);
-          const lost = Number(r.lost_v ?? 0);
-          const consumed = Number(r.consumed_v ?? 0);
-          const net = returned - issued - lost - consumed;
-          await c.query(
-            `update operation_participants
-                set issued_value = $1,
-                    returned_value = $2,
-                    lost_value = $3,
-                    consumed_value = $4,
-                    net_material_delta = $5,
-                    settled = true
-              where operation_id = $6 and member_id = $7`,
-            [issued, returned, lost, consumed, net, data.id, r.member_id],
-          );
-        }
-
-        // Mark every other participant as settled too
-        await c.query(
-          `update operation_participants set settled = true
-            where operation_id = $1 and (settled is null or settled = false)`,
-          [data.id],
-        );
-
-        // Aggregate totals on operation
-        const tot = await c.query(
-          `select coalesce(sum(issued_value),0) as supplied,
-                  coalesce(sum(returned_value),0) as returned,
-                  coalesce(sum(lost_value),0) as lost,
-                  coalesce(sum(consumed_value),0) as consumed
-             from operation_participants where operation_id = $1`,
-          [data.id],
-        );
-        const supplied = Number(tot.rows[0].supplied);
-        const returnedT = Number(tot.rows[0].returned);
-        const lostT = Number(tot.rows[0].lost);
-        const consumedT = Number(tot.rows[0].consumed);
-        const gross = returnedT;
-        const net = returnedT - lostT - consumedT;
-
-        await c.query(
-          `update operations
-              set status = 'concluida',
-                  end_time = coalesce(end_time, now()),
-                  liquidation_started_at = coalesce(liquidation_started_at, now()),
-                  supplied_value = $1,
-                  returned_value = $2,
-                  lost_value = $3,
-                  consumed_value = $4,
-                  gross_value = $5,
-                  net_value = $6,
-                  was_profitable = ($6 > 0),
-                  result = case when ($6 > 0) then 'vitoria' else 'derrota' end,
-                  updated_at = now()
-            where id = $7`,
-          [supplied, returnedT, lostT, consumedT, gross, net, data.id],
-        );
-
-        await c.query(
-          `insert into audit_logs (action, entity_type, entity_id, actor_id, after_state, created_at)
-           values ('liquidate', 'operation', $1::text, $2,
-                   jsonb_build_object('supplied', $3, 'returned', $4, 'lost', $5, 'consumed', $6, 'net', $7),
-                   now())`,
-          [
-            data.id,
-            `web:${context.userId}`,
-            supplied,
-            returnedT,
-            lostT,
-            consumedT,
-            net,
-          ],
-        );
-
-        await c.query("commit");
-        return {
-          supplied,
-          returned: returnedT,
-          lost: lostT,
-          consumed: consumedT,
-          gross,
-          net,
-          op: op.rows[0],
-        };
-      } catch (e) {
-        await c.query("rollback");
-        throw e;
-      }
-    });
+    if (!result) throw new Error("Falha na liquidação");
 
     await enqueueNotification({
       embed: {

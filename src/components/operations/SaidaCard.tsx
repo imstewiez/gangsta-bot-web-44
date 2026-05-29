@@ -65,7 +65,7 @@ const TYPE_STYLES: Record<string, { bg: string; text: string; border: string; ic
 const TYPE_LABELS: Record<string, string> = {
   ataque: "Saída",
   recolha: "Pista",
-  craft: "Craft",
+  craft: "Fabricação",
   dominio: "Domínio",
   defesa: "Defesa",
   outra: "Outra",
@@ -219,7 +219,7 @@ export function SaidaCard({
       <div className="flex items-center gap-2">
         <MapPin className="h-4 w-4 text-muted-foreground/50" />
         <h3 className="text-lg font-bold leading-tight">
-          {saida.spot ?? "Spot por definir"}
+          {saida.spot ?? "Local por definir"}
         </h3>
         <span className="ml-auto text-[10px] text-muted-foreground/40 font-mono">
           #{saida.id}
@@ -269,7 +269,7 @@ export function SaidaCard({
         <MiniStat
           icon={Swords}
           value={`${fmtNum(totalKills)}/${fmtNum(totalDeaths)}`}
-          label="K/D"
+          label="R/A"
           accent={totalKills > totalDeaths}
         />
         <MiniStat

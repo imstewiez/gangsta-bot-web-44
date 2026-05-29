@@ -100,7 +100,7 @@ function Page() {
       <PageHeader
         eyebrow="Chefia"
         title="Editar Receitas"
-        description="Editar receitas de craft"
+        description="Editar receitas de fabricação"
       />
 
       <Reveal direction="up">

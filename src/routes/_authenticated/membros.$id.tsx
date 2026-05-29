@@ -182,7 +182,7 @@ function Page() {
       {/* Stats grid */}
       <Reveal direction="up" delay={100}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4">
-          <StatCard icon={Sword} label="Kills" value={data.kills} tone="primary" />
+          <StatCard icon={Sword} label="Abates" value={data.kills} tone="primary" />
           <StatCard icon={Skull} label="Mortes" value={data.deaths} tone="destructive" />
           <StatCard icon={Crosshair} label="Saídas" value={data.saidas} tone="info" />
           <StatCard icon={Truck} label="Entregas" value={data.deliveries} tone="success" />
@@ -422,7 +422,7 @@ const MOVEMENT_TYPE_META: Record<string, { label: string; icon: LucideIcon; tone
   venda_bairrista: { label: "Venda", icon: Coins, tone: "text-warning" },
   aquisicao: { label: "Aquisição", icon: ShoppingBag, tone: "text-success" },
   saida: { label: "Saída", icon: Crosshair, tone: "text-destructive" },
-  craft: { label: "Craft", icon: Package, tone: "text-primary" },
+  craft: { label: "Fabricação", icon: Package, tone: "text-primary" },
   transferencia: { label: "Transferência", icon: ArrowDownUp, tone: "text-accent-foreground" },
 };
 

@@ -406,7 +406,7 @@ function SellRow({
               {recipe.ingredients.map((ing) => (
                 <div key={ing.item_id} className="flex justify-between gap-4">
                   <span className="text-muted-foreground">{ing.name}</span>
-                  <span className="font-mono text-muted-foreground/80">{ing.quantity} unidades</span>
+                  <span className="font-mono text-muted-foreground/80">{ing.quantity} {ing.quantity === 1 ? "unidade" : "unidades"}</span>
                 </div>
               ))}
               {isManager && (

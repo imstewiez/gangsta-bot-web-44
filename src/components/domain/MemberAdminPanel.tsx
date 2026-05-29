@@ -57,7 +57,7 @@ const STAT_META: {
 }[] = [
   {
     key: "kills",
-    label: "Kills",
+    label: "Abates",
     icon: Swords,
     color: "text-emerald-400",
     bg: "bg-emerald-400/10 border-emerald-400/20",

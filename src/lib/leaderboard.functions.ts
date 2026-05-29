@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery } from "./pg.server";
+import { logger } from "./logger.server";
+import { LeaderboardPeriodSchema, LeaderboardSortBySchema, SortDirSchema } from "./security";
 
 export type LeaderRow = {
   member_id: number;
@@ -53,9 +55,9 @@ function periodBoundsSql(period: LeaderboardPeriod): { start: string; end: strin
 export const getLeaderboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { period?: LeaderboardPeriod; sortBy?: LeaderboardSortBy; sortDir?: "asc" | "desc" }) => ({
-    period: d?.period ?? "week",
-    sortBy: (d?.sortBy as LeaderboardSortBy) ?? "score",
-    sortDir: d?.sortDir ?? "desc",
+    period: LeaderboardPeriodSchema.optional().parse(d?.period) ?? "week",
+    sortBy: LeaderboardSortBySchema.optional().parse(d?.sortBy) ?? "score",
+    sortDir: SortDirSchema.optional().parse(d?.sortDir) ?? "desc",
   }))
   .handler(async ({ data }): Promise<LeaderRow[]> => {
     const sortCol = SORT_COLS[data.sortBy] ?? "score";
@@ -158,7 +160,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
       return rows;
     } catch (e) {
       const errMsg = typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
-      console.error("[leaderboard] query failed:", errMsg);
+      logger.error("leaderboard_query_failed", { error: errMsg });
       throw new Error("Leaderboard query failed: " + errMsg.slice(0, 500));
     }
   });

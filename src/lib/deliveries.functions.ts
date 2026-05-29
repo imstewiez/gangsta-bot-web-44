@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { z } from "zod";
+import { DeliveryScopeSchema, UuidSchema } from "./security";
 
 
 type DeliveryLine = {
@@ -28,7 +30,7 @@ type DeliveryRow = {
 export const listDeliveries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { scope?: "mine" | "manage" }) => ({
-    scope: d?.scope ?? "mine",
+    scope: DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine",
   }))
   .handler(async ({ data, context }): Promise<DeliveryRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -163,7 +165,13 @@ export const createDelivery = createServerFn({ method: "POST" })
 export const decideDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { id: string; approve: boolean; reason?: string | null }) => d,
+    (d: { id: string; approve: boolean; reason?: string | null }) => {
+      return z.object({
+        id: UuidSchema,
+        approve: z.boolean(),
+        reason: z.string().max(500).nullable().optional(),
+      }).parse(d);
+    },
   )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -199,28 +207,10 @@ export const decideDelivery = createServerFn({ method: "POST" })
       ],
     );
     if (data.approve) {
-      // post inventory movements: incoming (positive) using allowed type
-      for (const l of before.lines) {
-        await pgQuery(
-          `insert into inventory_movements
-             (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
-           values ('entrega_bairrista', $1, $2, $3, 'armazem', $4, $5, now())`,
-          [
-            l.item_id,
-            l.qty,
-            before.requester_member_id,
-            `delivery:${data.id}`,
-            `web:${context.userId}`,
-          ],
-        );
-      }
-      // Update all_time_stats so profile shows correct counts
-      const statColumn = before.tipo === 'venda' ? 'sales' : 'deliveries';
+      // Atomic delivery approval via stored procedure (batch insert + stats update)
       await pgQuery(
-        `insert into all_time_stats (member_id, ${statColumn}, updated_at)
-         values ($1, 1, now())
-         on conflict (member_id) do update set ${statColumn} = all_time_stats.${statColumn} + 1, updated_at = now()`,
-        [before.requester_member_id],
+        `SELECT public.sp_approve_delivery($1, $2, $3)`,
+        [data.id, `web:${context.userId}`, me.discord_id],
       );
     }
     return { ok: true };

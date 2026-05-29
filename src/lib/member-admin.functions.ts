@@ -225,12 +225,13 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
     if (data.kills_delta && data.kills_delta !== 0) {
       const n = Math.abs(data.kills_delta);
       if (data.kills_delta > 0) {
-        for (let i = 0; i < n; i++) {
-          await pgQuery(
-            "insert into kill_logs (killer_id, victim_name, spot, notes, created_at, created_by) values ($1, 'manual', 'ajuste', $2, now(), $3)",
-            [data.id, reason, context.userId],
-          );
-        }
+        // Batch insert N kill rows in a single query
+        await pgQuery(
+          `INSERT INTO kill_logs (killer_id, victim_name, spot, notes, created_at, created_by)
+           SELECT $1, 'manual', 'ajuste', $2, now(), $3
+           FROM generate_series(1, $4)`,
+          [data.id, reason, context.userId, n],
+        );
       } else {
         await pgQuery(
           "delete from kill_logs where id in (select id from kill_logs where killer_id = $1 order by created_at desc limit $2)",

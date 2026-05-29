@@ -50,7 +50,15 @@ export const setPrize = createServerFn({ method: "POST" })
       description?: string | null;
       status?: string | null;
       notes?: string | null;
-    }) => d,
+    }) => {
+      const id = Number(d?.id);
+      if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
+      if (d.prize_type != null && d.prize_type.length > 50) throw new Error("Tipo de prémio demasiado longo");
+      if (d.description != null && d.description.length > 500) throw new Error("Descrição demasiado longa");
+      if (d.status != null && d.status.length > 50) throw new Error("Status demasiado longo");
+      if (d.notes != null && d.notes.length > 1000) throw new Error("Notas demasiado longas");
+      return { id, prize_type: d.prize_type ?? null, description: d.description ?? null, status: d.status ?? null, notes: d.notes ?? null };
+    },
   )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);

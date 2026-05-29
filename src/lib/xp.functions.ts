@@ -80,7 +80,11 @@ export type MemberXP = {
 
 export const getMemberXP = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { member_id: number }) => d)
+  .inputValidator((d: { member_id: number }) => {
+    const id = Number(d?.member_id);
+    if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
+    return { member_id: id };
+  })
   .handler(async ({ data }): Promise<MemberXP> => {
     const pointsCase = buildItemPointsCase();
     const row = await pgOne<{ total_points: string }>(

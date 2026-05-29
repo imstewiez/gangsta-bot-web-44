@@ -194,7 +194,7 @@ function AdminIndexPage() {
                 );
               })}
               {!users.isLoading && !users.data?.length && (
-                <EmptyState title="Nenhum utilizador" description="Nenhum utilizador" />
+                <EmptyState title="Nenhum utilizador" description="Ainda não existem utilizadores registados." />
               )}
             </div>
           </CardContent>

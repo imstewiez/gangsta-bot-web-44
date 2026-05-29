@@ -84,14 +84,14 @@ function Page() {
     <>
       <PageHeader
         eyebrow="Chefia"
-        title="Onboarding"
+        title="Integração"
         description="Novos membros"
       />
       <Reveal direction="up">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             {["pending", "approved", "denied", "all"].map((s) => (
-              <TabsTrigger key={s} value={s} className="interactive-tab">
+              <TabsTrigger key={s === "pending" ? "Pendentes" : s === "approved" ? "Aprovados" : s === "denied" ? "Recusados" : "Todos"} value={s} className="interactive-tab">
                 {s}
               </TabsTrigger>
             ))}

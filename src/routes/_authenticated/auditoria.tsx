@@ -29,8 +29,8 @@ const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: strin
   member_joined:         { label: "Nova admissão", icon: UserPlus, tone: "text-emerald-400", category: "membro" },
   member_left:           { label: "Saiu do servidor", icon: UserMinus, tone: "text-muted-foreground", category: "membro" },
   member_renamed:        { label: "Renomeação", icon: Pencil, tone: "text-blue-400", category: "membro" },
-  member_tier_set:       { label: "Tier alterado", icon: ArrowUpCircle, tone: "text-blue-400", category: "membro" },
-  member_stats_adjusted: { label: "Stats ajustados", icon: Settings2, tone: "text-amber-400", category: "membro" },
+  member_tier_set:       { label: "Cargo alterado", icon: ArrowUpCircle, tone: "text-blue-400", category: "membro" },
+  member_stats_adjusted: { label: "Estatísticas ajustadas", icon: Settings2, tone: "text-amber-400", category: "membro" },
 
   order_new:             { label: "Encomenda criada", icon: ShoppingBag, tone: "text-blue-400", category: "encomenda" },
   order_created:         { label: "Encomenda criada", icon: ShoppingBag, tone: "text-blue-400", category: "encomenda" },
@@ -56,7 +56,7 @@ const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: strin
   prize_set:             { label: "Prémio definido", icon: Sparkles, tone: "text-primary", category: "prémio" },
   prize_delivered:       { label: "Prémio entregue", icon: Trophy, tone: "text-emerald-400", category: "prémio" },
 
-  rankings_recompute:    { label: "Ranking recalculado", icon: Activity, tone: "text-blue-400", category: "sistema" },
+  rankings_recompute:    { label: "Classificação recalculada", icon: Activity, tone: "text-blue-400", category: "sistema" },
 
   tag_request:           { label: "Pedido de tag", icon: MessageSquare, tone: "text-blue-400", category: "tag" },
   tag_approved:          { label: "Tag aprovada", icon: CheckCircle2, tone: "text-emerald-400", category: "tag" },

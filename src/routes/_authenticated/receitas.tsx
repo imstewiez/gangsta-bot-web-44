@@ -153,7 +153,7 @@ function RecipeCard({
                 )
               ) : (
                 <span className="text-muted-foreground/70 font-mono">
-                  {i.quantity} unidades
+                  {i.quantity} {i.quantity === 1 ? "unidade" : "unidades"}
                 </span>
               )}
             </li>
@@ -224,7 +224,7 @@ function RecipeCard({
         {isManager && expanded && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/20 p-2 text-[11px] space-y-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-              Breakdown de custos
+              Detalhe de custos
             </div>
             {r.ingredients.map((ing) => (
               <div key={ing.item_id} className="flex justify-between text-muted-foreground/80">
@@ -398,10 +398,10 @@ function Page() {
 
       <Dialog open={calcRecipe != null} onOpenChange={(v) => !v && setCalcRecipe(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Simular crafting</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Simular fabricação</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div>
-              <label className="text-xs text-muted-foreground">Quantidade a craftar</label>
+              <label className="text-xs text-muted-foreground">Quantidade a fabricar</label>
               <Input type="number" min={1} value={qtyStr} onChange={(e) => setQtyStr(e.target.value)} />
             </div>
             {result && (

@@ -29,7 +29,7 @@ import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/tops")({
   head: () => ({
-    meta: [{ title: "Leaderboard | Ballas Gang" }],
+    meta: [{ title: "Classificação | Ballas Gang" }],
   }),
   component: Page,
 });
@@ -42,14 +42,14 @@ const COLUMNS: {
   icon?: React.ComponentType<{ className?: string }>;
   align?: "left" | "right";
 }[] = [
-  { key: "kills", label: "Kills", icon: Skull, align: "right" },
+  { key: "kills", label: "Abates", icon: Skull, align: "right" },
   { key: "deaths", label: "Mortes", icon: Flame, align: "right" },
-  { key: "kd", label: "K/D", align: "right" },
+  { key: "kd", label: "R/A", align: "right" },
   { key: "deliveries", label: "Entregas", icon: Truck, align: "right" },
   { key: "sales", label: "Vendas", icon: Package, align: "right" },
   { key: "ops", label: "Saídas", icon: Crosshair, align: "right" },
   { key: "wins", label: "Vit.", icon: Swords, align: "right" },
-  { key: "score", label: "Score", align: "right" },
+  { key: "score", label: "Pontos", align: "right" },
 ];
 
 function Page() {
@@ -91,7 +91,7 @@ function Page() {
     <>
       <PageHeader
         eyebrow="Bairro"
-        title="Leaderboard"
+        title="Classificação"
         description="Rankings e estatísticas"
         icon={Trophy}
         action={

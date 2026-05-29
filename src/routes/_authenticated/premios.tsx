@@ -122,7 +122,7 @@ function Page() {
                   {latest.winner_name ?? "—"}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Score: {fmtNum(Math.round(latest.hybrid_score ?? 0))} pts
+                  Pontos: {fmtNum(Math.round(latest.hybrid_score ?? 0))}
                 </div>
                 {latest.prize_type && (
                   <div className="mt-1 flex items-center gap-1.5 text-sm text-primary font-medium">
@@ -189,7 +189,7 @@ function Page() {
                 <div className="text-[11px] text-muted-foreground">
                   {fmtDate(p.week_start)} → {fmtDate(p.week_end)}
                   {p.hybrid_score != null && (
-                    <span> · {fmtNum(Math.round(p.hybrid_score))} pts</span>
+                    <span> · {fmtNum(Math.round(p.hybrid_score))} pontos</span>
                   )}
                 </div>
               </div>

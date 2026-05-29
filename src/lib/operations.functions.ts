@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { pgQuery, pgOne, withClient } from "./pg.server";
+import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { enqueueNotification } from "./notifier.server";
+import { z } from "zod";
+import { IdSchema, NameSchema, SpotSchema, OperationTypeSchema, ScheduledAtSchema, NotesSchema } from "./security";
 
 export type ParticipantStat = {
   member_id: number;
@@ -34,27 +36,9 @@ export type SaidaRow = {
   participants_json: ParticipantStat[];
 };
 
-// Auto-close any saída older than 12h (opportunistic — runs on every list).
-async function autoCloseStaleOperations(): Promise<void> {
-  try {
-    await pgQuery(
-      `update operations
-         set status = 'concluida',
-             end_time = coalesce(end_time, now()),
-             updated_at = now()
-       where deleted_at is null
-         and status in ('criada','trancagem','em_preparacao','em_curso','em_liquidacao')
-         and coalesce(start_time, date::timestamp, created_at) < now() - interval '12 hours'`,
-    );
-  } catch (err) {
-    console.error("[autoCloseStaleOperations] failed:", err);
-  }
-}
-
 export const listSaidas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<SaidaRow[]> => {
-    await autoCloseStaleOperations();
     const rows = await pgQuery<Omit<SaidaRow, 'participants_json'> & { participants_json: string }>(
       `select o.id,
               o.operation_type as tipo,
@@ -106,9 +90,12 @@ export const addKill = createServerFn({ method: "POST" })
       spot?: string | null;
       notes?: string | null;
     }) => {
-      if (!Number.isFinite(d.killer_id)) throw new Error("Killer inválido");
-      if (!d.victim_name?.trim()) throw new Error("Vítima obrigatória");
-      return d;
+      return z.object({
+        killer_id: IdSchema,
+        victim_name: NameSchema,
+        spot: SpotSchema,
+        notes: z.string().max(1000).nullable().optional(),
+      }).parse(d);
     },
   )
   .handler(async ({ data, context }) => {
@@ -150,8 +137,13 @@ export const createOperation = createServerFn({ method: "POST" })
       scheduled_at?: string | null;
       notes?: string | null;
     }) => {
-      if (!d.operation_type?.trim()) throw new Error("Tipo obrigatório");
-      return d;
+      return z.object({
+        operation_type: OperationTypeSchema,
+        spot: SpotSchema,
+        leader_id: IdSchema.nullable().optional(),
+        scheduled_at: ScheduledAtSchema,
+        notes: NotesSchema,
+      }).parse(d);
     },
   )
   .handler(async ({ data, context }) => {
@@ -187,54 +179,41 @@ export const createOperationWithParticipants = createServerFn({ method: "POST" }
       notes?: string | null;
       participants?: number[];
     }) => {
-      if (!d.operation_type?.trim()) throw new Error("Tipo obrigatório");
-      if (d.participants && d.participants.length > 50) throw new Error("Máximo 50 participantes");
-      return d;
+      return z.object({
+        operation_type: OperationTypeSchema,
+        spot: SpotSchema,
+        leader_id: IdSchema.nullable().optional(),
+        scheduled_at: ScheduledAtSchema,
+        notes: NotesSchema,
+        participants: z.array(IdSchema).max(50).optional(),
+      }).parse(d);
     },
   )
   .handler(async ({ data, context }) => {
     const sched = data.scheduled_at ? new Date(data.scheduled_at) : null;
-    return withClient(async (c) => {
-      const op = await c.query(
-        `insert into operations
-           (operation_type, spot, leader_id, status, date, scheduled_time, start_time, notes, created_by, created_at)
-         values ($1, $2, $3, 'criada',
-           coalesce(($4::timestamptz)::date, current_date),
-           ($4::timestamptz)::time,
-           $4::timestamptz, $5, $6, now())
-         returning id`,
-        [
-          data.operation_type,
-          data.spot ?? null,
-          data.leader_id ?? null,
-          sched ? sched.toISOString() : null,
-          data.notes ?? null,
-          `web:${context.userId}`,
-        ],
-      );
-      const opId = op.rows[0]?.id;
-      if (!opId) throw new Error("Falha ao criar saída");
+    // Atomic operation creation via stored procedure
+    const opId = await pgOne<{ sp_create_operation_with_participants: number }>(
+      `SELECT public.sp_create_operation_with_participants($1, $2, $3, $4, $5, $6, $7) as sp_create_operation_with_participants`,
+      [
+        data.operation_type,
+        data.spot ?? null,
+        data.leader_id ?? null,
+        sched ? sched.toISOString() : null,
+        data.notes ?? null,
+        `web:${context.userId}`,
+        data.participants ?? [],
+      ],
+    );
 
-      // Add participants
-      const pids = data.participants ?? [];
-      if (pids.length > 0) {
-        const values = pids.map((_, i) => `($1, $${i + 2}, 'participante')`).join(",");
-        await c.query(
-          `insert into operation_participants (operation_id, member_id, role_in_op) values ${values}`,
-          [opId, ...pids],
-        );
-      }
-
-      return { id: opId };
-    });
+    if (!opId?.sp_create_operation_with_participants) throw new Error("Falha ao criar saída");
+    return { id: opId.sp_create_operation_with_participants };
   });
 
 // ---------- Cancel operation ----------
 export const cancelOperation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number }) => {
-    if (!Number.isFinite(d.id)) throw new Error("id inválido");
-    return d;
+    return z.object({ id: IdSchema }).parse(d);
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -279,9 +258,10 @@ export const cancelOperation = createServerFn({ method: "POST" })
 export const kickParticipant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { operation_id: number; member_id: number }) => {
-    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
-    if (!Number.isFinite(d.member_id)) throw new Error("member_id inválido");
-    return d;
+    return z.object({
+      operation_id: IdSchema,
+      member_id: IdSchema,
+    }).parse(d);
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -307,9 +287,11 @@ export const kickParticipant = createServerFn({ method: "POST" })
 export const inviteMembers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { operation_id: number; member_ids?: number[]; role?: string }) => {
-    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
-    if (d.member_ids && d.member_ids.length > 50) throw new Error("Máximo 50 membros por convite");
-    return d;
+    return z.object({
+      operation_id: IdSchema,
+      member_ids: z.array(IdSchema).max(50).optional(),
+      role: z.string().max(50).optional(),
+    }).parse(d);
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -344,15 +326,15 @@ export const inviteMembers = createServerFn({ method: "POST" })
     const existingSet = new Set(existing.map((e) => e.member_id));
     const newIds = targetIds.filter((id) => !existingSet.has(id));
 
-    for (const memberId of newIds) {
+    if (newIds.length > 0) {
+      // Batch insert participants
+      const values = newIds.map((_, i) => `($1, $${i + 2}, 'pending', 'membro')`).join(",");
       await pgQuery(
-        `insert into operation_participants (operation_id, member_id, participant_type, role_in_op) values ($1, $2, 'pending', 'membro')`,
-        [data.operation_id, memberId],
+        `insert into operation_participants (operation_id, member_id, participant_type, role_in_op) values ${values}`,
+        [data.operation_id, ...newIds],
       );
-    }
 
-    // Notify invited members
-    for (const memberId of newIds) {
+      // Notify invited members (single batch notification instead of N+1)
       await enqueueNotification({
         embed: {
           title: "Convite para saída",
@@ -369,8 +351,7 @@ export const inviteMembers = createServerFn({ method: "POST" })
 export const acceptInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { operation_id: number }) => {
-    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
-    return d;
+    return z.object({ operation_id: IdSchema }).parse(d);
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -385,8 +366,7 @@ export const acceptInvite = createServerFn({ method: "POST" })
 export const declineInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { operation_id: number }) => {
-    if (!Number.isFinite(d.operation_id)) throw new Error("operation_id inválido");
-    return d;
+    return z.object({ operation_id: IdSchema }).parse(d);
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -412,9 +392,10 @@ import { assertAdmin } from "./admin.functions";
 
 export const listAuditLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { limit?: number }) => ({
-    limit: Math.max(1, Math.min(d?.limit ?? 100, 500)),
-  }))
+  .inputValidator((d: { limit?: number }) => {
+    const limit = z.number().finite().optional().parse(d?.limit) ?? 100;
+    return { limit: Math.max(1, Math.min(limit, 500)) };
+  })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     return pgQuery<{

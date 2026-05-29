@@ -3,6 +3,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { pgOne, pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { z } from "zod";
+import { UuidSchema } from "./security";
 
 async function getEffectiveRoles(userId: string): Promise<string[]> {
   const { data: roleRows, error: rErr } = await supabaseAdmin
@@ -122,9 +124,11 @@ export const setUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
     (d: { user_id: string; role: "superadmin" | "admin" | "member"; grant: boolean }) => {
-      if (!["superadmin", "admin", "member"].includes(d.role))
-        throw new Error("Role inválido");
-      return d;
+      return z.object({
+        user_id: UuidSchema,
+        role: z.enum(["superadmin", "admin", "member"]),
+        grant: z.boolean(),
+      }).parse(d);
     },
   )
   .handler(async ({ data, context }) => {

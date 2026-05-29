@@ -99,7 +99,7 @@ function Page() {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["saida", saidaId] });
       qc.invalidateQueries({ queryKey: ["saidas"] });
-      toast.success(`Saída liquidada · Net ${r.net.toFixed(0)} €`);
+      toast.success(`Saída liquidada · Líquido ${r.net.toFixed(0)} €`);
       setConfirmLiq(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -247,7 +247,7 @@ function Page() {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5" />
-                  {activeParticipants.length} participantes
+                  {activeParticipants.length} participante{activeParticipants.length !== 1 ? "s" : ""}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Swords className="h-3.5 w-3.5" />
@@ -386,7 +386,7 @@ function Page() {
               Liquidar
             </DialogTitle>
             <DialogDescription>
-              Vais finalizar a saída #{saidaId} e calcular o net para todos os participantes.
+              Vais finalizar a saída #{saidaId} e calcular o líquido para todos os participantes.
               Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
@@ -628,19 +628,19 @@ function ResultTab({
       )}
 
       <div className="grid grid-cols-3 gap-3">
-        <ResultStat label="Kills Totais" value={fmtNum(operation.our_kills ?? totalKills)} icon={Skull} color="text-red-400" />
+        <ResultStat label="Abates Totais" value={fmtNum(operation.our_kills ?? totalKills)} icon={Skull} color="text-red-400" />
         <ResultStat label="Mortes" value={fmtNum(operation.deaths ?? totalDeaths)} icon={Users} color="text-destructive" />
         <ResultStat label="Sobreviventes" value={fmtNum(operation.survivors ?? participants.filter((p) => p.survived).length)} icon={Shield} color="text-emerald-400" />
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <ResultStat label="K/D Ratio" value={String(kd)} icon={Swords} color="text-primary" />
+        <ResultStat label="Rácio R/A" value={String(kd)} icon={Swords} color="text-primary" />
       </div>
 
       {/* Kill distribution */}
       {participants.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card/40 p-4">
-          <h4 className="mb-3 text-sm font-semibold">Performance individual</h4>
+          <h4 className="mb-3 text-sm font-semibold">Desempenho individual</h4>
           <div className="space-y-2">
             {participants
               .sort((a, b) => b.kills - a.kills)
@@ -843,7 +843,7 @@ function InviteDialog({ operationId, onClose }: { operationId: number; onClose: 
                   onClick={() => setSelectedRole(r.role)}
                 >
                   <span className="text-sm font-medium">{r.role}</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground">{r.count} membros</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">{r.count} membro{r.count !== 1 ? "s" : ""}</span>
                 </label>
               ))}
             </div>

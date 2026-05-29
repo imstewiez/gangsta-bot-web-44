@@ -12,7 +12,7 @@ import type { CurrentMember } from "@/lib/pricing.shared";
 const TIER_BENEFITS: Record<string, string[]> = {
   young_blood: ["Acesso ao arsenal básico", "Preços de bairrista N1"],
   o_gunao: ["Desconto nas armas (-10k€)", "Acesso à casa dos bairristas", "Considerado para Mini Gang"],
-  gangster_fodido: ["Desconto máximo nas armas (-20k€)", "Acesso total à casa dos bairristas", "Membro da Mini Gang", "Giveaways extra", "Respeito de oficial"],
+  gangster_fodido: ["Desconto máximo nas armas (-20k€)", "Acesso total à casa dos bairristas", "Membro da Mini Gang", "Sorteios extra", "Respeito de oficial"],
   patrao_di_zona: ["Gestão de zona", "Acesso a canais de comando"],
   real_gangster: ["Status de oficial eminente", "Acesso a ops avançadas"],
   og: ["Mentoria de bairristas", "Veto em decisões estratégicas"],
@@ -81,9 +81,9 @@ export function ProfileCard({
         {/* Stats grid */}
         {stats && (
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-px bg-border/40 mx-5 rounded-sm overflow-hidden">
-            <StatBox icon={<Crosshair className="h-3.5 w-3.5" />} label="Kills" value={stats.kills} />
+            <StatBox icon={<Crosshair className="h-3.5 w-3.5" />} label="Abates" value={stats.kills} />
             <StatBox icon={<Skull className="h-3.5 w-3.5" />} label="Mortes" value={stats.deaths} />
-            <StatBox icon={<Zap className="h-3.5 w-3.5" />} label="K/D" value={stats.kd} />
+            <StatBox icon={<Zap className="h-3.5 w-3.5" />} label="R/A" value={stats.kd} />
             <StatBox icon={<Swords className="h-3.5 w-3.5" />} label="Saídas" value={stats.saidas} />
             <StatBox icon={<Trophy className="h-3.5 w-3.5" />} label="Win%" value={`${stats.winRate}%`} />
             <StatBox icon={<Package className="h-3.5 w-3.5" />} label="Entregas" value={stats.deliveries} />

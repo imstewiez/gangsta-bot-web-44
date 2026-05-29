@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
   errorComponent: PageErrorBoundary,
   head: () => ({
-    meta: [{ title: "Dashboard Chefia | Ballas Gang" }],
+    meta: [{ title: "Painel Chefia | Ballas Gang" }],
   }),
   component: AdminDashboardPage,
 });
@@ -63,7 +63,7 @@ function AdminDashboardPage() {
     <>
       <PageHeader
         eyebrow="Chefia"
-        title="Dashboard"
+        title="Painel"
         description="Visão geral da firma"
         icon={Activity}
       />
@@ -140,7 +140,7 @@ function AdminDashboardPage() {
                         <CycleKpi label="Lucro" value={fmtPrice(cycle.total_profit)} tone={cycle.total_profit >= 0 ? "success" : "destructive"} />
                       </div>
 
-                      {/* Breakdown por item — tabela */}
+                      {/* Detalhe por item — tabela */}
                       {cycle.items.length > 0 && (
                         <div className="px-4 py-3">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Breakdown por item</p>
@@ -217,7 +217,7 @@ function AdminDashboardPage() {
                 {k?.inactiveMembers.map((m) => (
                   <div key={m.display_name} className="flex items-center justify-between rounded-sm bg-muted/30 px-2 py-1.5 text-sm">
                     <span>{m.display_name ?? "—"}</span>
-                    <span className="text-xs text-muted-foreground">{m.days} dias</span>
+                    <span className="text-xs text-muted-foreground">{m.days} {m.days === 1 ? "dia" : "dias"}</span>
                   </div>
                 ))}
               </div>

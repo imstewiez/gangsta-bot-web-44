@@ -40,7 +40,11 @@ export type MemberPreview = {
 
 export const getMemberPreview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { member_id: number }) => d)
+  .inputValidator((d: { member_id: number }) => {
+    const id = Number(d?.member_id);
+    if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
+    return { member_id: id };
+  })
   .handler(async ({ data, context }): Promise<MemberPreview> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_superadmin) throw new Error("Sem permissão — só superadmins podem usar o preview.");
