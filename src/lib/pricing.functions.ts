@@ -22,91 +22,143 @@ export const getCatalog = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const tier = me?.tier ?? null;
 
-    const items = getAllItems();
-    const itemNames = Object.values(items).map((i) => i.name);
+    const configItems = getAllItems();
+    const configNames = Object.values(configItems).map((i) => i.name);
 
-    // Mapear nomes para IDs reais da DB + preços actualizados + side da DB
+    // Fetch ALL active DB items (including those not in config.json)
     const dbItems = await pgQuery<{
       id: number;
       name: string;
+      category: string | null;
+      subcategory: string | null;
       side: string | null;
       purchase_price: number | null;
       min_sale_price: number | null;
       xp_points: number | null;
     }>(
-      `select id, name, side, purchase_price::float as purchase_price, min_sale_price::float as min_sale_price, xp_points
-       from items where name = any($1::text[]) and active = true`,
-      [itemNames],
+      `select id, name, category, subcategory, side,
+              purchase_price::float as purchase_price,
+              min_sale_price::float as min_sale_price,
+              xp_points
+       from items where active = true`,
     );
-    const dbByName = new Map(dbItems.map((i) => [i.name, i]));
 
-    return Object.entries(items)
-      .filter(([id, item]) => {
-        const db = dbByName.get(item.name);
-        const effectiveSide = db?.side ?? item.side ?? "venda";
-        return effectiveSide === "venda" || effectiveSide === "ambos";
-      })
-      .map(([id, item]) => {
-        const db = dbByName.get(item.name);
-        const tierPrice = getTierPrice(id, tier) ?? db?.min_sale_price ?? item.sellPrice ?? item.estimatedValue ?? 0;
-        const dbId = db?.id ?? getNumericId(id);
+    const result: CatalogItem[] = [];
+    const seenDbIds = new Set<number>();
 
-        return {
-          id: dbId,
-          name: item.name,
-          category: item.category ?? "outros",
-          subcategory: item.subcategory,
-          side: (db?.side ?? item.side ?? "venda") as "venda" | "compra" | "ambos",
-          purchase_price: db?.purchase_price ?? item.buyPrice ?? null,
-          morador_purchase_price: null,
-          min_sale_price: db?.min_sale_price ?? item.sellPrice ?? null,
-          xp_points: db?.xp_points ?? item.xpPoints ?? 0,
-          tier_price: tierPrice,
-        };
-      }).sort((a, b) => (b.min_sale_price ?? 0) - (a.min_sale_price ?? 0));
+    // First pass: items from config.json with DB overrides
+    for (const [id, item] of Object.entries(configItems)) {
+      const db = dbItems.find((d) => d.name === item.name);
+      if (!db) continue;
+      seenDbIds.add(db.id);
+      const effectiveSide = db.side ?? item.side ?? "venda";
+      if (effectiveSide !== "venda" && effectiveSide !== "ambos") continue;
+
+      const tierPrice = getTierPrice(id, tier) ?? db.min_sale_price ?? item.sellPrice ?? item.estimatedValue ?? 0;
+
+      result.push({
+        id: db.id,
+        name: item.name,
+        category: item.category ?? "outros",
+        subcategory: item.subcategory,
+        side: effectiveSide as "venda" | "compra" | "ambos",
+        purchase_price: db.purchase_price ?? item.buyPrice ?? null,
+        morador_purchase_price: null,
+        min_sale_price: db.min_sale_price ?? item.sellPrice ?? null,
+        xp_points: db.xp_points ?? item.xpPoints ?? 0,
+        tier_price: tierPrice,
+      });
+    }
+
+    // Second pass: DB items NOT in config.json
+    for (const db of dbItems) {
+      if (seenDbIds.has(db.id)) continue;
+      const effectiveSide = db.side ?? "venda";
+      if (effectiveSide !== "venda" && effectiveSide !== "ambos") continue;
+
+      result.push({
+        id: db.id,
+        name: db.name,
+        category: db.category ?? "outros",
+        subcategory: db.subcategory,
+        side: effectiveSide as "venda" | "compra" | "ambos",
+        purchase_price: db.purchase_price ?? null,
+        morador_purchase_price: null,
+        min_sale_price: db.min_sale_price ?? null,
+        xp_points: db.xp_points ?? 0,
+        tier_price: db.min_sale_price ?? 0,
+      });
+    }
+
+    return result.sort((a, b) => (b.min_sale_price ?? 0) - (a.min_sale_price ?? 0));
   });
 
 export const getBuyCatalog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CatalogItem[]> => {
-    const items = getAllItems();
-    const itemNames = Object.values(items).map((i) => i.name);
+    const configItems = getAllItems();
 
     const dbItems = await pgQuery<{
       id: number;
       name: string;
+      category: string | null;
+      subcategory: string | null;
       side: string | null;
       purchase_price: number | null;
       min_sale_price: number | null;
       xp_points: number | null;
     }>(
-      `select id, name, side, purchase_price::float as purchase_price, min_sale_price::float as min_sale_price, xp_points
-       from items where name = any($1::text[]) and active = true`,
-      [itemNames],
+      `select id, name, category, subcategory, side,
+              purchase_price::float as purchase_price,
+              min_sale_price::float as min_sale_price,
+              xp_points
+       from items where active = true`,
     );
-    const dbByName = new Map(dbItems.map((i) => [i.name, i]));
 
-    return Object.entries(items)
-      .filter(([id, item]) => {
-        const db = dbByName.get(item.name);
-        const effectiveSide = db?.side ?? item.side ?? "compra";
-        return effectiveSide === "compra" || effectiveSide === "ambos";
-      })
-      .map(([id, item]) => {
-        const db = dbByName.get(item.name);
-        const dbId = db?.id ?? getNumericId(id);
+    const result: CatalogItem[] = [];
+    const seenDbIds = new Set<number>();
 
-        return {
-          id: dbId,
-          name: item.name,
-          category: item.category ?? "outros",
-          subcategory: item.subcategory,
-          side: (db?.side ?? item.side ?? "compra") as "venda" | "compra" | "ambos",
-          purchase_price: db?.purchase_price ?? item.buyPrice ?? null,
-          morador_purchase_price: null,
-          min_sale_price: db?.min_sale_price ?? item.sellPrice ?? null,
-          xp_points: db?.xp_points ?? item.xpPoints ?? 0,
-          tier_price: null,
-        };
-      }).sort((a, b) => (b.purchase_price ?? 0) - (a.purchase_price ?? 0));
+    // First pass: items from config.json with DB overrides
+    for (const [id, item] of Object.entries(configItems)) {
+      const db = dbItems.find((d) => d.name === item.name);
+      if (!db) continue;
+      seenDbIds.add(db.id);
+      const effectiveSide = db.side ?? item.side ?? "compra";
+      if (effectiveSide !== "compra" && effectiveSide !== "ambos") continue;
+
+      result.push({
+        id: db.id,
+        name: item.name,
+        category: item.category ?? "outros",
+        subcategory: item.subcategory,
+        side: effectiveSide as "venda" | "compra" | "ambos",
+        purchase_price: db.purchase_price ?? item.buyPrice ?? null,
+        morador_purchase_price: null,
+        min_sale_price: db.min_sale_price ?? item.sellPrice ?? null,
+        xp_points: db.xp_points ?? item.xpPoints ?? 0,
+        tier_price: null,
+      });
+    }
+
+    // Second pass: DB items NOT in config.json
+    for (const db of dbItems) {
+      if (seenDbIds.has(db.id)) continue;
+      const effectiveSide = db.side ?? "compra";
+      if (effectiveSide !== "compra" && effectiveSide !== "ambos") continue;
+
+      result.push({
+        id: db.id,
+        name: db.name,
+        category: db.category ?? "outros",
+        subcategory: db.subcategory,
+        side: effectiveSide as "venda" | "compra" | "ambos",
+        purchase_price: db.purchase_price ?? null,
+        morador_purchase_price: null,
+        min_sale_price: db.min_sale_price ?? null,
+        xp_points: db.xp_points ?? 0,
+        tier_price: null,
+      });
+    }
+
+    return result.sort((a, b) => (b.purchase_price ?? 0) - (a.purchase_price ?? 0));
   });

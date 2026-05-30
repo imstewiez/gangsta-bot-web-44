@@ -21,6 +21,7 @@ import {
   Box,
   Layers,
   Skull,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,14 @@ export type ArmoryCategory =
   | "corpos"
   | "prints"
   | "reciclagem"
+  | "materiais"
+  | "metais"
+  | "madeiras"
+  | "texteis"
+  | "componentes"
+  | "droga"
+  | "equipamento"
+  | "dinheiro"
   | "outros";
 
 export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
@@ -52,6 +61,14 @@ export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
   "coletes",
   "acessorios",
   "reciclagem",
+  "materiais",
+  "metais",
+  "madeiras",
+  "texteis",
+  "componentes",
+  "droga",
+  "equipamento",
+  "dinheiro",
   "outros",
 ];
 
@@ -94,7 +111,6 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-blue-400",
     tone: "primary",
   },
-
   acessorios: {
     label: "Acessórios",
     icon: Telescope,
@@ -104,7 +120,6 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-yellow-400",
     tone: "info",
   },
-
   coletes: {
     label: "Coletes",
     icon: Shield,
@@ -114,7 +129,6 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-emerald-400",
     tone: "warning",
   },
-
   corpos: {
     label: "Corpos",
     icon: Box,
@@ -133,7 +147,6 @@ export const ARMORY_CAT_CONFIG: Record<
     headerColor: "text-primary",
     tone: "primary",
   },
-
   reciclagem: {
     label: "Reciclagem",
     icon: Recycle,
@@ -141,6 +154,78 @@ export const ARMORY_CAT_CONFIG: Record<
     bg: "bg-green-500/10",
     border: "border-green-500/30",
     headerColor: "text-green-400",
+    tone: "muted",
+  },
+  materiais: {
+    label: "Materiais",
+    icon: Cog,
+    color: "text-slate-400",
+    bg: "bg-slate-500/10",
+    border: "border-slate-500/30",
+    headerColor: "text-slate-400",
+    tone: "muted",
+  },
+  metais: {
+    label: "Metais",
+    icon: Pickaxe,
+    color: "text-zinc-400",
+    bg: "bg-zinc-500/10",
+    border: "border-zinc-500/30",
+    headerColor: "text-zinc-400",
+    tone: "muted",
+  },
+  madeiras: {
+    label: "Madeiras",
+    icon: Trees,
+    color: "text-amber-600",
+    bg: "bg-amber-600/10",
+    border: "border-amber-600/30",
+    headerColor: "text-amber-600",
+    tone: "muted",
+  },
+  texteis: {
+    label: "Têxteis",
+    icon: FlaskConical,
+    color: "text-pink-400",
+    bg: "bg-pink-500/10",
+    border: "border-pink-500/30",
+    headerColor: "text-pink-400",
+    tone: "muted",
+  },
+  componentes: {
+    label: "Componentes",
+    icon: Hammer,
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/30",
+    headerColor: "text-cyan-400",
+    tone: "muted",
+  },
+  droga: {
+    label: "Droga",
+    icon: Pill,
+    color: "text-purple-400",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/30",
+    headerColor: "text-purple-400",
+    tone: "muted",
+  },
+  equipamento: {
+    label: "Equipamento",
+    icon: Crosshair,
+    color: "text-indigo-400",
+    bg: "bg-indigo-500/10",
+    border: "border-indigo-500/30",
+    headerColor: "text-indigo-400",
+    tone: "muted",
+  },
+  dinheiro: {
+    label: "Dinheiro",
+    icon: Banknote,
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/30",
+    headerColor: "text-emerald-500",
     tone: "muted",
   },
   outros: {
@@ -206,8 +291,8 @@ export function filterItemForDisplay(
 
   const cat = itemDisplayCategory(itemName, category, subcategory);
 
-  // Categorias escondidas
-  if (cat === "outros") return null;
+  // Categorias escondidas — nenhuma por omissão (antes "outros" era escondido)
+  // if (cat === "outros") return null;
 
   // Apenas colete padrão
   if (cat === "coletes") {

@@ -110,6 +110,7 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
       subcategory: string | null;
       side: string | null;
       purchase_price: number | null;
+      morador_purchase_price: number | null;
       min_sale_price: number | null;
       estimated_value: number | null;
       xp_points: number | null;
@@ -117,6 +118,7 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
     }>(
       `select id, name, category, subcategory, side,
               purchase_price::float as purchase_price,
+              morador_purchase_price::float as morador_purchase_price,
               min_sale_price::float as min_sale_price,
               estimated_value::float as estimated_value,
               xp_points, active
@@ -124,7 +126,43 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
        order by active desc, category, name`,
     );
 
-    return rows.map((r) => ({ ...r, in_config: configNames.has(r.name) }));
+    // Fetch all DB recipes with ingredients
+    const recipeRows = await pgQuery<{
+      recipe_id: number;
+      item_id: number;
+    }>(`select id as recipe_id, item_id from craft_recipes`);
+
+    const ingredientRows = await pgQuery<{
+      recipe_id: number;
+      ingredient_item_id: number;
+      quantity: number;
+      ingredient_name: string;
+    }>(
+      `select ri.recipe_id, ri.ingredient_item_id, ri.quantity, i.name as ingredient_name
+       from recipe_ingredients ri
+       join items i on i.id = ri.ingredient_item_id`
+    );
+
+    const recipeMap = new Map<number, { recipe_id: number; ingredients: typeof ingredientRows }>();
+    for (const r of recipeRows) {
+      recipeMap.set(r.item_id, { recipe_id: r.recipe_id, ingredients: [] });
+    }
+    for (const ing of ingredientRows) {
+      const rec = recipeMap.get(
+        recipeRows.find((r) => r.recipe_id === ing.recipe_id)?.item_id ?? 0
+      );
+      if (rec) rec.ingredients.push(ing);
+    }
+
+    return rows.map((r) => {
+      const recipe = recipeMap.get(r.id);
+      return {
+        ...r,
+        in_config: configNames.has(r.name),
+        recipe_id: recipe?.recipe_id ?? null,
+        ingredients: recipe?.ingredients ?? [],
+      };
+    });
   });
 
 export const updateItemPrice = createServerFn({ method: "POST" })
@@ -182,6 +220,7 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
     subcategory?: string;
     side?: string;
     purchase_price?: number;
+    morador_purchase_price?: number;
     min_sale_price?: number;
     estimated_value?: number;
     xp_points?: number;
@@ -202,6 +241,7 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
     if (data.subcategory !== undefined) { sets.push(`subcategory = $${sets.length + 1}`); vals.push(data.subcategory); }
     if (data.side !== undefined) { sets.push(`side = $${sets.length + 1}`); vals.push(data.side); }
     if (data.purchase_price !== undefined) { sets.push(`purchase_price = $${sets.length + 1}`); vals.push(data.purchase_price); }
+    if (data.morador_purchase_price !== undefined) { sets.push(`morador_purchase_price = $${sets.length + 1}`); vals.push(data.morador_purchase_price); }
     if (data.min_sale_price !== undefined) { sets.push(`min_sale_price = $${sets.length + 1}`); vals.push(data.min_sale_price); }
     if (data.estimated_value !== undefined) { sets.push(`estimated_value = $${sets.length + 1}`); vals.push(data.estimated_value); }
     if (data.xp_points !== undefined) { sets.push(`xp_points = $${sets.length + 1}`); vals.push(data.xp_points); }
@@ -254,6 +294,80 @@ export const createItemAdmin = createServerFn({ method: "POST" })
     );
     if (!result) throw new Error("Erro ao criar item");
     return { id: result.id };
+  });
+
+export const getMaterialItemsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    const rows = await pgQuery<{
+      id: number;
+      name: string;
+      category: string | null;
+      purchase_price: number | null;
+    }>(
+      `select id, name, category, purchase_price::float as purchase_price
+       from items
+       where active = true
+       order by category, name`
+    );
+
+    return rows;
+  });
+
+export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    item_id: number;
+    ingredients: Array<{ ingredient_item_id: number; quantity: number }>;
+  }) => {
+    if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
+    if (!Array.isArray(d.ingredients)) throw new Error("ingredients inválido");
+    for (const ing of d.ingredients) {
+      if (!Number.isFinite(ing.ingredient_item_id)) throw new Error("ingredient_item_id inválido");
+      if (!Number.isFinite(ing.quantity) || ing.quantity < 0) throw new Error("quantidade inválida");
+    }
+    return d;
+  })
+  .handler(async ({ context, data }): Promise<void> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+
+    // Ensure craft_recipes row exists
+    const existing = await pgOne<{ id: number }>(
+      `select id from craft_recipes where item_id = $1 limit 1`,
+      [data.item_id],
+    );
+
+    let recipeId: number;
+    if (existing) {
+      recipeId = existing.id;
+    } else {
+      const inserted = await pgOne<{ id: number }>(
+        `insert into craft_recipes (item_id, quantity) values ($1, 1) returning id`,
+        [data.item_id],
+      );
+      if (!inserted) throw new Error("Erro ao criar receita");
+      recipeId = inserted.id;
+    }
+
+    // Delete existing ingredients
+    await pgQuery(
+      `delete from recipe_ingredients where recipe_id = $1`,
+      [recipeId],
+    );
+
+    // Insert new ingredients
+    for (const ing of data.ingredients) {
+      if (ing.quantity > 0) {
+        await pgQuery(
+          `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
+          [recipeId, ing.ingredient_item_id, ing.quantity],
+        );
+      }
+    }
   });
 
 export const updateRecipeIngredientQty = createServerFn({ method: "POST" })

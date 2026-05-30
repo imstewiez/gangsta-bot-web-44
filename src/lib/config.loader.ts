@@ -224,6 +224,9 @@ export const CATEGORY_LABELS: Record<string, string> = {
   componentes: "Componentes",
   reciclagem: "Reciclagem",
   dinheiro: "Dinheiro",
+  madeiras: "Madeiras",
+  texteis: "Têxteis",
+  droga: "Droga",
 };
 
 /** Devolve o label bonito de uma categoria */
