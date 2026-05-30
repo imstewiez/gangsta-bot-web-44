@@ -1,7 +1,7 @@
 # Project Context — gangsta-bot-web-44
 
-> **Última atualização:** 2026-05-29
-> **Sessão:** Code audit completo + critical fixes + deploy
+> **Última atualização:** 2026-05-30
+> **Sessão:** Code audit completo + critical fixes + deploy + item side model + categorias + receitas no admin
 
 ---
 
@@ -104,6 +104,28 @@ wrangler.jsonc                  # Config Cloudflare Worker
 - Renomeações: `cemetery_kills_id_seq` → `kill_logs_id_seq`, `stock_v3_movements` → `stock_movements`, `stock_v3_pricing` → `stock_pricing`
 - Types TypeScript expandidos: 20+ tabelas + tipos de retorno dos SPs
 - Seed script: `scripts/seed-items.ts`
+
+### Item Side Model (venda / compra / ambos)
+- Cada item tem `side` que controla onde aparece:
+  - `venda` → firma vende (preçário venda, encomendas, stock)
+  - `compra` → firma compra (preçário compra, entregas)
+  - `ambos` → aparece em tudo
+- O `side` é lido da **DB** em runtime (`getCatalog`, `getBuyCatalog`, `getStock`, `getLedger`)
+- Alterar no Admin → Gestão de Items reflecte imediatamente
+- DB constraint `items_side_check` permite `'compra' | 'venda' | 'ambos'`
+
+### Categorias corrigidas
+- Prints, Corpos, Reciclagem movidos para categorias próprias (antes estavam em `outros`/`sucata_industria`)
+- Nova categoria `reciclagem` com design verde no preçário
+
+### Receitas no Admin
+- Coluna "Receita" com toggle ▼/▲ na Gestão de Items
+- Expande para mostrar ingredientes + custo estimado
+
+### XP / Pontos
+- **Só entregas dão pontos** — `venda_bairrista` removido do cálculo de XP
+- Encomendas (fulfilled) não afetam XP
+- Pontos mostrados no preçário de compra (onde se entrega material)
 
 ### Observabilidade & Segurança
 - **Rate limiting**: 60 req/min por IP (Redis distribuído ou memória)
