@@ -294,6 +294,7 @@ function DelList({
 
 function NewDelivery() {
   const [open, setOpen] = useState(false);
+  const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
   const catFn = useAuthedServerFn(getCatalog);
   const createFn = useAuthedServerFn(createDelivery);
   const qc = useQueryClient();
@@ -312,7 +313,6 @@ function NewDelivery() {
     { item_id: "", qty: "1" },
   ]);
   const [notes, setNotes] = useState("");
-  const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
   const [responsavel, setResponsavel] = useState("");
   const managersFn = useAuthedServerFn(listManagers);
   const managers = useQuery({

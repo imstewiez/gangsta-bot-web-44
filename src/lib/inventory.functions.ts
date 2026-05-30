@@ -4,7 +4,7 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { IdSchema } from "./security";
-import { getSaleItems } from "./config.loader";
+import { getAllItems } from "./config.loader";
 
 async function gateInventory(supabase: unknown, userId: string) {
   const me = await resolveCurrentMember(supabase as never, userId);
@@ -25,16 +25,21 @@ export const getStock = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<StockRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const items = getSaleItems();
+    const items = getAllItems();
     const itemNames = Object.values(items).map((i) => i.name);
 
-    // Map config names to real DB IDs (config is source of truth)
-    const dbItems = await pgQuery<{ id: number; name: string }>(
-      `select id, name from items where name = any($1::text[])`,
+    // Map config names to real DB IDs + side (DB é espelho do config)
+    const dbItems = await pgQuery<{ id: number; name: string; side: string | null }>(
+      `select id, name, side from items where name = any($1::text[])`,
       [itemNames],
     );
-    const dbIdMap = new Map(dbItems.map((i) => [i.name, i.id]));
-    const dbIds = dbItems.map((i) => i.id);
+    const dbByName = new Map(dbItems.map((i) => [i.name, i]));
+    const dbIds = dbItems
+      .filter((i) => {
+        const effectiveSide = i.side ?? items[Object.keys(items).find(k => items[k].name === i.name) ?? ""]?.side ?? "venda";
+        return effectiveSide === "venda" || effectiveSide === "ambos";
+      })
+      .map((i) => i.id);
 
     if (dbIds.length === 0) return [];
 
@@ -61,11 +66,13 @@ export const getStock = createServerFn({ method: "GET" })
 
     return Object.values(items)
       .map((item) => {
-        const id = dbIdMap.get(item.name);
-        if (!id) return null;
-        const bal = balanceMap.get(id);
+        const db = dbByName.get(item.name);
+        if (!db) return null;
+        const effectiveSide = db.side ?? item.side ?? "venda";
+        if (effectiveSide !== "venda" && effectiveSide !== "ambos") return null;
+        const bal = balanceMap.get(db.id);
         return {
-          item_id: id,
+          item_id: db.id,
           item_name: item.name,
           category: item.category ?? null,
           subcategory: item.subcategory ?? null,
@@ -117,15 +124,20 @@ export const getLedger = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const items = getSaleItems();
+    const items = getAllItems();
     const itemNames = Object.values(items).map((i) => i.name);
 
-    // Only show movements for items existing in config.json
-    const dbItems = await pgQuery<{ id: number }>(
-      `select id from items where name = any($1::text[])`,
+    // Only show movements for items existing in config.json (venda + ambos)
+    const dbItems = await pgQuery<{ id: number; side: string | null }>(
+      `select id, side from items where name = any($1::text[])`,
       [itemNames],
     );
-    const dbIds = dbItems.map((i) => i.id);
+    const dbIds = dbItems
+      .filter((i) => {
+        const effectiveSide = i.side ?? items[Object.keys(items).find(k => items[k].name === i.name) ?? ""]?.side ?? "venda";
+        return effectiveSide === "venda" || effectiveSide === "ambos";
+      })
+      .map((i) => i.id);
     if (dbIds.length === 0) return [];
 
     const params: unknown[] = [data.limit, dbIds];
