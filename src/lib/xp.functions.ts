@@ -61,7 +61,7 @@ export const getMemberXP = createServerFn({ method: "GET" })
          AND im.movement_type = ANY($2::text[])`,
       [
         data.member_id,
-        ["entrega_bairrista", "entrega_oficial", "venda_bairrista"],
+        ["entrega_bairrista", "entrega_oficial"],
       ],
     );
     const totalPoints = Number(row?.total_points ?? 0);
