@@ -15,9 +15,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtPrice } from "@/lib/domain";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Plus, Trash2, Pencil, Check, X, Save } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, Save, Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { Reveal } from "@/components/layout/Reveal";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 export const Route = createFileRoute("/_authenticated/admin/itens")({
   errorComponent: PageErrorBoundary,
@@ -48,6 +49,10 @@ const CATEGORIES = [
 ];
 
 function AdminItemsPage() {
+  useRealtimeSync([
+    { table: "items", queryKeys: [["dbItemsAdmin"], ["catalog"], ["buyCatalog"]] },
+    { table: "inventory_balance", queryKeys: [["stock"]] },
+  ]);
   const qc = useQueryClient();
   const listFn = useAuthedServerFn(listDbItemsAdmin);
   const updateFn = useAuthedServerFn(updateItemAdmin);
@@ -69,6 +74,10 @@ function AdminItemsPage() {
     mutationFn: (v: any) => updateFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
+      qc.invalidateQueries({ queryKey: ["catalog"] });
+      qc.invalidateQueries({ queryKey: ["buyCatalog"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["recipes"] });
       setEditingId(null);
       toast.success("Item atualizado");
     },
@@ -290,7 +299,9 @@ function AdminItemsPage() {
                           <td className="px-3 py-2 text-center">{it.in_config ? "✓" : "✗"}</td>
                           <td className="px-3 py-2 text-center">
                             <div className="flex justify-center gap-1">
-                              <button className="text-emerald-400" onClick={() => updateM.mutate({ item_id: it.id, ...editForm })}><Check className="h-4 w-4" /></button>
+                              <button className="text-emerald-400" disabled={updateM.isPending} onClick={() => updateM.mutate({ item_id: it.id, ...editForm })}>
+                                {updateM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                              </button>
                               <button className="text-muted-foreground" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></button>
                             </div>
                           </td>
