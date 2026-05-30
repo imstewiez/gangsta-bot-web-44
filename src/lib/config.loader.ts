@@ -20,7 +20,7 @@ export type ItemType =
 
 export type ItemTier = "orange" | "red" | "special" | null;
 
-export type ItemSide = "venda" | "compra";
+export type ItemSide = "venda" | "compra" | "ambos";
 
 export type ConfigItem = {
   name: string;
@@ -112,17 +112,17 @@ export function getItemsByTier(tier: ItemTier): Record<string, ConfigItem> {
   );
 }
 
-/** Lista items com side = "venda" (disponíveis para encomendas/preçário) */
+/** Lista items que a firma vende (venda + ambos) */
 export function getSaleItems(): Record<string, ConfigItem> {
   return Object.fromEntries(
-    Object.entries(ITEMS).filter(([, v]) => v.side === "venda")
+    Object.entries(ITEMS).filter(([, v]) => v.side === "venda" || v.side === "ambos")
   );
 }
 
-/** Lista items com side = "compra" (matérias-primas) */
+/** Lista items que a firma compra (compra + ambos) */
 export function getBuyItems(): Record<string, ConfigItem> {
   return Object.fromEntries(
-    Object.entries(ITEMS).filter(([, v]) => v.side === "compra")
+    Object.entries(ITEMS).filter(([, v]) => v.side === "compra" || v.side === "ambos")
   );
 }
 

@@ -61,7 +61,7 @@ export type CatalogItem = {
   name: string;
   category: string;
   subcategory: string | null;
-  side: "compra" | "venda";
+  side: "compra" | "venda" | "ambos";
   purchase_price: number | null;
   morador_purchase_price: number | null;
   min_sale_price: number | null;

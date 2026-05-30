@@ -303,7 +303,10 @@ function NewDelivery() {
     enabled: open,
   });
   const items = (cat.data ?? []).filter(
-    (i: CatalogItem) => i.side === "compra",
+    (i: CatalogItem) =>
+      tipo === "entrega"
+        ? i.side === "compra" || i.side === "ambos"
+        : i.side === "venda" || i.side === "ambos",
   );
   const [lines, setLines] = useState<{ item_id: string; qty: string }[]>([
     { item_id: "", qty: "1" },

@@ -214,6 +214,7 @@ function AdminItemsPage() {
                 <select value={addForm.side} onChange={(e) => setAddForm({ ...addForm, side: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                   <option value="venda">venda</option>
                   <option value="compra">compra</option>
+                  <option value="ambos">ambos</option>
                 </select>
                 <Input type="number" placeholder="Preço sem material" value={addForm.purchase_price ?? ""} onChange={(e) => setAddForm({ ...addForm, purchase_price: Number(e.target.value) })} />
                 <Input type="number" placeholder="Preço com material" value={addForm.min_sale_price ?? ""} onChange={(e) => setAddForm({ ...addForm, min_sale_price: Number(e.target.value) })} />
@@ -272,6 +273,7 @@ function AdminItemsPage() {
                             <select value={editForm.side} onChange={(e) => setEditForm({ ...editForm, side: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground w-full">
                               <option value="venda">venda</option>
                               <option value="compra">compra</option>
+                              <option value="ambos">ambos</option>
                             </select>
                           </td>
                           <td className="px-3 py-2 text-center">

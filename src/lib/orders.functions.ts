@@ -151,7 +151,7 @@ export const createOrder = createServerFn({ method: "POST" })
     for (const line of data.lines) {
       const dbItem = itemMap.get(line.item_id);
       if (!dbItem) throw new Error(`Item não encontrado: ${line.item_id}`);
-      if (dbItem.side !== "venda")
+      if (dbItem.side !== "venda" && dbItem.side !== "ambos")
         throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
 
       // Receitas e ingredientes do config.json (fonte única de verdade)

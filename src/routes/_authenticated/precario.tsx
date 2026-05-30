@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useMemo, useState } from "react";
-import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
+import { getCatalog, getBuyCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { listRecipes, type RecipeRow } from "@/lib/recipes.functions";
 
 import {
@@ -36,22 +36,19 @@ export const Route = createFileRoute("/_authenticated/precario")({
   component: Page,
 });
 
-const COMPRA_GROUPS: { key: string; label: string }[] = [
-  { key: "corpos", label: "Corpos" },
-  { key: "prints", label: "Prints" },
-];
-
 function Page() {
   useRealtimeSync([
-    { table: "items", queryKeys: [["catalog"]] },
+    { table: "items", queryKeys: [["catalog"], ["buyCatalog"]] },
   ]);
+  const [tab, setTab] = useState("compra");
   const catFn = useAuthedServerFn(getCatalog);
+  const buyCatFn = useAuthedServerFn(getBuyCatalog);
   const meFn = useAuthedServerFn(getCurrentMember);
   const recipesFn = useAuthedServerFn(listRecipes);
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn() });
+  const buyCat = useQuery({ queryKey: ["buyCatalog"], queryFn: () => buyCatFn(), enabled: tab === "compra" });
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => recipesFn() });
-  const [tab, setTab] = useState("compra");
 
   const grouped = useMemo(() => {
     const out: Record<string, CatalogItem[]> = {};
@@ -62,6 +59,16 @@ function Page() {
     }
     return out;
   }, [cat.data]);
+
+  const buyGrouped = useMemo(() => {
+    const out: Record<string, CatalogItem[]> = {};
+    for (const it of buyCat.data ?? []) {
+      const k = filterItemForDisplay(it.name, it.category, it.subcategory);
+      if (!k) continue;
+      (out[k] ||= []).push(it);
+    }
+    return out;
+  }, [buyCat.data]);
 
   const recipeMap = useMemo(() => {
     const map = new Map<number, RecipeRow>();
@@ -109,14 +116,18 @@ function Page() {
               </p>
             </Reveal>
             <Stagger direction="up" staggerDelay={80} baseDelay={100} className="space-y-8">
-              {COMPRA_GROUPS.map((g) => (
-                <BuyTable
-                  key={g.key}
-                  catKey={g.key}
-                  title={g.label}
-                  items={grouped[g.key] ?? []}
-                />
-              ))}
+              {ARMORY_CAT_ORDER.map((key) => {
+                const items = buyGrouped[key] ?? [];
+                if (!items.length) return null;
+                return (
+                  <BuyTable
+                    key={key}
+                    catKey={key}
+                    title={ARMORY_CAT_CONFIG[key].label}
+                    items={items}
+                  />
+                );
+              })}
             </Stagger>
           </TabsContent>
 

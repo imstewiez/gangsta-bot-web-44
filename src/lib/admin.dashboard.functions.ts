@@ -46,7 +46,7 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
         `select i.name, coalesce(b.balance, 0)::int as balance
          from items i
          left join inventory_balance b on b.item_id = i.id
-         where i.active = true and i.side = 'venda'
+         where i.active = true and i.side in ('venda', 'ambos')
            and coalesce(b.balance, 0) < 5
          order by coalesce(b.balance, 0) asc
          limit 10`

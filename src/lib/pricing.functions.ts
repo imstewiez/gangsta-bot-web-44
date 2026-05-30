@@ -5,6 +5,7 @@ import { pgQuery } from "./pg.server";
 import type { CurrentMember, CatalogItem } from "./pricing.shared";
 import {
   getSaleItems,
+  getBuyItems,
   getTierPrice,
   getCategoryLabel,
   getNumericId,
@@ -57,4 +58,42 @@ export const getCatalog = createServerFn({ method: "GET" })
         tier_price: tierPrice,
       };
     }).sort((a, b) => (b.min_sale_price ?? 0) - (a.min_sale_price ?? 0));
+  });
+
+export const getBuyCatalog = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CatalogItem[]> => {
+    const items = getBuyItems();
+    const itemNames = Object.values(items).map((i) => i.name);
+
+    const dbItems = await pgQuery<{
+      id: number;
+      name: string;
+      purchase_price: number | null;
+      min_sale_price: number | null;
+      xp_points: number | null;
+    }>(
+      `select id, name, purchase_price::float as purchase_price, min_sale_price::float as min_sale_price, xp_points
+       from items where name = any($1::text[]) and active = true`,
+      [itemNames],
+    );
+    const dbByName = new Map(dbItems.map((i) => [i.name, i]));
+
+    return Object.entries(items).map(([id, item]) => {
+      const db = dbByName.get(item.name);
+      const dbId = db?.id ?? getNumericId(id);
+
+      return {
+        id: dbId,
+        name: item.name,
+        category: item.category ?? "outros",
+        subcategory: item.subcategory,
+        side: item.side,
+        purchase_price: db?.purchase_price ?? item.buyPrice ?? null,
+        morador_purchase_price: null,
+        min_sale_price: db?.min_sale_price ?? item.sellPrice ?? null,
+        xp_points: db?.xp_points ?? item.xpPoints ?? 0,
+        tier_price: null,
+      };
+    }).sort((a, b) => (b.purchase_price ?? 0) - (a.purchase_price ?? 0));
   });
