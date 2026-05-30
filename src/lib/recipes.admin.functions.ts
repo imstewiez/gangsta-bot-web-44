@@ -121,7 +121,9 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
-    const configNames = new Set(Object.values(getAllItems()).map((i) => i.name));
+    const configItems = getAllItems();
+    const configNames = new Set(Object.values(configItems).map((i) => i.name));
+    const configRecipes = getAllRecipes();
 
     const rows = await pgQuery<{
       id: number;
@@ -145,6 +147,9 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
        from items
        order by active desc, category, name`,
     );
+
+    // Build name -> DB id map for all items
+    const dbIdByName = new Map(rows.map((r) => [r.name, r.id]));
 
     // Fetch all DB recipes with ingredients
     const recipeRows = await pgQuery<{
@@ -174,12 +179,47 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
       if (rec) rec.ingredients.push(ing);
     }
 
+    // Merge with config.json recipes: for items that have a config recipe but no DB recipe,
+    // synthesize ingredients from config so they show up in admin.
+    const configIdByName = new Map<string, string>();
+    for (const [id, item] of Object.entries(configItems)) {
+      configIdByName.set(item.name, id);
+    }
+
+    for (const [recipeId, recipe] of Object.entries(configRecipes)) {
+      const outputItem = configItems[recipe.output];
+      if (!outputItem) continue;
+      const outputDbId = dbIdByName.get(outputItem.name);
+      if (!outputDbId) continue;
+      if (recipeMap.has(outputDbId)) continue; // DB recipe exists, skip
+
+      // Synthesize ingredients from config
+      const syntheticIngredients = [];
+      for (const [ingConfigId, qty] of Object.entries(recipe.inputs)) {
+        const ingItem = configItems[ingConfigId];
+        if (!ingItem) continue;
+        const ingDbId = dbIdByName.get(ingItem.name);
+        if (!ingDbId) continue;
+        syntheticIngredients.push({
+          recipe_id: -1, // virtual
+          ingredient_item_id: ingDbId,
+          quantity,
+          ingredient_name: ingItem.name,
+        });
+      }
+
+      recipeMap.set(outputDbId, {
+        recipe_id: -1,
+        ingredients: syntheticIngredients,
+      });
+    }
+
     return rows.map((r) => {
       const recipe = recipeMap.get(r.id);
       return {
         ...r,
         in_config: configNames.has(r.name),
-        recipe_id: recipe?.recipe_id ?? null,
+        recipe_id: recipe && recipe.recipe_id > 0 ? recipe.recipe_id : null,
         ingredients: recipe?.ingredients ?? [],
       };
     });
