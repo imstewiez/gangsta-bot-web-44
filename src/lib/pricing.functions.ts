@@ -25,16 +25,24 @@ export const getCatalog = createServerFn({ method: "GET" })
     const items = getSaleItems();
     const itemNames = Object.values(items).map((i) => i.name);
 
-    // Mapear nomes para IDs reais da DB para compatibilidade com encomendas/stock
-    const dbItems = await pgQuery<{ id: number; name: string }>(
-      `select id, name from items where name = any($1::text[]) and active = true`,
+    // Mapear nomes para IDs reais da DB + preços actualizados
+    const dbItems = await pgQuery<{
+      id: number;
+      name: string;
+      purchase_price: number | null;
+      min_sale_price: number | null;
+      xp_points: number | null;
+    }>(
+      `select id, name, purchase_price::float as purchase_price, min_sale_price::float as min_sale_price, xp_points
+       from items where name = any($1::text[]) and active = true`,
       [itemNames],
     );
-    const dbIdByName = new Map(dbItems.map((i) => [i.name, i.id]));
+    const dbByName = new Map(dbItems.map((i) => [i.name, i]));
 
     return Object.entries(items).map(([id, item]) => {
-      const tierPrice = getTierPrice(id, tier) ?? item.sellPrice ?? item.estimatedValue ?? 0;
-      const dbId = dbIdByName.get(item.name) ?? getNumericId(id);
+      const db = dbByName.get(item.name);
+      const tierPrice = getTierPrice(id, tier) ?? db?.min_sale_price ?? item.sellPrice ?? item.estimatedValue ?? 0;
+      const dbId = db?.id ?? getNumericId(id);
 
       return {
         id: dbId,
@@ -42,10 +50,10 @@ export const getCatalog = createServerFn({ method: "GET" })
         category: item.category ?? "outros",
         subcategory: item.subcategory,
         side: item.side,
-        purchase_price: item.buyPrice,
+        purchase_price: db?.purchase_price ?? item.buyPrice ?? null,
         morador_purchase_price: null,
-        min_sale_price: item.sellPrice,
-        xp_points: item.xpPoints,
+        min_sale_price: db?.min_sale_price ?? item.sellPrice ?? null,
+        xp_points: db?.xp_points ?? item.xpPoints ?? 0,
         tier_price: tierPrice,
       };
     }).sort((a, b) => (b.min_sale_price ?? 0) - (a.min_sale_price ?? 0));
