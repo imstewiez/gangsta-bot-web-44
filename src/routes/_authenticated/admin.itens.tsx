@@ -241,7 +241,9 @@ function AdminItemsPage() {
                     <th className="px-3 py-2 text-left">Categoria</th>
                     <th className="px-3 py-2 text-right">Sem mat.</th>
                     <th className="px-3 py-2 text-right">Com mat.</th>
+                    <th className="px-3 py-2 text-right">Custo</th>
                     <th className="px-3 py-2 text-center">XP</th>
+                    <th className="px-3 py-2 text-center">Side</th>
                     <th className="px-3 py-2 text-center">Ativo</th>
                     <th className="px-3 py-2 text-center">Config</th>
                     <th className="px-3 py-2 text-center w-24"></th>
@@ -249,7 +251,7 @@ function AdminItemsPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 && !items.isLoading && (
-                    <tr><td colSpan={9} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
+                    <tr><td colSpan={11} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
                   )}
                   {filtered.map((it: any) => (
                     <tr key={it.id} className={`border-t border-border interactive-row ${!it.in_config ? "opacity-60" : ""}`}>
@@ -264,7 +266,14 @@ function AdminItemsPage() {
                           </td>
                           <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.purchase_price} onChange={(e) => setEditForm({ ...editForm, purchase_price: Number(e.target.value) })} /></td>
                           <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.min_sale_price} onChange={(e) => setEditForm({ ...editForm, min_sale_price: Number(e.target.value) })} /></td>
+                          <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.estimated_value} onChange={(e) => setEditForm({ ...editForm, estimated_value: Number(e.target.value) })} /></td>
                           <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-center" value={editForm.xp_points} onChange={(e) => setEditForm({ ...editForm, xp_points: Number(e.target.value) })} /></td>
+                          <td className="px-3 py-2">
+                            <select value={editForm.side} onChange={(e) => setEditForm({ ...editForm, side: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground w-full">
+                              <option value="venda">venda</option>
+                              <option value="compra">compra</option>
+                            </select>
+                          </td>
                           <td className="px-3 py-2 text-center">
                             <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} />
                           </td>
@@ -285,7 +294,9 @@ function AdminItemsPage() {
                           <td className="px-3 py-2 text-muted-foreground">{it.category}</td>
                           <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.purchase_price)}</td>
                           <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.min_sale_price)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtPrice(it.estimated_value)}</td>
                           <td className="px-3 py-2 text-center">{it.xp_points}</td>
+                          <td className="px-3 py-2 text-center text-xs text-muted-foreground">{it.side}</td>
                           <td className="px-3 py-2 text-center">
                             <span className={`inline-block w-2 h-2 rounded-full ${it.active ? "bg-emerald-400" : "bg-red-400"}`} />
                           </td>

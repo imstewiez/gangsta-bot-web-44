@@ -1,30 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useMemo, useState } from "react";
 import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { listRecipes, type RecipeRow } from "@/lib/recipes.functions";
-import { updateItemPrice } from "@/lib/recipes.admin.functions";
 
 import {
   itemPoints,
   type CatalogItem,
-  type CurrentMember,
 } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { fmtNum, fmtPrice } from "@/lib/domain";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { fmtPrice } from "@/lib/domain";
 import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import {
   Tags,
-  Pencil,
-  Check,
-  X,
   ChevronDown,
   ChevronUp,
   Package,
@@ -54,16 +45,13 @@ function Page() {
   useRealtimeSync([
     { table: "items", queryKeys: [["catalog"]] },
   ]);
-  const qc = useQueryClient();
   const catFn = useAuthedServerFn(getCatalog);
   const meFn = useAuthedServerFn(getCurrentMember);
   const recipesFn = useAuthedServerFn(listRecipes);
-  const updateFn = useAuthedServerFn(updateItemPrice);
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => catFn() });
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => recipesFn() });
   const [tab, setTab] = useState("compra");
-  const [editMode, setEditMode] = useState(false);
 
   const grouped = useMemo(() => {
     const out: Record<string, CatalogItem[]> = {};
@@ -84,16 +72,6 @@ function Page() {
   }, [recipes.data]);
 
   const isManager = me.data?.is_manager ?? false;
-
-  const updatePrice = useMutation({
-    mutationFn: (v: { item_id: number; purchase_price?: number; min_sale_price?: number; xp_points?: number }) =>
-      updateFn({ data: v }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["catalog"] });
-      toast.success("Preço atualizado");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   function vendaItemsForGroup(catKey: string): CatalogItem[] {
     return (cat.data ?? []).filter((it) => {
@@ -117,17 +95,6 @@ function Page() {
         }
       />
 
-      {isManager && (
-        <Reveal direction="up" delay={50}>
-          <div className="mb-4 flex justify-end gap-2">
-            <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
-              <Pencil className="mr-1 h-3.5 w-3.5" />
-              {editMode ? "Concluir" : "Editar preços"}
-            </Button>
-          </div>
-        </Reveal>
-      )}
-
       <Reveal direction="up" delay={100}>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
@@ -148,10 +115,6 @@ function Page() {
                   catKey={g.key}
                   title={g.label}
                   items={grouped[g.key] ?? []}
-                  editMode={editMode && isManager}
-                  onUpdatePrice={(id, val) => updatePrice.mutate({ item_id: id, purchase_price: val })}
-                  onUpdatePoints={(id, val) => updatePrice.mutate({ item_id: id, xp_points: val })}
-                  pending={updatePrice.isPending}
                 />
               ))}
             </Stagger>
@@ -172,9 +135,6 @@ function Page() {
                   items={vendaItemsForGroup(key)}
                   recipeMap={recipeMap}
                   isManager={isManager}
-                  editMode={editMode && isManager}
-                  onUpdatePrice={(id, field, val) => updatePrice.mutate({ item_id: id, [field]: val })}
-                  pending={updatePrice.isPending}
                 />
               ))}
             </Stagger>
@@ -189,18 +149,10 @@ function BuyTable({
   title,
   items,
   catKey,
-  editMode,
-  onUpdatePrice,
-  onUpdatePoints,
-  pending,
 }: {
   title: string;
   items: CatalogItem[];
   catKey: string;
-  editMode: boolean;
-  onUpdatePrice: (id: number, val: number) => void;
-  onUpdatePoints: (id: number, val: number) => void;
-  pending: boolean;
 }) {
   if (!items.length) return null;
   const isDrogas = items[0]?.subcategory === "drogas";
@@ -225,7 +177,7 @@ function BuyTable({
           </thead>
           <tbody>
             {sorted.map((it) => (
-              <PriceRow key={it.id} it={it} catKey={catKey} editMode={editMode} onUpdatePrice={onUpdatePrice} onUpdatePoints={onUpdatePoints} pending={pending} isDrogas={isDrogas} />
+              <PriceRow key={it.id} it={it} catKey={catKey} isDrogas={isDrogas} />
             ))}
           </tbody>
         </table>
@@ -273,7 +225,7 @@ function SellTable({
           </thead>
           <tbody>
             {sorted.map((it) => (
-              <SellRow key={it.id} it={it} catKey={catKey} recipe={recipeMap.get(it.id) ?? null} isManager={isManager} editMode={editMode} onUpdatePrice={onUpdatePrice} pending={pending} />
+              <SellRow key={it.id} it={it} catKey={catKey} recipe={recipeMap.get(it.id) ?? null} isManager={isManager} />
             ))}
           </tbody>
         </table>
@@ -283,15 +235,10 @@ function SellTable({
 }
 
 function PriceRow({
-  it, catKey, editMode, onUpdatePrice, onUpdatePoints, pending, isDrogas,
+  it, catKey, isDrogas,
 }: {
-  it: CatalogItem; catKey: string; editMode: boolean; onUpdatePrice: (id: number, val: number) => void; onUpdatePoints: (id: number, val: number) => void; pending: boolean; isDrogas: boolean;
+  it: CatalogItem; catKey: string; isDrogas: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(String(it.purchase_price ?? 0));
-  const [editingPoints, setEditingPoints] = useState(false);
-  const [ptsVal, setPtsVal] = useState(String(itemPoints(it.name, it.category, it.xp_points)));
-
   return (
     <tr className="border-t border-border interactive-row">
       <td className="px-3 py-2">
@@ -301,26 +248,10 @@ function PriceRow({
         </span>
       </td>
       <td className="px-3 py-2 text-center">
-        {editMode ? (
-          editingPoints ? (
-            <div className="flex items-center justify-center gap-1">
-              <Input type="number" min={0} className="h-5 w-14 text-center text-xs px-1" value={ptsVal} onChange={(e) => setPtsVal(e.target.value)} autoFocus />
-              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePoints(it.id, Number(ptsVal)); setEditingPoints(false); }}><Check className="h-3 w-3" /></button>
-              <button className="text-muted-foreground" onClick={() => { setPtsVal(String(itemPoints(it.name, it.category, it.xp_points))); setEditingPoints(false); }}><X className="h-3 w-3" /></button>
-            </div>
-          ) : (
-            <button className="inline-flex items-center justify-center gap-1 rounded-sm bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400" onClick={() => setEditingPoints(true)}>
-              <Star className="h-2.5 w-2.5" />
-              {itemPoints(it.name, it.category, it.xp_points)}
-              <Pencil className="h-2.5 w-2.5 text-amber-200/70" />
-            </button>
-          )
-        ) : (
-          <span className="inline-flex items-center justify-center gap-1 rounded-sm bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400">
-            <Star className="h-2.5 w-2.5" />
-            {itemPoints(it.name, it.category, it.xp_points)}
-          </span>
-        )}
+        <span className="inline-flex items-center justify-center gap-1 rounded-sm bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400">
+          <Star className="h-2.5 w-2.5" />
+          {itemPoints(it.name, it.category, it.xp_points)}
+        </span>
       </td>
       {isDrogas ? (
         <>
@@ -329,21 +260,7 @@ function PriceRow({
         </>
       ) : (
         <td className="px-3 py-2 text-right font-mono">
-          {editMode ? (
-            editing ? (
-              <div className="flex items-center justify-end gap-1">
-                <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={val} onChange={(e) => setVal(e.target.value)} autoFocus />
-                <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, Number(val)); setEditing(false); }}><Check className="h-3 w-3" /></button>
-                <button className="text-muted-foreground" onClick={() => { setVal(String(it.purchase_price ?? 0)); setEditing(false); }}><X className="h-3 w-3" /></button>
-              </div>
-            ) : (
-              <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditing(true)}>
-                {fmtPrice(it.purchase_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-              </button>
-            )
-          ) : (
-            fmtPrice(it.purchase_price)
-          )}
+          {fmtPrice(it.purchase_price)}
         </td>
       )}
     </tr>
@@ -351,17 +268,12 @@ function PriceRow({
 }
 
 function SellRow({
-  it, catKey, recipe, isManager, editMode, onUpdatePrice, pending,
+  it, catKey, recipe, isManager,
 }: {
   it: CatalogItem; catKey: string; recipe: RecipeRow | null;
   isManager: boolean;
-  editMode: boolean; onUpdatePrice: (id: number, field: "purchase_price" | "min_sale_price", val: number) => void; pending: boolean;
 }) {
-  const [editingPurchase, setEditingPurchase] = useState(false);
-  const [editingSale, setEditingSale] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [purchaseVal, setPurchaseVal] = useState(String(it.purchase_price ?? 0));
-  const [saleVal, setSaleVal] = useState(String(it.min_sale_price ?? 0));
   const finalPrice = it.tier_price ?? it.min_sale_price ?? 0;
 
   return (
@@ -374,39 +286,11 @@ function SellRow({
           </span>
         </td>
         <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-        {isManager && editMode ? (
-          editingPurchase ? (
-            <div className="flex items-center justify-end gap-1">
-              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={purchaseVal} onChange={(e) => setPurchaseVal(e.target.value)} autoFocus />
-              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, "purchase_price", Number(purchaseVal)); setEditingPurchase(false); }}><Check className="h-3 w-3" /></button>
-              <button className="text-muted-foreground" onClick={() => { setPurchaseVal(String(it.purchase_price ?? 0)); setEditingPurchase(false); }}><X className="h-3 w-3" /></button>
-            </div>
-          ) : (
-            <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingPurchase(true)}>
-              {fmtPrice(it.purchase_price)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-            </button>
-          )
-        ) : (
           <span>{fmtPrice(it.purchase_price)}</span>
-        )}
-      </td>
-      <td className="px-3 py-2 text-right font-mono">
-        {isManager && editMode ? (
-          editingSale ? (
-            <div className="flex items-center justify-end gap-1">
-              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={saleVal} onChange={(e) => setSaleVal(e.target.value)} autoFocus />
-              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(it.id, "min_sale_price", Number(saleVal)); setEditingSale(false); }}><Check className="h-3 w-3" /></button>
-              <button className="text-muted-foreground" onClick={() => { setSaleVal(String(it.min_sale_price ?? 0)); setEditingSale(false); }}><X className="h-3 w-3" /></button>
-            </div>
-          ) : (
-            <button className="flex items-center gap-1 justify-end w-full" onClick={() => setEditingSale(true)}>
-              <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span> <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-            </button>
-          )
-        ) : (
+        </td>
+        <td className="px-3 py-2 text-right font-mono">
           <span className="text-primary font-semibold">{fmtPrice(finalPrice)}</span>
-        )}
-      </td>
+        </td>
       <td className="px-3 py-2 text-center">
           {recipe && recipe.ingredients.length > 0 && (
             <button onClick={() => setExpanded((v) => !v)} className="text-muted-foreground hover:text-foreground transition-colors">
