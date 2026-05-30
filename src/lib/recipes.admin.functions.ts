@@ -289,19 +289,34 @@ export const deleteItemAdmin = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<void> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
-
-    const id = data.item_id;
-
-    // Delete related records manually (foreign keys without CASCADE)
-    await pgQuery(`delete from orders where item_id = $1`, [id]);
-    await pgQuery(`delete from inventory_movements where item_id = $1`, [id]);
-    await pgQuery(`delete from operation_materials where item_id = $1`, [id]);
-    await pgQuery(`delete from operation_participants where weapon_item_id = $1`, [id]);
-    await pgQuery(`delete from recipe_ingredients where ingredient_item_id = $1`, [id]);
-    // These have CASCADE but we delete explicitly for safety
-    await pgQuery(`delete from craft_recipes where item_id = $1`, [id]);
-    await pgQuery(`delete from inventory_balance where item_id = $1`, [id]);
-    await pgQuery(`delete from item_price_history where item_id = $1`, [id]);
-    // Finally delete the item itself
-    await pgQuery(`delete from items where id = $1`, [id]);
+    await deleteItemsByIds([data.item_id]);
   });
+
+export const deleteItemsAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { item_ids: number[] }) => {
+    if (!Array.isArray(d.item_ids) || d.item_ids.length === 0) throw new Error("item_ids inválido");
+    if (!d.item_ids.every((id) => Number.isFinite(id))) throw new Error("item_ids contém IDs inválidos");
+    return d;
+  })
+  .handler(async ({ context, data }): Promise<void> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+    await deleteItemsByIds(data.item_ids);
+  });
+
+async function deleteItemsByIds(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  // Delete related records in batch (foreign keys without CASCADE)
+  await pgQuery(`delete from orders where item_id = any($1::int[])`, [ids]);
+  await pgQuery(`delete from inventory_movements where item_id = any($1::int[])`, [ids]);
+  await pgQuery(`delete from operation_materials where item_id = any($1::int[])`, [ids]);
+  await pgQuery(`delete from operation_participants where weapon_item_id = any($1::int[])`, [ids]);
+  await pgQuery(`delete from recipe_ingredients where ingredient_item_id = any($1::int[])`, [ids]);
+  // These have CASCADE but we delete explicitly for safety
+  await pgQuery(`delete from craft_recipes where item_id = any($1::int[])`, [ids]);
+  await pgQuery(`delete from inventory_balance where item_id = any($1::int[])`, [ids]);
+  await pgQuery(`delete from item_price_history where item_id = any($1::int[])`, [ids]);
+  // Finally delete the items themselves
+  await pgQuery(`delete from items where id = any($1::int[])`, [ids]);
+}

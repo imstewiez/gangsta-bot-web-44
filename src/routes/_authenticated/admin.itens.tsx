@@ -6,6 +6,7 @@ import {
   updateItemAdmin,
   createItemAdmin,
   deleteItemAdmin,
+  deleteItemsAdmin,
 } from "@/lib/recipes.admin.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ function AdminItemsPage() {
   const updateFn = useAuthedServerFn(updateItemAdmin);
   const createFn = useAuthedServerFn(createItemAdmin);
   const deleteFn = useAuthedServerFn(deleteItemAdmin);
+  const bulkDeleteFn = useAuthedServerFn(deleteItemsAdmin);
 
   const items = useQuery({ queryKey: ["dbItemsAdmin"], queryFn: () => listFn() });
   const [filter, setFilter] = useState("");
@@ -87,12 +89,12 @@ function AdminItemsPage() {
 
   const bulkDeleteM = useMutation({
     mutationFn: async (ids: number[]) => {
-      for (const id of ids) await deleteFn({ data: { item_id: id } });
+      await bulkDeleteFn({ data: { item_ids: ids } });
     },
-    onSuccess: () => {
+    onSuccess: (_, ids) => {
       qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
       setSelected(new Set());
-      toast.success(`${bulkDeleteM.variables?.length ?? 0} items removidos`);
+      toast.success(`${ids.length} items removidos`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
