@@ -8,14 +8,15 @@ import {
   deleteItemAdmin,
   deleteItemsAdmin,
 } from "@/lib/recipes.admin.functions";
+import { getRecipeForItemName, getAllItems } from "@/lib/config.loader";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtPrice } from "@/lib/domain";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Plus, Trash2, Pencil, Check, X, Save, Loader2 } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, Trash2, Pencil, Check, X, Save, Loader2, ChevronDown, ChevronUp, Package } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { Reveal } from "@/components/layout/Reveal";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
@@ -69,6 +70,17 @@ function AdminItemsPage() {
   const [editForm, setEditForm] = useState<any>({});
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<any>({ name: "", category: "armas_orange", side: "venda" });
+  const [expandedRecipes, setExpandedRecipes] = useState<Set<number>>(new Set());
+
+  function toggleRecipe(id: number) {
+    setExpandedRecipes((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  const allConfigItems = getAllItems();
 
   const updateM = useMutation({
     mutationFn: (v: any) => updateFn({ data: v }),
@@ -97,9 +109,9 @@ function AdminItemsPage() {
 
   const deleteM = useMutation({
     mutationFn: (id: number) => deleteFn({ data: { item_id: id } }),
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
       qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
-      setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      setSelected((prev) => { const n = new Set(prev); n.delete(deletedId); return n; });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -263,75 +275,119 @@ function AdminItemsPage() {
                     <th className="px-3 py-2 text-center">XP</th>
                     <th className="px-3 py-2 text-center">Side</th>
                     <th className="px-3 py-2 text-center">Ativo</th>
+                    <th className="px-3 py-2 text-center">Receita</th>
                     <th className="px-3 py-2 text-center">Config</th>
                     <th className="px-3 py-2 text-center w-24"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && !items.isLoading && (
-                    <tr><td colSpan={11} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
+                    <tr><td colSpan={12} className="px-3 py-4 text-center text-muted-foreground">Nenhum item encontrado</td></tr>
                   )}
-                  {filtered.map((it: any) => (
-                    <tr key={it.id} className={`border-t border-border interactive-row ${!it.in_config ? "opacity-60" : ""}`}>
-                      {editingId === it.id ? (
-                        <>
-                          <td className="px-2 py-2 text-center"><input type="checkbox" disabled /></td>
-                          <td className="px-3 py-2"><Input className="h-7 text-xs" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></td>
-                          <td className="px-3 py-2">
-                            <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground">
-                              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.purchase_price} onChange={(e) => setEditForm({ ...editForm, purchase_price: Number(e.target.value) })} /></td>
-                          <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.min_sale_price} onChange={(e) => setEditForm({ ...editForm, min_sale_price: Number(e.target.value) })} /></td>
-                          <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.estimated_value} onChange={(e) => setEditForm({ ...editForm, estimated_value: Number(e.target.value) })} /></td>
-                          <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-center" value={editForm.xp_points} onChange={(e) => setEditForm({ ...editForm, xp_points: Number(e.target.value) })} /></td>
-                          <td className="px-3 py-2">
-                            <select value={editForm.side} onChange={(e) => setEditForm({ ...editForm, side: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground w-full">
-                              <option value="venda">venda</option>
-                              <option value="compra">compra</option>
-                              <option value="ambos">ambos</option>
-                            </select>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} />
-                          </td>
-                          <td className="px-3 py-2 text-center">{it.in_config ? "✓" : "✗"}</td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex justify-center gap-1">
-                              <button className="text-emerald-400" disabled={updateM.isPending} onClick={() => updateM.mutate({ item_id: it.id, ...editForm })}>
-                                {updateM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                              </button>
-                              <button className="text-muted-foreground" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-2 py-2 text-center">
-                            <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggleSelect(it.id)} />
-                          </td>
-                          <td className="px-3 py-2 font-medium">{it.name}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{it.category}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.purchase_price)}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.min_sale_price)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtPrice(it.estimated_value)}</td>
-                          <td className="px-3 py-2 text-center">{it.xp_points}</td>
-                          <td className="px-3 py-2 text-center text-xs text-muted-foreground">{it.side}</td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={`inline-block w-2 h-2 rounded-full ${it.active ? "bg-emerald-400" : "bg-red-400"}`} />
-                          </td>
-                          <td className="px-3 py-2 text-center text-xs">{it.in_config ? "✓" : <span className="text-red-400">✗</span>}</td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex justify-center gap-1">
-                              <button className="text-muted-foreground hover:text-foreground" onClick={() => startEdit(it)}><Pencil className="h-3.5 w-3.5" /></button>
-                              <button className="text-muted-foreground hover:text-destructive" onClick={() => deleteM.mutate(it.id)}><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
+                  {filtered.map((it: any) => {
+                    const recipe = it.in_config ? getRecipeForItemName(it.name) : null;
+                    const isExpanded = expandedRecipes.has(it.id);
+                    return (
+                      <React.Fragment key={it.id}>
+                        <tr className={`border-t border-border interactive-row ${!it.in_config ? "opacity-60" : ""}`}>
+                          {editingId === it.id ? (
+                            <>
+                              <td className="px-2 py-2 text-center"><input type="checkbox" disabled /></td>
+                              <td className="px-3 py-2"><Input className="h-7 text-xs" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></td>
+                              <td className="px-3 py-2">
+                                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground">
+                                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                              </td>
+                              <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.purchase_price} onChange={(e) => setEditForm({ ...editForm, purchase_price: Number(e.target.value) })} /></td>
+                              <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.min_sale_price} onChange={(e) => setEditForm({ ...editForm, min_sale_price: Number(e.target.value) })} /></td>
+                              <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-right" value={editForm.estimated_value} onChange={(e) => setEditForm({ ...editForm, estimated_value: Number(e.target.value) })} /></td>
+                              <td className="px-3 py-2"><Input type="number" className="h-7 text-xs text-center" value={editForm.xp_points} onChange={(e) => setEditForm({ ...editForm, xp_points: Number(e.target.value) })} /></td>
+                              <td className="px-3 py-2">
+                                <select value={editForm.side} onChange={(e) => setEditForm({ ...editForm, side: e.target.value })} className="h-7 rounded border border-input bg-background px-1 text-xs text-foreground w-full">
+                                  <option value="venda">venda</option>
+                                  <option value="compra">compra</option>
+                                  <option value="ambos">ambos</option>
+                                </select>
+                              </td>
+                              <td className="px-3 py-2 text-center">—</td>
+                              <td className="px-3 py-2 text-center">
+                                <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} />
+                              </td>
+                              <td className="px-3 py-2 text-center">{it.in_config ? "✓" : "✗"}</td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex justify-center gap-1">
+                                  <button className="text-emerald-400" disabled={updateM.isPending} onClick={() => updateM.mutate({ item_id: it.id, ...editForm })}>
+                                    {updateM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                  </button>
+                                  <button className="text-muted-foreground" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-2 py-2 text-center">
+                                <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggleSelect(it.id)} />
+                              </td>
+                              <td className="px-3 py-2 font-medium">{it.name}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{it.category}</td>
+                              <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.purchase_price)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{fmtPrice(it.min_sale_price)}</td>
+                              <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtPrice(it.estimated_value)}</td>
+                              <td className="px-3 py-2 text-center">{it.xp_points}</td>
+                              <td className="px-3 py-2 text-center text-xs text-muted-foreground">{it.side}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`inline-block w-2 h-2 rounded-full ${it.active ? "bg-emerald-400" : "bg-red-400"}`} />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                {recipe ? (
+                                  <button onClick={() => toggleRecipe(it.id)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </button>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-center text-xs">{it.in_config ? "✓" : <span className="text-red-400">✗</span>}</td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex justify-center gap-1">
+                                  <button className="text-muted-foreground hover:text-foreground" onClick={() => startEdit(it)}><Pencil className="h-3.5 w-3.5" /></button>
+                                  <button className="text-muted-foreground hover:text-destructive" onClick={() => deleteM.mutate(it.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                        {recipe && isExpanded && (
+                          <tr className="border-t border-border/50 bg-muted/20">
+                            <td colSpan={12} className="px-3 py-2">
+                              <div className="text-xs space-y-1">
+                                <div className="text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
+                                  <Package className="h-3 w-3" />
+                                  Materiais para produzir {it.name}
+                                </div>
+                                {Object.entries(recipe.inputs).map(([ingId, qty]) => {
+                                  const ingItem = allConfigItems[ingId];
+                                  return (
+                                    <div key={ingId} className="flex justify-between gap-4">
+                                      <span className="text-muted-foreground">{ingItem?.name ?? ingId}</span>
+                                      <span className="font-mono text-muted-foreground/80">{qty} {qty === 1 ? "unidade" : "unidades"} · {fmtPrice(ingItem?.buyPrice ?? 0)}</span>
+                                    </div>
+                                  );
+                                })}
+                                <div className="pt-1 border-t border-border/30 flex justify-between gap-4 text-muted-foreground/60">
+                                  <span>Custo estimado</span>
+                                  <span className="font-mono">
+                                    {fmtPrice(Object.entries(recipe.inputs).reduce((sum, [ingId, qty]) => sum + ((allConfigItems[ingId]?.buyPrice ?? 0) * (qty as number)), 0))}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -34,9 +34,10 @@ export const getStock = createServerFn({ method: "GET" })
       [itemNames],
     );
     const dbByName = new Map(dbItems.map((i) => [i.name, i]));
+    const itemByName = new Map(Object.entries(items).map(([, v]) => [v.name, v]));
     const dbIds = dbItems
       .filter((i) => {
-        const effectiveSide = i.side ?? items[Object.keys(items).find(k => items[k].name === i.name) ?? ""]?.side ?? "venda";
+        const effectiveSide = i.side ?? itemByName.get(i.name)?.side ?? "venda";
         return effectiveSide === "venda" || effectiveSide === "ambos";
       })
       .map((i) => i.id);
@@ -128,8 +129,8 @@ export const getLedger = createServerFn({ method: "GET" })
     const itemNames = Object.values(items).map((i) => i.name);
 
     // Only show movements for items existing in config.json (venda + ambos)
-    const dbItems = await pgQuery<{ id: number; side: string | null }>(
-      `select id, side from items where name = any($1::text[])`,
+    const dbItems = await pgQuery<{ id: number; name: string; side: string | null }>(
+      `select id, name, side from items where name = any($1::text[])`,
       [itemNames],
     );
     const dbIds = dbItems
