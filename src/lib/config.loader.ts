@@ -202,6 +202,7 @@ export const ARMORY_CATEGORIES = [
   "prints",
   "coletes",
   "acessorios",
+  "reciclagem",
   "outros",
 ] as const;
 
@@ -221,7 +222,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   equipamento: "Equipamento",
   metais: "Metais",
   componentes: "Componentes",
-  sucata_industria: "Sucata / Indústria",
+  reciclagem: "Reciclagem",
   dinheiro: "Dinheiro",
 };
 

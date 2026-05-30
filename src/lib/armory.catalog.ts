@@ -40,6 +40,7 @@ export type ArmoryCategory =
   | "coletes"
   | "corpos"
   | "prints"
+  | "reciclagem"
   | "outros";
 
 export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
@@ -50,6 +51,7 @@ export const ARMORY_CAT_ORDER: ArmoryCategory[] = [
   "prints",
   "coletes",
   "acessorios",
+  "reciclagem",
   "outros",
 ];
 
@@ -132,6 +134,15 @@ export const ARMORY_CAT_CONFIG: Record<
     tone: "primary",
   },
 
+  reciclagem: {
+    label: "Reciclagem",
+    icon: Recycle,
+    color: "text-green-400",
+    bg: "bg-green-500/10",
+    border: "border-green-500/30",
+    headerColor: "text-green-400",
+    tone: "muted",
+  },
   outros: {
     label: "Outros",
     icon: Package,
@@ -265,6 +276,9 @@ export function itemDisplayCategory(
   // 4. Prints (só se NÃO for arma — já verificado acima)
   if (cat === "prints" || sub === "prints" || /print|esquema|blueprint/.test(name))
     return "prints";
+
+  // 4.5. Reciclagem
+  if (cat === "reciclagem" || sub === "reciclagem") return "reciclagem";
 
   // 5. Acessórios / coletes
   if (

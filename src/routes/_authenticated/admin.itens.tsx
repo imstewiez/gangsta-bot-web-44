@@ -37,6 +37,14 @@ const CATEGORIES = [
   "corpos",
   "coletes",
   "prints",
+  "reciclagem",
+  "madeiras",
+  "metais",
+  "texteis",
+  "componentes",
+  "droga",
+  "equipamento",
+  "dinheiro",
 ];
 
 function AdminItemsPage() {
