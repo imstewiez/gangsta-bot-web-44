@@ -107,11 +107,11 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       currentLeader,
     ] = await Promise.all([
       pgQuery<{ tier: string; count: string }>(
-        `select coalesce(tier, 'unknown') as tier, count(*)::text as count
-         from members
-         where deleted_at is null
-           and (status = 'ativo' or status is null)
-           and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')
+        `select coalesce(m.tier, 'unknown') as tier, count(*)::text as count
+         from members m
+         where m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
+           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
          group by 1 order by 2 desc`,
       ).catch(() => []),
       pgQuery<{ tier: string; name: string | null; score: number }>(
@@ -125,11 +125,11 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          order by m.tier, coalesce(s.kills_total * 3 + s.deliveries * 2 + s.sales * 2 + s.saidas_total * 2 + s.wins * 4 - s.deaths_total, 0) desc`,
       ).catch(() => []),
       pgOne<{ count: string }>(
-        `select count(*)::text as count from members
-         where deleted_at is null
-           and (status = 'ativo' or status is null)
-           and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')
-           and joined_at >= now() - interval '7 days'`,
+        `select count(*)::text as count from members m
+         where m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
+           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
+           and m.joined_at >= now() - interval '7 days'`
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
         `select count(*)::text as count from operations

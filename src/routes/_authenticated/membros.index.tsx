@@ -4,14 +4,19 @@ import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
+import { getCurrentMember } from "@/lib/pricing.functions";
+import { syncDiscordMembers } from "@/lib/member-sync.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ROLE_LABELS, POSITION_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
-import { Users, RotateCcw } from "lucide-react";
+import { Users, RotateCcw, Loader2, RefreshCw } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/ui/table-skeleton";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
+import { PLACEHOLDER, LOADING, beautifyError } from "@/lib/messages";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/membros/")({
   head: () => ({
@@ -49,11 +54,11 @@ function Page() {
     <>
       <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} membro${list.length !== 1 ? "s" : ""}`}
         icon={Users}
-        action={<Input placeholder="Procurar..." value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
+        action={<Input placeholder={PLACEHOLDER.searchMembers} value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />} />
       {error && (
         <Reveal direction="up">
           <div className="mb-4 flex items-center gap-3 rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm animate-rise">
-            <span className="text-destructive">{error instanceof Error ? error.message : "Erro a carregar membros."}</span>
+            <span className="text-destructive">{beautifyError(error)}</span>
             <button
               onClick={() => refetch()}
               className="ml-auto inline-flex cursor-pointer items-center gap-1 text-display text-[10px] tracking-wider text-destructive underline underline-offset-2 hover:text-destructive/80"
@@ -79,7 +84,14 @@ function Page() {
           </thead>
           <tbody>
             {isLoading && (
-              <TableRowsSkeleton rows={8} cols={6} widths={["w-40", "w-24", "w-28", "w-16", "w-24", "w-20"]} />
+              <tr>
+                <td colSpan={6} className="py-12">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{LOADING.members}</p>
+                  </div>
+                </td>
+              </tr>
             )}
             {sorted.map((m) => (
               <tr key={m.id} className="border-t border-border interactive-row transition-colors duration-150 cursor-pointer">

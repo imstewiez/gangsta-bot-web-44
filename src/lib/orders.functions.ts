@@ -5,7 +5,11 @@ import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, OrderStatusSchema, IdSchema, NotesSchema } from "./security";
 import { logger } from "./logger.server";
-import { getAllItems, getRecipeForItemName } from "./config.loader";
+import { logAdminAction } from "./logging.functions";
+import { getAllItems, getTierPrice } from "./config.loader";
+import { resolveItemPrices, getConfigIdByName } from "./pricing.resolver";
+import { getSurchargeForItem } from "./tier-pricing.functions";
+import { getMergedRecipeForItemName } from "./recipes.functions";
 
 
 type OrderRow = {
@@ -132,18 +136,34 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!me) throw new Error("Não tens conta de membro associada.");
     const cfgItems = getAllItems();
 
-    // Fetch DB items for names + sides (DB é espelho do config.json)
+    // Fetch DB items for names + sides + prices
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
       id: number;
       name: string;
       side: string | null;
-      base: number | null;
+      min_sale_price: number | null;
+      estimated_value: number | null;
     }>(
-      `select id, name, side, min_sale_price::float as base from items where id = ANY($1) and active = true`,
+      `select id, name, side, min_sale_price::float as min_sale_price, estimated_value::float as estimated_value
+       from items where id = ANY($1) and active = true`,
       [itemIds],
     );
     const itemMap = new Map(items.map((i) => [i.id, i]));
+
+    // Fetch DB prices for all potential ingredients
+    const allConfigItems = Object.values(cfgItems);
+    const allConfigNames = allConfigItems.map((i) => i.name);
+    const dbPrices = await pgQuery<{
+      name: string;
+      purchase_price: number | null;
+      estimated_value: number | null;
+    }>(
+      `select name, purchase_price::float as purchase_price, estimated_value::float as estimated_value
+       from items where name = ANY($1::text[]) and active = true`,
+      [allConfigNames],
+    );
+    const dbPriceMap = new Map(dbPrices.map((p) => [p.name, p]));
 
     const paymentMode = (data.payment_mode as string) || 'materials_money';
     const batchId = crypto.randomUUID();
@@ -154,16 +174,23 @@ export const createOrder = createServerFn({ method: "POST" })
       if (dbItem.side !== "venda" && dbItem.side !== "ambos")
         throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
 
-      // Receitas e ingredientes do config.json (fonte única de verdade)
-      const recipe = getRecipeForItemName(dbItem.name);
+      const configItem = cfgItems[Object.keys(cfgItems).find(k => cfgItems[k].name === dbItem.name) ?? ""];
+      const itemSurcharges = await getSurchargeForItem(dbItem.id);
+      const itemPrices = resolveItemPrices(dbItem, configItem, me?.tier ?? null, itemSurcharges);
+
+      // Receitas e ingredientes (merged DB + config)
+      const recipe = await getMergedRecipeForItemName(dbItem.name);
       let ingredientsJson: Array<{ name: string; needed: number }> | null = null;
       let materialCostPerUnit = 0;
       if (recipe) {
         const isOrange = recipe.output.toLowerCase().includes("orange");
-        // Custo material = soma dos buyPrice dos ingredientes
+        // Custo material = soma dos purchase_price dos ingredientes (DB > config)
         materialCostPerUnit = Object.entries(recipe.inputs).reduce((sum, [ingId, qty]) => {
           const ingItem = cfgItems[ingId];
-          return sum + (Number(ingItem?.buyPrice ?? 0) * Number(qty));
+          if (!ingItem) return sum;
+          const ingDb = dbPriceMap.get(ingItem.name);
+          const ingPrices = resolveItemPrices(ingDb, ingItem);
+          return sum + (Number(ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0) * Number(qty));
         }, 0);
         if (paymentMode === 'materials_money') {
           ingredientsJson = Object.entries(recipe.inputs)
@@ -186,7 +213,7 @@ export const createOrder = createServerFn({ method: "POST" })
       let moneyCost: number | null = null;
 
       if (paymentMode === 'money_only') {
-        const base = dbItem.base ?? 0;
+        const base = itemPrices.min_sale_price ?? itemPrices.estimated_value ?? 0;
         const subtotal = base + materialCostPerUnit;
         unit = Math.round(subtotal + subtotal * 0.30);
         total = unit * line.quantity;
@@ -195,9 +222,9 @@ export const createOrder = createServerFn({ method: "POST" })
         moneyCost = total;
         ingredientsJson = [];
       } else {
-        unit = dbItem.base ?? 0;
+        unit = itemPrices.tier_price ?? itemPrices.min_sale_price ?? itemPrices.estimated_value ?? 0;
         total = unit * line.quantity;
-        dirtyMoney = (dbItem.base ?? 0) * line.quantity;
+        dirtyMoney = (itemPrices.estimated_value ?? 0) * line.quantity;
       }
 
       const ingredientsJsonStr = ingredientsJson ? JSON.stringify(ingredientsJson) : null;
@@ -229,6 +256,15 @@ export const createOrder = createServerFn({ method: "POST" })
         results.push({ id: row.id, item_name: dbItem.name, quantity: line.quantity });
       }
     }
+    await logAdminAction(context.supabase, {
+      action: "order_created",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Membro",
+      targetType: "order",
+      targetId: results.map((r) => r.id).join(","),
+      details: `${results.length} encomenda(s) criada(s): ${results.map((r) => `${r.quantity}× ${r.item_name}`).join(", ")}`,
+      afterState: { batch_id: batchId, items: results },
+    });
     return { ids: results.map((r) => r.id) };
   });
 
@@ -262,11 +298,25 @@ export const transitionOrder = createServerFn({ method: "POST" })
 
     if (!result) throw new Error("Encomenda não encontrada");
 
-    // Permission check after the fact (the SP returns responsavel; if mismatch, we can't rollback,
-    // but the SP is atomic so we check before calling in the UI; this is a safety net)
+    const actionMap: Record<string, string> = {
+      approved: "order_approved",
+      denied: "order_denied",
+      fulfilled: "order_fulfilled",
+      cancelled: "order_cancelled",
+      ready: "order_updated",
+      in_progress: "order_updated",
+    };
+    await logAdminAction(context.supabase, {
+      action: actionMap[data.to] ?? "order_updated",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "order",
+      targetId: data.id,
+      details: `Encomenda #${data.id} (${result.item_name ?? "?"} × ${result.quantity}) alterada de "${result.old_status}" para "${data.to}"`,
+      afterState: { old_status: result.old_status, new_status: data.to },
+    });
+
     if (!me?.is_superadmin && me?.id !== result.responsavel_member_id) {
-      // We cannot rollback a committed SP, but this path should be unreachable if UI is correct.
-      // Log and continue; in production, add a pre-check SP if needed.
       logger.warn("transitionOrder_permission_mismatch", {
         orderId: data.id,
         meId: me?.id,

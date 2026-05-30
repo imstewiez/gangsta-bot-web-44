@@ -8,12 +8,12 @@ import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Shield, ShieldOff, Crown } from "lucide-react";
+import { Shield, ShieldOff, Crown, Loader2, Users } from "lucide-react";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
-import { Loader2 } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { Reveal } from "@/components/layout/Reveal";
+import { ROLE_LABELS, EMPTY_STATE, LOADING, beautifyError } from "@/lib/messages";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   errorComponent: PageErrorBoundary,
@@ -58,7 +58,7 @@ function AdminIndexPage() {
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(["appUsers"], ctx.prev);
-      toast.error(_e.message);
+      toast.error(beautifyError(_e));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["appUsers"] });
@@ -84,11 +84,14 @@ function AdminIndexPage() {
           </CardHeader>
           <CardContent>
             {users.isLoading && (
-              <PageSkeleton rows={6} />
+              <div className="flex flex-col items-center justify-center h-64 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{LOADING.generic}</p>
+              </div>
             )}
             {users.error && (
               <p className="text-destructive text-sm">
-                {(users.error as Error).message}
+                {beautifyError(users.error)}
               </p>
             )}
             <div className="space-y-2">
@@ -119,18 +122,18 @@ function AdminIndexPage() {
                       {isSuper && (
                         <span className="rounded-sm px-2 py-1 text-display bg-amber-500/20 text-amber-500 border border-amber-500/30">
                           <Crown className="inline h-3 w-3 mr-1" />
-                          superadmin
+                          {ROLE_LABELS.superadmin}
                         </span>
                       )}
                       {isAdmin && !isSuper && (
                         <span className="rounded-sm px-2 py-1 text-display bg-primary/20 text-primary border border-primary/30">
                           <Shield className="inline h-3 w-3 mr-1" />
-                          admin
+                          {ROLE_LABELS.admin}
                         </span>
                       )}
                       {!isAdmin && !isSuper && (
                         <span className="rounded-sm px-2 py-1 text-display bg-muted">
-                          member
+                          {ROLE_LABELS.member}
                         </span>
                       )}
                     </div>
@@ -152,12 +155,12 @@ function AdminIndexPage() {
                           {isSuper ? (
                             <>
                               <ShieldOff className="mr-1 h-3 w-3" />
-                              Remover super
+                              Remover Manda-Chuva
                             </>
                           ) : (
                             <>
                               <Crown className="mr-1 h-3 w-3" />
-                              Tornar super
+                              Tornar Manda-Chuva
                             </>
                           )}
                         </ButtonLoading>
@@ -179,12 +182,12 @@ function AdminIndexPage() {
                           {isAdmin ? (
                             <>
                               <ShieldOff className="mr-1 h-3 w-3" />
-                              Remover admin
+                              Remover Direção
                             </>
                           ) : (
                             <>
                               <Shield className="mr-1 h-3 w-3" />
-                              Tornar admin
+                              Tornar Direção
                             </>
                           )}
                         </ButtonLoading>
@@ -194,7 +197,11 @@ function AdminIndexPage() {
                 );
               })}
               {!users.isLoading && !users.data?.length && (
-                <EmptyState title="Nenhum utilizador" description="Ainda não existem utilizadores registados." />
+                <div className="col-span-full text-center py-12">
+                  <Users className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm font-medium text-foreground">{EMPTY_STATE.users.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.users.description}</p>
+                </div>
               )}
             </div>
           </CardContent>

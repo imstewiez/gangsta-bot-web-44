@@ -51,7 +51,7 @@ const GROUPS: NavGroup[] = [
       { to: "/dashboard", label: "Casa",        icon: Home },
 
       { to: "/membros",   label: "Membros",     icon: Users },
-      { to: "/tops",      label: "Leaderboard", icon: Trophy },
+      { to: "/tops",      label: "Classificação", icon: Trophy },
       { to: "/premios",       label: "Prémios",       icon: Sparkles },
 
     ],
@@ -76,8 +76,8 @@ const GROUPS: NavGroup[] = [
   {
     label: "Chefia",
     items: [
-      { to: "/admin/dashboard",   label: "Dashboard",    icon: Activity,   admin: true },
-      { to: "/admin/itens",       label: "Items",        icon: Package,    admin: true },
+      { to: "/admin/dashboard",   label: "Painel",    icon: Activity,   admin: true },
+      { to: "/admin/itens",       label: "Materiais",        icon: Package,    admin: true },
       { to: "/admin",             label: "Definições",   icon: Shield,     admin: true },
       { to: "/auditoria",         label: "Auditoria",    icon: ScrollText, admin: true },
 

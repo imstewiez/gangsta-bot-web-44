@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { logAdminAction } from "./logging.functions";
 import {
   getAllRecipes,
   getItemById,
@@ -81,18 +82,37 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
-    const items = getAllItems();
-    return Object.entries(items)
-      .map(([id, item]) => ({
-        id: getNumericId(id),
-        name: item.name,
-        category: item.category,
-        subcategory: item.subcategory,
-        estimated_value: item.estimatedValue,
-        purchase_price: item.buyPrice,
+    const configItems = getAllItems();
+    const configNames = Object.values(configItems).map((i) => i.name);
+
+    const dbItems = await pgQuery<{
+      id: number;
+      name: string;
+      category: string | null;
+      subcategory: string | null;
+      estimated_value: number | null;
+      purchase_price: number | null;
+    }>(
+      `select id, name, category, subcategory,
+              estimated_value::float as estimated_value,
+              purchase_price::float as purchase_price
+       from items where name = any($1::text[]) and active = true
+       order by category, name`,
+      [configNames],
+    );
+
+    return dbItems.map((db) => {
+      const cfg = configItems[Object.keys(configItems).find(k => configItems[k].name === db.name) ?? ""];
+      return {
+        id: db.id,
+        name: db.name,
+        category: db.category ?? cfg?.category ?? null,
+        subcategory: db.subcategory ?? cfg?.subcategory ?? null,
+        estimated_value: db.estimated_value ?? cfg?.estimatedValue ?? null,
+        purchase_price: db.purchase_price ?? cfg?.buyPrice ?? null,
         unit: "unidade",
-      }))
-      .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name));
+      };
+    });
   });
 
 export const listDbItemsAdmin = createServerFn({ method: "GET" })
@@ -253,6 +273,15 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
       `update items set ${sets.join(", ")}, updated_at = now() where id = $${vals.length}`,
       vals,
     );
+    await logAdminAction(context.supabase, {
+      action: "item_updated",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "item",
+      targetId: data.item_id,
+      details: `Item atualizado (${sets.length} campos)`,
+      afterState: { fields_changed: sets.map((s) => s.split(" ")[0]) },
+    });
   });
 
 export const createItemAdmin = createServerFn({ method: "POST" })
@@ -293,6 +322,15 @@ export const createItemAdmin = createServerFn({ method: "POST" })
       ],
     );
     if (!result) throw new Error("Erro ao criar item");
+    await logAdminAction(context.supabase, {
+      action: "item_created",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "item",
+      targetId: result.id,
+      details: `Material criado: ${data.name}`,
+      afterState: { name: data.name, category: data.category, side: data.side },
+    });
     return { id: result.id };
   });
 
@@ -311,6 +349,7 @@ export const getMaterialItemsAdmin = createServerFn({ method: "GET" })
       `select id, name, category, purchase_price::float as purchase_price
        from items
        where active = true
+         and category in ('materiais','reciclagem','prints','metais','corpos')
        order by category, name`
     );
 
@@ -372,8 +411,8 @@ export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
 
 export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { recipe_id: number; ingredient_item_id: number; quantity: number }) => {
-    if (!Number.isFinite(d.recipe_id)) throw new Error("recipe_id inválido");
+  .inputValidator((d: { item_id: number; ingredient_item_id: number; quantity: number }) => {
+    if (!Number.isFinite(d.item_id)) throw new Error("item_id inválido");
     if (!Number.isFinite(d.ingredient_item_id)) throw new Error("ingredient_item_id inválido");
     if (!Number.isFinite(d.quantity) || d.quantity < 0) throw new Error("quantidade inválida");
     return d;
@@ -382,14 +421,31 @@ export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
 
+    // Find or create craft_recipes row for this item
+    let recipeId: number;
+    const existing = await pgOne<{ id: number }>(
+      `select id from craft_recipes where item_id = $1 limit 1`,
+      [data.item_id],
+    );
+    if (existing) {
+      recipeId = existing.id;
+    } else {
+      const inserted = await pgOne<{ id: number }>(
+        `insert into craft_recipes (item_id, quantity) values ($1, 1) returning id`,
+        [data.item_id],
+      );
+      if (!inserted) throw new Error("Erro ao criar receita");
+      recipeId = inserted.id;
+    }
+
     await pgQuery(
       `delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`,
-      [data.recipe_id, data.ingredient_item_id],
+      [recipeId, data.ingredient_item_id],
     );
     if (data.quantity > 0) {
       await pgQuery(
         `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
-        [data.recipe_id, data.ingredient_item_id, data.quantity],
+        [recipeId, data.ingredient_item_id, data.quantity],
       );
     }
   });
@@ -403,7 +459,16 @@ export const deleteItemAdmin = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<void> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+    const item = await pgOne<{ name: string }>(`select name from items where id = $1`, [data.item_id]);
     await deleteItemsByIds([data.item_id]);
+    await logAdminAction(context.supabase, {
+      action: "item_deleted",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "item",
+      targetId: data.item_id,
+      details: `Material eliminado: ${item?.name ?? "#" + data.item_id}`,
+    });
   });
 
 export const deleteItemsAdmin = createServerFn({ method: "POST" })
@@ -416,21 +481,44 @@ export const deleteItemsAdmin = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<void> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+    const items = await pgQuery<{ id: number; name: string }>(
+      `select id, name from items where id = any($1::int[])`, [data.item_ids],
+    );
     await deleteItemsByIds(data.item_ids);
+    await logAdminAction(context.supabase, {
+      action: "item_deleted",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "item",
+      targetId: data.item_ids.join(","),
+      details: `${data.item_ids.length} materiais eliminados: ${items.map((i) => i.name).join(", ")}`,
+    });
   });
 
 async function deleteItemsByIds(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
-  // Delete related records in batch (foreign keys without CASCADE)
-  await pgQuery(`delete from orders where item_id = any($1::int[])`, [ids]);
+
+  // Guard: block deletion if there are pending orders for these items
+  const pendingOrders = await pgOne<{ count: string }>(
+    `select count(*)::text as count from orders where item_id = any($1::int[]) and status in ('pending','approved','in_progress','ready')`,
+    [ids],
+  );
+  if (Number(pendingOrders?.count ?? 0) > 0) {
+    throw new Error(`Não é possível eliminar: existem ${pendingOrders?.count} encomenda(s) pendente(s) associadas a estes materiais. Resolva as encomendas primeiro.`);
+  }
+
+  // Soft-delete items instead of hard delete to preserve order history
+  await pgQuery(
+    `update items set active = false, deleted_at = now(), updated_at = now() where id = any($1::int[])`,
+    [ids],
+  );
+
+  // Clean up non-critical related records
   await pgQuery(`delete from inventory_movements where item_id = any($1::int[])`, [ids]);
   await pgQuery(`delete from operation_materials where item_id = any($1::int[])`, [ids]);
   await pgQuery(`delete from operation_participants where weapon_item_id = any($1::int[])`, [ids]);
   await pgQuery(`delete from recipe_ingredients where ingredient_item_id = any($1::int[])`, [ids]);
-  // These have CASCADE but we delete explicitly for safety
   await pgQuery(`delete from craft_recipes where item_id = any($1::int[])`, [ids]);
   await pgQuery(`delete from inventory_balance where item_id = any($1::int[])`, [ids]);
   await pgQuery(`delete from item_price_history where item_id = any($1::int[])`, [ids]);
-  // Finally delete the items themselves
-  await pgQuery(`delete from items where id = any($1::int[])`, [ids]);
 }

@@ -16,10 +16,12 @@ import {
   Flame, CalendarDays, Trophy, Medal, Award,
   UserPlus, Skull, Crosshair, Home as HomeIcon,
   Sparkles, Users, Swords, Zap, MapPin,
+  Loader2, Activity,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { EMPTY_STATE, LOADING } from "@/lib/messages";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 
@@ -85,6 +87,13 @@ function Dashboard() {
           >
             Tentar novamente
           </button>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">{LOADING.dashboard}</p>
         </div>
       )}
 
@@ -186,76 +195,113 @@ function Dashboard() {
 
       {data?.prize && (
         <Reveal delay={200} direction="up">
-          <Card className={cn(
-            "mt-6 interactive-card",
-            data.prize.status === "in_progress"
-              ? "border-orange-500/40 bg-gradient-to-br from-orange-500/10 via-card to-card"
-              : "border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card"
-          )}>
-            <CardContent className="flex items-start gap-4 p-5">
-              <span className={cn(
-                "grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1",
+          <div className="mt-6 relative group">
+            {/* Animated glow border */}
+            <div className={cn(
+              "absolute -inset-[1px] rounded-2xl opacity-70 blur-sm transition-opacity duration-500 group-hover:opacity-100",
+              data.prize.status === "in_progress"
+                ? "bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 animate-pulse"
+                : "bg-gradient-to-r from-purple-500 via-fuchsia-400 to-purple-500"
+            )} />
+            <Card className={cn(
+              "relative overflow-hidden rounded-2xl border-0",
+              data.prize.status === "in_progress"
+                ? "bg-gradient-to-br from-orange-950/80 via-slate-950 to-slate-950"
+                : "bg-gradient-to-br from-purple-950/80 via-slate-950 to-slate-950"
+            )}>
+              {/* Shimmer background */}
+              <div className={cn(
+                "absolute inset-0 opacity-20",
                 data.prize.status === "in_progress"
-                  ? "bg-orange-500/20 ring-orange-500/40"
-                  : "bg-primary/20 ring-primary/40"
-              )}>
-                {data.prize.status === "in_progress" ? (
-                  <Flame className="h-6 w-6 text-orange-400" />
-                ) : (
-                  <Sparkles className="h-6 w-6 text-primary" />
-                )}
-              </span>
-              <div className="flex-1 min-w-0">
-                {/* Semana + estado */}
-                <div className="flex items-center gap-2">
-                  <div className="text-display text-[11px] tracking-[0.3em] text-primary uppercase">
-                    Semana {data.prize.week_label}
+                  ? "bg-[linear-gradient(110deg,transparent_25%,rgba(251,146,60,0.3)_50%,transparent_75%)] bg-[length:200%_100%] animate-[shimmer_3s_infinite]"
+                  : "bg-[linear-gradient(110deg,transparent_25%,rgba(192,132,252,0.3)_50%,transparent_75%)] bg-[length:200%_100%] animate-[shimmer_3s_infinite]"
+              )} />
+
+              <CardContent className="relative flex items-center gap-5 p-6">
+                {/* Big glowing icon */}
+                <div className="relative shrink-0">
+                  <div className={cn(
+                    "absolute inset-0 rounded-full blur-lg opacity-60",
+                    data.prize.status === "in_progress" ? "bg-orange-500" : "bg-purple-500"
+                  )} />
+                  <div className={cn(
+                    "relative grid h-16 w-16 place-items-center rounded-full ring-2",
+                    data.prize.status === "in_progress"
+                      ? "bg-orange-500/20 ring-orange-400/60"
+                      : "bg-purple-500/20 ring-purple-400/60"
+                  )}>
+                    {data.prize.status === "in_progress" ? (
+                      <Flame className="h-8 w-8 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.8)]" />
+                    ) : (
+                      <Sparkles className="h-8 w-8 text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]" />
+                    )}
                   </div>
-                  {data.prize.status === "in_progress" && (
-                    <Badge variant="default" className="bg-orange-500 text-white border-transparent text-[10px]">
-                      <Flame className="w-3 h-3 mr-1" />
-                      A decorrer
-                    </Badge>
-                  )}
                 </div>
 
-                {/* Vencedor (sempre o líder / calculado) */}
-                <div className="mt-1 flex items-center gap-2 text-lg font-semibold">
-                  <TierIcon tier={data.prize.winner_tier} size="sm" />
-                  <span className="truncate">{data.prize.winner_name}</span>
-                  {data.prize.score != null && (
-                    <span className="text-sm font-mono text-muted-foreground">· {fmtNum(Math.round(data.prize.score))} pontos</span>
-                  )}
-                </div>
+                <div className="flex-1 min-w-0">
+                  {/* Week label + status */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn(
+                      "text-display text-[11px] tracking-[0.25em] uppercase font-bold",
+                      data.prize.status === "in_progress" ? "text-orange-400" : "text-purple-400"
+                    )}>
+                      Semana {data.prize.week_label}
+                    </span>
+                    {data.prize.status === "in_progress" && (
+                      <Badge className="bg-orange-500 text-white border-transparent text-[10px] shadow-[0_0_10px_rgba(249,115,22,0.5)]">
+                        <Flame className="w-3 h-3 mr-1" />
+                        A decorrer
+                      </Badge>
+                    )}
+                    {data.prize.status === "defined" && (
+                      <Badge className="bg-purple-600 text-white border-transparent text-[10px] shadow-[0_0_10px_rgba(147,51,234,0.5)]">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Definido
+                      </Badge>
+                    )}
+                  </div>
 
-                {/* Prémio — separado e destacado */}
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-display text-[10px] uppercase tracking-wider text-muted-foreground">Prémio:</span>
-                  {!data.prize.prize_description ? (
-                    <Badge variant="outline" className="text-[10px] border-yellow-500/50 text-yellow-400 bg-yellow-500/10">
-                      Por definir
-                    </Badge>
-                  ) : data.prize.prize_status === "entregue" ? (
-                    <Badge variant="default" className="text-[10px] bg-green-600 text-white border-transparent">
-                      Entregue
-                    </Badge>
+                  {/* Prize description as hero text */}
+                  {data.prize.prize_description ? (
+                    <div className={cn(
+                      "text-xl font-display font-black tracking-tight leading-tight",
+                      data.prize.status === "in_progress" ? "text-orange-100" : "text-purple-100"
+                    )}>
+                      {data.prize.prize_description}
+                    </div>
                   ) : (
-                    <Badge variant="default" className="text-[10px] bg-purple-600 text-white border-transparent">
-                      Definido
-                    </Badge>
+                    <div className="text-lg font-display font-bold text-muted-foreground italic">
+                      Prémio por definir…
+                    </div>
                   )}
+
+                  {/* Winner row */}
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <TierIcon tier={data.prize.winner_tier} size="sm" />
+                    <span className="font-semibold text-foreground">{data.prize.winner_name}</span>
+                    {data.prize.score != null && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        · {fmtNum(Math.round(data.prize.score))} pts
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {data.prize.prize_description ? (
-                  <div className="mt-0.5 text-sm font-medium text-foreground">{data.prize.prize_description}</div>
-                ) : (
-                  <div className="mt-0.5 text-xs text-muted-foreground italic">A chefia ainda não definiu o prémio desta semana.</div>
-                )}
-              </div>
-              <Link to="/premios" className="text-display cursor-pointer text-[10px] tracking-[0.2em] text-primary interactive-link shrink-0 mt-1">
-                VER PRÉMIOS →
-              </Link>
-            </CardContent>
-          </Card>
+
+                {/* CTA button */}
+                <Link
+                  to="/premios"
+                  className={cn(
+                    "shrink-0 rounded-lg px-4 py-2 text-[11px] font-bold tracking-wider uppercase transition-all hover:scale-105",
+                    data.prize.status === "in_progress"
+                      ? "bg-orange-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] hover:shadow-[0_0_30px_rgba(249,115,22,0.6)]"
+                      : "bg-purple-600 text-white shadow-[0_0_20px_rgba(147,51,234,0.4)] hover:shadow-[0_0_30px_rgba(147,51,234,0.6)]"
+                  )}
+                >
+                  Ver Prémios →
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </Reveal>
       )}
 
@@ -310,7 +356,13 @@ function Dashboard() {
                           </li>
                         );
                       })}
-                      {!sorted.length && !isLoading && <li className="text-sm text-muted-foreground">Sem dados.</li>}
+                      {!sorted.length && !isLoading && (
+                        <li className="col-span-full text-center py-6">
+                          <Activity className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                          <p className="text-sm font-medium text-foreground">{EMPTY_STATE.dashboard.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.dashboard.description}</p>
+                        </li>
+                      )}
                     </ul>
                   </>
                 );
@@ -389,7 +441,13 @@ function TopList({ title, icon, subtitle, rows, loading, compact }: {
             </li>
           );
         })}
-        {!rows?.length && !loading && <li className="px-2 py-1.5 text-xs text-muted-foreground">Ainda sem pontos.</li>}
+        {!rows?.length && !loading && (
+          <li className="col-span-full text-center py-6">
+            <Trophy className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+            <p className="text-sm font-medium text-foreground">{EMPTY_STATE.leaderboard.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.leaderboard.description}</p>
+          </li>
+        )}
       </ol>
     </div>
   );

@@ -13,13 +13,25 @@
   // Public vars (non-sensitive)
   "vars": {
     "SUPABASE_URL": "https://zducvbkozxtacwzvggli.supabase.co",
-    "SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdWN2Ymtvenh0YWN3enZnZ2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDAwMjcsImV4cCI6MjA5NDE3NjAyN30.Rf7AHVSigbdQxkvMSwHY2pDYgjoLyG2oqSAw4E-v2Lc"
+    "SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdWN2Ymtvenh0YWN3enZnZ2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDAwMjcsImV4cCI6MjA5NDE3NjAyN30.Rf7AHVSigbdQxkvMSwHY2pDYgjoLyG2oqSAw4E-v2Lc",
+    "DISCORD_GUILD_ID": "",
+    "MANDA_CHUVA_ROLE_ID": "",
+    "KINGPIN_ROLE_ID": "",
+    "OG_ROLE_ID": "",
+    "REAL_GANGSTER_ROLE_ID": "",
+    "PATRAO_DI_ZONA_ROLE_ID": "",
+    "GANGSTER_FODIDO_ROLE_ID": "",
+    "O_GUNAO_ROLE_ID": "",
+    "YOUNG_BLOOD_ROLE_ID": "",
+    "BAIRRISTAS_BASE_ROLE_ID": "",
+    "BAIRRISTA_DEFAULT_TIER": "young_blood"
   },
   // Secrets to configure via dashboard or `wrangler secret put`:
   //   SUPABASE_SERVICE_ROLE_KEY  - Supabase service_role key (Database access)
   //   CRON_SECRET                - Random secret for /api/cron/recalc endpoint
   //   UPSTASH_REDIS_REST_URL     - Optional: Upstash Redis REST URL (distributed rate limiting)
   //   UPSTASH_REDIS_REST_TOKEN   - Optional: Upstash Redis REST token
+  //   DISCORD_BOT_TOKEN          - Discord bot token (for guild member sync)
   "workers_dev": true,
   "routes": [
     { "pattern": "ballasgang.eu", "custom_domain": true },

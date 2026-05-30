@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/dialog";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
-import { Trophy, Gift, Check, Home, Car, Sword, Banknote, Package } from "lucide-react";
+import { beautifyError, EMPTY_STATE, LOADING } from "@/lib/messages";
+import { Trophy, Gift, Check, Home, Car, Sword, Banknote, Package, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Reveal } from "@/components/layout/Reveal";
 import { cn } from "@/lib/utils";
@@ -87,7 +88,7 @@ function Page() {
       toast.success("Prémio atualizado");
       setEditId(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const latest = prizes.data?.[0];
@@ -182,7 +183,10 @@ function Page() {
             Histórico de prémios
           </div>
           {prizes.isLoading && (
-            <p className="text-muted-foreground">A carregar</p>
+            <div className="flex flex-col items-center justify-center h-64 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{LOADING.generic}</p>
+            </div>
           )}
           {(prizes.data ?? []).slice(1).map((p) => (
             <div
@@ -238,7 +242,11 @@ function Page() {
             </div>
           ))}
           {!prizes.isLoading && (prizes.data ?? []).length <= 1 && (
-            <p className="text-muted-foreground text-sm">Sem histórico de prémios.</p>
+            <div className="col-span-full text-center py-12">
+              <Trophy className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm font-medium text-foreground">{EMPTY_STATE.prizes.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.prizes.description}</p>
+            </div>
           )}
         </div>
       </Reveal>

@@ -5,6 +5,7 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyBot } from "./discord.server";
 import { getTierOrder, isAdminTier, isSuperAdminTier } from "./config.loader";
+import { logAdminAction } from "./logging.functions";
 
 const TIERS = getTierOrder();
 
@@ -56,11 +57,23 @@ export const adminRenameMember = createServerFn({ method: "POST" })
     }).parse,
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, context.userId);
+    const me = await assertManager(context.supabase, context.userId);
+    const before = await pgOne<{ display_name: string | null; nickname: string | null }>(
+      "select display_name, nickname from members where id = $1", [data.id],
+    );
     await pgQuery(
       "update members set display_name = $2, nickname = $3, updated_at = now() where id = $1",
       [data.id, data.display_name, data.nickname ?? null],
     );
+    await logAdminAction(context.supabase, {
+      action: "member_renamed",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "member",
+      targetId: data.id,
+      details: `Renomeado de "${before?.display_name ?? ""}" para "${data.display_name}"`,
+      afterState: { nickname: data.nickname, previous: before },
+    });
     const did = await getDiscordId(data.id);
     if (did)
       await notifyBot({
@@ -117,28 +130,38 @@ export const adminSetTier = createServerFn({ method: "POST" })
     const isPromotingToHighCommand = isAdminTier(data.tier);
     const isDemotingFromHighCommand = targetTier ? isAdminTier(targetTier) : false;
 
+    let me;
     if (isPromotingToHighCommand || isDemotingFromHighCommand) {
-      await assertSuperAdminMember(context.supabase, context.userId);
+      me = await assertSuperAdminMember(context.supabase, context.userId);
     } else {
-      await assertManager(context.supabase, context.userId);
+      me = await assertManager(context.supabase, context.userId);
     }
     const before = await pgOne<{
       tier: string | null;
       discord_id: string | null;
-    }>("select tier, discord_id from members where id = $1", [data.id]);
+      display_name: string | null;
+    }>("select tier, discord_id, display_name from members where id = $1", [data.id]);
     await pgQuery(
       "update members set tier = $2, role = $2, updated_at = now() where id = $1",
       [data.id, data.tier],
     );
-    // Sync user_roles automatically (no more manual syncRolesFromTiers needed)
     await syncUserRolesForMember(data.id, data.tier, before?.tier ?? null);
+    const tierList = getTierOrder();
+    const fromIdx = tierList.indexOf(before?.tier ?? "young_blood");
+    const toIdx = tierList.indexOf(data.tier);
+    const isPromotion = toIdx >= fromIdx;
+    await logAdminAction(context.supabase, {
+      action: isPromotion ? "member_promoted" : "member_demoted",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "member",
+      targetId: data.id,
+      details: `${before?.display_name ?? "Membro"} ${isPromotion ? "promovido" : "despromovido"} de "${before?.tier ?? "?"}" para "${data.tier}"`,
+      afterState: { previous_tier: before?.tier, new_tier: data.tier },
+    });
     if (before?.discord_id) {
-      const tierList = getTierOrder();
-      const fromIdx = tierList.indexOf(before.tier ?? "young_blood");
-      const toIdx = tierList.indexOf(data.tier);
-      const action = toIdx >= fromIdx ? "promote" : "demote";
       await notifyBot({
-        action,
+        action: isPromotion ? "promote" : "demote",
         discord_id: before.discord_id,
         from_tier: before.tier,
         to_tier: data.tier,
@@ -158,18 +181,30 @@ export const adminKickMember = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const targetTier = await getMemberTier(data.id);
+    let me;
     if (targetTier && isAdminTier(targetTier)) {
-      await assertSuperAdminMember(context.supabase, context.userId);
+      me = await assertSuperAdminMember(context.supabase, context.userId);
     } else {
-      await assertManager(context.supabase, context.userId);
+      me = await assertManager(context.supabase, context.userId);
     }
-    const did = await getDiscordId(data.id);
+    const target = await pgOne<{ discord_id: string | null; display_name: string | null }>(
+      "select discord_id, display_name from members where id = $1", [data.id],
+    );
     await pgQuery(
       "update members set deleted_at = now(), updated_at = now() where id = $1",
       [data.id],
     );
-    if (did)
-      await notifyBot({ action: "kick", discord_id: did, reason: data.reason });
+    await logAdminAction(context.supabase, {
+      action: "member_kicked",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "member",
+      targetId: data.id,
+      details: `${target?.display_name ?? "Membro #" + data.id} kickado${data.reason ? " (" + data.reason + ")" : ""}`,
+      afterState: { reason: data.reason },
+    });
+    if (target?.discord_id)
+      await notifyBot({ action: "kick", discord_id: target.discord_id, reason: data.reason });
     return { ok: true };
   });
 
@@ -207,7 +242,7 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, context.userId);
+    const me = await assertManager(context.supabase, context.userId);
     // Ensure all_time_stats row exists for this member
     await pgQuery(`INSERT INTO all_time_stats (member_id, orders) VALUES ($1, 0) ON CONFLICT (member_id) DO NOTHING`, [data.id]);
     const reason = data.reason || "ajuste manual direção";
@@ -290,6 +325,22 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       );
     }
 
+    await logAdminAction(context.supabase, {
+      action: "member_stats_adjusted",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "member",
+      targetId: data.id,
+      details: data.reason || "ajuste manual direção",
+      afterState: {
+        kills_delta: data.kills_delta,
+        deaths_delta: data.deaths_delta,
+        deliveries_delta: data.deliveries_delta,
+        sales_delta: data.sales_delta,
+        orders_delta: data.orders_delta,
+        saidas_delta: data.saidas_delta,
+      },
+    });
     return { ok: true };
   });
 

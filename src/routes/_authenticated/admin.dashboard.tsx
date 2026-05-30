@@ -11,6 +11,7 @@ import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { cn } from "@/lib/utils";
+import { EMPTY_STATE, LOADING } from "@/lib/messages";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
   errorComponent: PageErrorBoundary,
@@ -78,10 +79,10 @@ function AdminDashboardPage() {
       </div>
 
       <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" staggerDelay={70} baseDelay={100}>
-        <KpiCard icon={Users} label="Membros ativos" value={k?.activeMembers ?? 0} sub={`de ${k?.totalMembers ?? 0} total`} />
-        <KpiCard icon={Package} label="Encomendas pendentes" value={k?.pendingOrders ?? 0} tone="warning" />
-        <KpiCard icon={DollarSign} label="Faturação (7d)" value={`${fmtPrice(k?.weeklyRevenue ?? 0)}`} tone="success" />
-        <KpiCard icon={TrendingUp} label="Valor stock" value={`${fmtPrice(k?.totalInventoryValue ?? 0)}`} />
+        <KpiCard icon={Users} label="Membros ativos" value={k?.activeMembers ?? 0} sub={`de ${k?.totalMembers ?? 0} total`} loading={kpis.isLoading} />
+        <KpiCard icon={Package} label="Encomendas pendentes" value={k?.pendingOrders ?? 0} tone="warning" loading={kpis.isLoading} />
+        <KpiCard icon={DollarSign} label="Faturação (7d)" value={`${fmtPrice(k?.weeklyRevenue ?? 0)}`} tone="success" loading={kpis.isLoading} />
+        <KpiCard icon={TrendingUp} label="Valor stock" value={`${fmtPrice(k?.totalInventoryValue ?? 0)}`} loading={kpis.isLoading} />
       </Stagger>
 
       {/* ── Ciclos de Encomendas (Chefia only) ── */}
@@ -102,11 +103,15 @@ function AdminDashboardPage() {
                 {cycles.isLoading && (
                   <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    A carregar ciclos...
+                    {LOADING.dashboard}
                   </div>
                 )}
                 {cycles.data && cycles.data.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4">Sem dados de encomendas.</p>
+                  <div className="col-span-full text-center py-6">
+                    <ShoppingCart className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-sm font-medium text-foreground">{EMPTY_STATE.orders.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.orders.description}</p>
+                  </div>
                 )}
                 <div className="space-y-4">
                   {cycles.data?.map((cycle) => (
@@ -147,7 +152,7 @@ function AdminDashboardPage() {
                           <div className="space-y-0">
                             {/* Header */}
                             <div className="grid grid-cols-[1fr_64px_80px_80px_80px] gap-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-1 mb-1">
-                              <span>Item</span>
+                              <span>Material</span>
                               <span className="text-right">Qtd</span>
                               <span className="text-right">Receita</span>
                               <span className="text-right">Custo</span>
@@ -177,30 +182,6 @@ function AdminDashboardPage() {
       )}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Reveal direction="up" delay={200}>
-          <Card className="interactive-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-display text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                Stock crítico
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {k?.lowStock.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhum item em stock crítico.</p>
-              )}
-              <div className="space-y-1.5">
-                {k?.lowStock.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between rounded-sm bg-destructive/5 px-2 py-1.5 text-sm">
-                    <span>{item.name}</span>
-                    <span className="font-mono text-xs text-destructive">{item.balance} em casa</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </Reveal>
-
         <Reveal direction="up" delay={300}>
           <Card className="interactive-card">
             <CardHeader className="pb-2">
@@ -211,7 +192,11 @@ function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               {k?.inactiveMembers.length === 0 && (
-                <p className="text-sm text-muted-foreground">Todos os membros estão activos.</p>
+                <div className="text-center py-6">
+                  <Users className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm font-medium text-foreground">Toda a tropa na ativa</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ninguém está inativo há mais de 14 dias.</p>
+                </div>
               )}
               <div className="space-y-1.5">
                 {k?.inactiveMembers.map((m) => (
@@ -229,12 +214,13 @@ function AdminDashboardPage() {
   );
 }
 
-function KpiCard({ icon: Icon, label, value, sub, tone }: {
+function KpiCard({ icon: Icon, label, value, sub, tone, loading }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string | number;
   sub?: string;
   tone?: "success" | "warning" | "destructive";
+  loading?: boolean;
 }) {
   const color = tone === "success" ? "text-emerald-400" : tone === "warning" ? "text-amber-400" : tone === "destructive" ? "text-destructive" : "text-foreground";
   return (
@@ -245,7 +231,14 @@ function KpiCard({ icon: Icon, label, value, sub, tone }: {
           <Icon className={cn("h-4 w-4", tone ? color : "text-muted-foreground/60")} />
         </div>
         <div className={cn("mt-1 text-3xl font-bold tabular-nums font-display", color)}>
-          {value}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-16 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">{LOADING.dashboard}</p>
+            </div>
+          ) : (
+            value
+          )}
         </div>
         {sub && <div className="mt-1 text-[10px] text-muted-foreground/60">{sub}</div>}
       </CardContent>

@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { notifyBot } from "./discord.server";
+import { logAdminAction } from "./logging.functions";
 
 type PrizeRow = {
   id: number;
@@ -100,7 +101,7 @@ export const setPrize = createServerFn({ method: "POST" })
     // Notify bot to DM winner
     if (prizeRow?.winner_member_id) {
       const memberRow = await pgOne<{ discord_id: string | null }>(
-        `select discord_id from members where id = $1`,
+        `select discord_id from members where id = $1 and deleted_at is null`,
         [prizeRow.winner_member_id],
       );
       if (memberRow?.discord_id) {
@@ -115,6 +116,17 @@ export const setPrize = createServerFn({ method: "POST" })
       }
     }
 
+    await logAdminAction(context.supabase, {
+      action: isDelivered ? "prize_delivered" : "prize_set",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "prize",
+      targetId: data.id,
+      details: isDelivered
+        ? `Prémio #${data.id} marcado como entregue`
+        : `Prémio #${data.id} definido: ${data.prize_type ?? "?"}`,
+      afterState: { prize_type: data.prize_type, status: data.status },
+    });
     return { ok: true };
   });
 
@@ -156,5 +168,13 @@ export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
         `web:${context.userId}`,
       ],
     );
+    await logAdminAction(context.supabase, {
+      action: "prize_set",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "prize",
+      targetId: row?.id ?? 0,
+      details: `Prémio gerado para semana ${top.week_start} (vencedor: ${top.member_id})`,
+    });
     return { id: row?.id, created: true };
   });

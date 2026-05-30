@@ -10,8 +10,14 @@ import {
   getMaterialItemsAdmin,
   updateItemRecipeAdmin,
 } from "@/lib/recipes.admin.functions";
+import {
+  listItemTierSurcharges,
+  upsertItemTierSurcharge,
+} from "@/lib/tier-pricing.functions";
 import { getCategoryLabel } from "@/lib/config.loader";
+import { ARMORY_CAT_CONFIG } from "@/lib/armory.catalog";
 import { PageHeader } from "@/components/layout/AppShell";
+import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +32,8 @@ import {
 } from "@/components/ui/dialog";
 import { fmtPrice } from "@/lib/domain";
 import { toast } from "sonner";
-import React, { useState, useMemo } from "react";
+import { beautifyError } from "@/lib/messages";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   Trash2,
@@ -35,10 +42,6 @@ import {
   Loader2,
   Package,
   Search,
-  X,
-  Check,
-  ChevronDown,
-  ChevronUp,
   Star,
   Tag,
 } from "lucide-react";
@@ -50,7 +53,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/admin/itens")({
   errorComponent: PageErrorBoundary,
   head: () => ({
-    meta: [{ title: "Gestão de Items | Ballas Gang" }],
+    meta: [{ title: "Gestão de Materiais | Ballas Gang" }],
   }),
   component: AdminItemsPage,
 });
@@ -60,6 +63,22 @@ const SIDE_META: Record<string, { label: string; color: string }> = {
   compra: { label: "Compra", color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
   ambos: { label: "Ambos", color: "bg-purple-500/15 text-purple-400 border-purple-500/30" },
 };
+
+const TIER_LABELS: Record<string, string> = {
+  young_blood: "Bairrista-1",
+  o_gunao: "Bairrista-2",
+  gangster_fodido: "Bairrista-3",
+};
+
+const TIER_ORDER = ["young_blood", "o_gunao", "gangster_fodido"] as const;
+
+function computeTierPrices(item: any, surcharges?: Map<string, number>): { tier: string; label: string; price: number }[] {
+  const basePrice = item.min_sale_price ?? 0;
+  return TIER_ORDER.map((t) => {
+    const surcharge = surcharges?.get(t) ?? 0;
+    return { tier: t, label: TIER_LABELS[t], price: basePrice + surcharge };
+  });
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   armas_orange: "bg-orange-500/15 text-orange-400 border-orange-500/30",
@@ -97,28 +116,20 @@ function AdminItemsPage() {
   const bulkDeleteFn = useAuthedServerFn(deleteItemsAdmin);
   const materialsFn = useAuthedServerFn(getMaterialItemsAdmin);
   const updateRecipeFn = useAuthedServerFn(updateItemRecipeAdmin);
+  const listSurchargesFn = useAuthedServerFn(listItemTierSurcharges);
 
   const items = useQuery({ queryKey: ["dbItemsAdmin"], queryFn: () => listFn() });
   const materials = useQuery({ queryKey: ["materialItemsAdmin"], queryFn: () => materialsFn() });
+  const surchargesQuery = useQuery({ queryKey: ["tierSurcharges"], queryFn: () => listSurchargesFn() });
 
   const [filter, setFilter] = useState("");
   const [catFilter, setCatFilter] = useState<string>("");
   const [sideFilter, setSideFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<any>({ name: "", category: "armas_orange", side: "venda" });
-  const [expandedRecipes, setExpandedRecipes] = useState<Set<number>>(new Set());
-
-  function toggleRecipe(id: number) {
-    setExpandedRecipes((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  }
 
   const updateM = useMutation({
     mutationFn: (v: any) => updateFn({ data: v }),
@@ -129,9 +140,9 @@ function AdminItemsPage() {
       qc.invalidateQueries({ queryKey: ["stock"] });
       qc.invalidateQueries({ queryKey: ["recipes"] });
       setEditingItem(null);
-      toast.success("Item atualizado");
+      toast.success("Material atualizado");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const createM = useMutation({
@@ -140,9 +151,9 @@ function AdminItemsPage() {
       qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
       setShowAdd(false);
       setAddForm({ name: "", category: "armas_orange", side: "venda" });
-      toast.success("Item criado");
+      toast.success("Material criado");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const deleteM = useMutation({
@@ -151,7 +162,7 @@ function AdminItemsPage() {
       qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
       setSelected((prev) => { const n = new Set(prev); n.delete(deletedId); return n; });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const bulkDeleteM = useMutation({
@@ -163,7 +174,7 @@ function AdminItemsPage() {
       setSelected(new Set());
       toast.success(`${ids.length} items removidos`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const updateRecipeM = useMutation({
@@ -173,7 +184,7 @@ function AdminItemsPage() {
       qc.invalidateQueries({ queryKey: ["recipes"] });
       toast.success("Receita atualizada");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const filtered = useMemo(() => {
@@ -181,10 +192,9 @@ function AdminItemsPage() {
       const matchesName = it.name.toLowerCase().includes(filter.toLowerCase());
       const matchesCat = !catFilter || it.category === catFilter;
       const matchesSide = !sideFilter || it.side === sideFilter;
-      const matchesStatus = statusFilter === "" ? true : statusFilter === "active" ? it.active : !it.active;
-      return matchesName && matchesCat && matchesSide && matchesStatus;
+      return matchesName && matchesCat && matchesSide;
     });
-  }, [items.data, filter, catFilter, sideFilter, statusFilter]);
+  }, [items.data, filter, catFilter, sideFilter]);
 
   const categoriesInUse = useMemo(() => {
     const set = new Set<string>();
@@ -214,144 +224,99 @@ function AdminItemsPage() {
     });
   }
 
-  const activeCount = (items.data ?? []).filter((it: any) => it.active).length;
-  const inactiveCount = (items.data ?? []).length - activeCount;
+
 
   return (
     <>
       <PageHeader
         eyebrow="Direção"
-        title="Gestão de Items"
-        description="Adicionar, editar e remover items da firma"
+        title="Gestão de Materiais"
+        description="Adicionar, editar e remover materiais da firma"
       />
 
-      {/* Stats */}
+      {/* Category counts */}
       <Reveal direction="up" delay={50}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <Card className="interactive-card">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="rounded-lg bg-primary/10 p-2">
-                <Package className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <div className="text-lg font-bold leading-none">{(items.data ?? []).length}</div>
-                <div className="text-[11px] text-muted-foreground">Total items</div>
-              </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin">
+          <Card className={cn("interactive-card shrink-0 cursor-pointer", !catFilter && "ring-1 ring-primary/40")} onClick={() => setCatFilter("")}>
+            <CardContent className="px-3 py-2 flex items-center gap-2">
+              <Package className="h-3.5 w-3.5 text-primary" />
+              <div className="text-sm font-bold leading-none">{(items.data ?? []).length}</div>
+              <div className="text-[10px] text-muted-foreground">Total</div>
             </CardContent>
           </Card>
-          <Card className="interactive-card">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="rounded-lg bg-emerald-500/10 p-2">
-                <Check className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div>
-                <div className="text-lg font-bold leading-none">{activeCount}</div>
-                <div className="text-[11px] text-muted-foreground">Activos</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="interactive-card">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="rounded-lg bg-muted p-2">
-                <X className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <div className="text-lg font-bold leading-none">{inactiveCount}</div>
-                <div className="text-[11px] text-muted-foreground">Inactivos</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="interactive-card">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="rounded-lg bg-amber-500/10 p-2">
-                <Star className="h-4 w-4 text-amber-400" />
-              </div>
-              <div>
-                <div className="text-lg font-bold leading-none">{selected.size}</div>
-                <div className="text-[11px] text-muted-foreground">Seleccionados</div>
-              </div>
-            </CardContent>
-          </Card>
+          {categoriesInUse.map((c) => {
+            const count = (items.data ?? []).filter((it: any) => it.category === c).length;
+            const cfg = CATEGORY_COLORS[c] ?? "";
+            const isActive = catFilter === c;
+            return (
+              <Card
+                key={c}
+                className={cn("interactive-card shrink-0 cursor-pointer", isActive && "ring-1 ring-primary/40")}
+                onClick={() => setCatFilter(isActive ? "" : c)}
+              >
+                <CardContent className="px-3 py-2 flex items-center gap-2">
+                  <span className={cn("inline-block h-2 w-2 rounded-full", cfg.split(" ")[0]?.replace("bg-", "bg-") ?? "bg-muted")} />
+                  <div className="text-sm font-bold leading-none">{count}</div>
+                  <div className="text-[10px] text-muted-foreground whitespace-nowrap">{getCategoryLabel(c)}</div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {selected.size > 0 && (
+            <Card className="interactive-card shrink-0 border-amber-500/30">
+              <CardContent className="px-3 py-2 flex items-center gap-2">
+                <Star className="h-3.5 w-3.5 text-amber-400" />
+                <div className="text-sm font-bold leading-none">{selected.size}</div>
+                <div className="text-[10px] text-muted-foreground">Selecionados</div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </Reveal>
 
       {/* Filters */}
       <Reveal direction="up" delay={100}>
-        <div className="flex flex-col gap-3 mb-4">
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Procurar item..."
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Button size="sm" onClick={() => setShowAdd((v) => !v)}>
-              <Plus className="mr-1 h-4 w-4" />
-              {showAdd ? "Cancelar" : "Novo item"}
-            </Button>
-            {selected.size > 0 && (
-              <Button size="sm" variant="destructive" onClick={() => {
-                if (confirm(`Remover ${selected.size} items?`)) bulkDeleteM.mutate(Array.from(selected));
-              }}>
-                <Trash2 className="mr-1 h-4 w-4" /> Remover {selected.size}
-              </Button>
-            )}
+        <div className="flex flex-wrap gap-2 items-center mb-4">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Procurar item..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="pl-9"
+            />
           </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => setCatFilter("")}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs transition-colors",
-                !catFilter ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-muted"
-              )}
-            >
-              Todas
-            </button>
+          <select
+            value={catFilter}
+            onChange={(e) => setCatFilter(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          >
+            <option value="">Todas as categorias</option>
             {categoriesInUse.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCatFilter(catFilter === c ? "" : c)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  catFilter === c ? CATEGORY_COLORS[c] ?? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-muted"
-                )}
-              >
-                {getCategoryLabel(c)}
-              </button>
+              <option key={c} value={c}>{getCategoryLabel(c)}</option>
             ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {(["", "active", "inactive"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  statusFilter === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-muted"
-                )}
-              >
-                {s === "" ? "Todos" : s === "active" ? "Activos" : "Inactivos"}
-              </button>
-            ))}
-            <div className="w-px h-4 bg-border mx-1" />
-            {(["", "venda", "compra", "ambos"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSideFilter(sideFilter === s ? "" : s)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  sideFilter === s ? SIDE_META[s]?.color ?? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-muted"
-                )}
-              >
-                {s === "" ? "Todos os lados" : SIDE_META[s]?.label ?? s}
-              </button>
-            ))}
-          </div>
+          </select>
+          <select
+            value={sideFilter}
+            onChange={(e) => setSideFilter(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          >
+            <option value="">Todos os lados</option>
+            <option value="venda">Venda</option>
+            <option value="compra">Compra</option>
+            <option value="ambos">Ambos</option>
+          </select>
+          <Button size="sm" onClick={() => setShowAdd((v) => !v)}>
+            <Plus className="mr-1 h-4 w-4" />
+            {showAdd ? "Cancelar" : "Novo item"}
+          </Button>
+          {selected.size > 0 && (
+            <Button size="sm" variant="destructive" onClick={() => {
+              if (confirm(`Remover ${selected.size} materiais?`)) bulkDeleteM.mutate(Array.from(selected));
+            }}>
+              <Trash2 className="mr-1 h-4 w-4" /> Remover {selected.size}
+            </Button>
+          )}
         </div>
       </Reveal>
 
@@ -362,7 +327,7 @@ function AdminItemsPage() {
             <CardHeader>
               <CardTitle className="text-display text-sm flex items-center gap-2">
                 <Plus className="h-4 w-4 text-primary" />
-                Novo Item
+                Novo Material
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -391,29 +356,15 @@ function AdminItemsPage() {
         </Reveal>
       )}
 
-      {/* Items grid */}
-      <Reveal direction="up" delay={150}>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.length === 0 && !items.isLoading && (
-            <div className="col-span-full text-center py-12 text-muted-foreground">
-              <Package className="mx-auto h-10 w-10 opacity-30 mb-3" />
-              <p className="text-sm">Nenhum item encontrado</p>
-            </div>
-          )}
-          {filtered.map((it: any) => (
-            <ItemCard
-              key={it.id}
-              item={it}
-              isSelected={selected.has(it.id)}
-              onToggleSelect={() => toggleSelect(it.id)}
-              onEdit={() => setEditingItem(it)}
-              onDelete={() => deleteM.mutate(it.id)}
-              isExpanded={expandedRecipes.has(it.id)}
-              onToggleRecipe={() => toggleRecipe(it.id)}
-            />
-          ))}
-        </div>
-      </Reveal>
+      {/* Grid de materiais agrupados por categoria */}
+      <AdminItemsGrid
+        items={filtered}
+        isLoading={items.isLoading}
+        selected={selected}
+        toggleSelect={toggleSelect}
+        onEdit={(it: any) => setEditingItem(it)}
+        surcharges={surchargesQuery.data ?? []}
+      />
 
       {/* Edit Dialog */}
       {editingItem && (
@@ -430,119 +381,200 @@ function AdminItemsPage() {
   );
 }
 
+const ADMIN_SECTIONS: { key: string; label: string; categories: string[] }[] = [
+  { key: "armas_orange", label: "Armas Orange", categories: ["armas_orange"] },
+  { key: "armas_red", label: "Armas Red", categories: ["armas_red"] },
+  { key: "carregadores", label: "Carregadores", categories: ["carregadores", "municoes"] },
+  { key: "acessorios_coletes", label: "Acessórios & Coletes", categories: ["acessorios", "coletes", "acessorios_armas"] },
+  { key: "prints", label: "Prints", categories: ["prints"] },
+  { key: "corpos", label: "Corpos", categories: ["corpos"] },
+  { key: "materiais_craft", label: "Materiais de Fabricação", categories: ["materiais", "reciclagem", "metais", "madeiras", "texteis", "componentes"] },
+];
+
+function AdminItemsGrid({
+  items,
+  isLoading,
+  selected,
+  toggleSelect,
+  onEdit,
+  surcharges,
+}: {
+  items: any[];
+  isLoading: boolean;
+  selected: Set<number>;
+  toggleSelect: (id: number) => void;
+  onEdit: (item: any) => void;
+  surcharges: Array<{ item_id: number; tier: string; surcharge: number }>;
+}) {
+  const surchargeMap = useMemo(() => {
+    const map = new Map<number, Map<string, number>>();
+    for (const s of surcharges) {
+      if (!map.has(s.item_id)) map.set(s.item_id, new Map());
+      map.get(s.item_id)!.set(s.tier, s.surcharge);
+    }
+    return map;
+  }, [surcharges]);
+  if (items.length === 0 && !isLoading) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Package className="mx-auto h-10 w-10 opacity-30 mb-3" />
+        <p className="text-sm">Nenhum item encontrado</p>
+      </div>
+    );
+  }
+
+  const grouped = new Map<string, any[]>();
+  for (const it of items) {
+    const sec = ADMIN_SECTIONS.find((s) => s.categories.includes(it.category));
+    const key = sec?.key ?? "outros";
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(it);
+  }
+
+  return (
+    <div className="space-y-6">
+      {ADMIN_SECTIONS.map((sec) => {
+        const list = grouped.get(sec.key) ?? [];
+        if (!list.length) return null;
+        const cfg = ARMORY_CAT_CONFIG[sec.key as keyof typeof ARMORY_CAT_CONFIG];
+        return (
+          <section key={sec.key}>
+            <CategoryHeader
+              category={sec.key}
+              label={sec.label}
+              right={`${list.length} item${list.length > 1 ? "s" : ""}`}
+            />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 mt-2">
+              {list.map((it: any) => (
+                <ItemCard
+                  key={it.id}
+                  item={it}
+                  isSelected={selected.has(it.id)}
+                  onToggleSelect={() => toggleSelect(it.id)}
+                  onEdit={() => onEdit(it)}
+                  itemSurcharges={surchargeMap.get(it.id) ?? null}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+      {/* Others — items that don't fit in any section */}
+      {(() => {
+        const others = grouped.get("outros") ?? [];
+        if (!others.length) return null;
+        return (
+          <section>
+            <CategoryHeader category="outros" label="Outros" right={`${others.length} item${others.length > 1 ? "s" : ""}`} />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 mt-2">
+              {others.map((it: any) => (
+                <ItemCard
+                  key={it.id}
+                  item={it}
+                  isSelected={selected.has(it.id)}
+                  onToggleSelect={() => toggleSelect(it.id)}
+                  onEdit={() => onEdit(it)}
+                  itemSurcharges={surchargeMap.get(it.id) ?? null}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+    </div>
+  );
+}
+
 function ItemCard({
   item,
   isSelected,
   onToggleSelect,
   onEdit,
-  onDelete,
-  isExpanded,
-  onToggleRecipe,
+  itemSurcharges,
 }: {
   item: any;
   isSelected: boolean;
   onToggleSelect: () => void;
   onEdit: () => void;
-  onDelete: () => void;
-  isExpanded: boolean;
-  onToggleRecipe: () => void;
+  itemSurcharges: Map<string, number> | null;
 }) {
   const sideMeta = SIDE_META[item.side ?? "venda"] ?? SIDE_META.venda;
   const catClass = CATEGORY_COLORS[item.category ?? "outros"] ?? CATEGORY_COLORS.outros;
 
   return (
-    <Card className={cn("interactive-card overflow-hidden transition-opacity", !item.active && "opacity-60")}>
+    <Card className="interactive-card overflow-hidden cursor-pointer" onClick={onEdit}>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2.5 min-w-0">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={onToggleSelect}
-              className="mt-1"
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm truncate">{item.name}</span>
-                {!item.active && (
-                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-red-500/30 text-red-400 bg-red-500/10">
-                    Inactivo
-                  </Badge>
-                )}
-                {!item.in_config && (
-                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-amber-500/30 text-amber-400 bg-amber-500/10">
-                    Só DB
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", catClass)}>
-                  <Tag className="h-2.5 w-2.5 mr-1" />
-                  {getCategoryLabel(item.category)}
-                </Badge>
-                <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", sideMeta.color)}>
-                  {sideMeta.label}
-                </Badge>
-                {item.xp_points > 0 && (
-                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-amber-500/30 text-amber-400 bg-amber-500/10">
-                    <Star className="h-2.5 w-2.5 mr-1" />
-                    {item.xp_points} XP
-                  </Badge>
-                )}
-              </div>
+        <div className="flex items-start gap-2.5 min-w-0">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm truncate">{item.name}</span>
             </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors" onClick={onEdit}>
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button className="text-muted-foreground hover:text-destructive p-1 rounded-md hover:bg-destructive/10 transition-colors" onClick={onDelete}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", catClass)}>
+                <Tag className="h-2.5 w-2.5 mr-1" />
+                {getCategoryLabel(item.category)}
+              </Badge>
+              <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", sideMeta.color)}>
+                {sideMeta.label}
+              </Badge>
+              {item.xp_points > 0 && (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-amber-500/30 text-amber-400 bg-amber-500/10">
+                  <Star className="h-2.5 w-2.5 mr-1" />
+                  {item.xp_points} XP
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Prices */}
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-md bg-muted/40 p-2">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Base (oficiais)</div>
-            <div className="font-mono text-sm font-medium">{fmtPrice(item.purchase_price)}</div>
-          </div>
-          <div className="rounded-md bg-muted/40 p-2">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Morador</div>
-            <div className="font-mono text-sm font-medium">{fmtPrice(item.morador_purchase_price)}</div>
-          </div>
-          <div className="rounded-md bg-muted/40 p-2">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Venda (c/ mat.)</div>
-            <div className="font-mono text-sm font-medium text-emerald-400">{fmtPrice(item.min_sale_price)}</div>
-          </div>
-          <div className="rounded-md bg-muted/40 p-2">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Estimado</div>
-            <div className="font-mono text-sm font-medium">{fmtPrice(item.estimated_value)}</div>
-          </div>
+          {item.min_sale_price > 0 && (
+            <div className="rounded-md bg-muted/40 p-2">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Com material</div>
+              <div className="font-mono text-sm font-medium text-emerald-400">{fmtPrice(item.min_sale_price)}</div>
+            </div>
+          )}
+          {item.purchase_price > 0 && (
+            <div className="rounded-md bg-muted/40 p-2">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Sem material</div>
+              <div className="font-mono text-sm font-medium">{fmtPrice(item.purchase_price)}</div>
+            </div>
+          )}
+          {item.estimated_value > 0 && (
+            <div className="rounded-md bg-muted/40 p-2">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Valor estimado</div>
+              <div className="font-mono text-sm font-medium">{fmtPrice(item.estimated_value)}</div>
+            </div>
+          )}
+          {(() => {
+            const tiers = computeTierPrices(item, itemSurcharges ?? undefined);
+            const hasDiff = tiers.some((t) => t.price !== tiers[0].price);
+            if (!hasDiff || item.min_sale_price <= 0) return null;
+            return (
+              <>
+                <div className="rounded-md bg-muted/40 p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Bairrista-1</div>
+                  <div className="font-mono text-sm font-medium text-emerald-400">{fmtPrice(tiers[0].price)}</div>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Bairrista-3</div>
+                  <div className="font-mono text-sm font-medium text-emerald-400">{fmtPrice(tiers[2].price)}</div>
+                </div>
+              </>
+            );
+          })()}
         </div>
-
-        {/* Recipe preview */}
-        {item.ingredients && item.ingredients.length > 0 && (
-          <button
-            onClick={onToggleRecipe}
-            className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
-          >
-            <Package className="h-3 w-3" />
-            <span>{item.ingredients.length} material{item.ingredients.length !== 1 ? "is" : ""}</span>
-            {isExpanded ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
-          </button>
-        )}
-        {isExpanded && item.ingredients && item.ingredients.length > 0 && (
-          <div className="mt-2 rounded-md bg-muted/30 p-2 text-xs space-y-1">
-            {item.ingredients.map((ing: any) => (
-              <div key={ing.ingredient_item_id} className="flex justify-between items-center">
-                <span className="text-muted-foreground">{ing.ingredient_name ?? `Item #${ing.ingredient_item_id}`}</span>
-                <span className="font-mono">{ing.quantity} {ing.quantity === 1 ? "unidade" : "unidades"}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -563,18 +595,19 @@ function EditItemDialog({
   onUpdateRecipe: (data: any) => void;
   pending: boolean;
 }) {
+  const listSurchargesFn = useAuthedServerFn(listItemTierSurcharges);
+  const upsertSurchargeFn = useAuthedServerFn(upsertItemTierSurcharge);
+
   const [form, setForm] = useState({
     item_id: item.id,
     name: item.name,
     category: item.category ?? "",
-    subcategory: item.subcategory ?? "",
     side: item.side ?? "venda",
     purchase_price: item.purchase_price ?? 0,
     morador_purchase_price: item.morador_purchase_price ?? 0,
     min_sale_price: item.min_sale_price ?? 0,
     estimated_value: item.estimated_value ?? 0,
     xp_points: item.xp_points ?? 0,
-    active: item.active,
   });
 
   const [recipeIngredients, setRecipeIngredients] = useState<
@@ -589,6 +622,22 @@ function EditItemDialog({
 
   const [newMaterialId, setNewMaterialId] = useState("");
   const [newMaterialQty, setNewMaterialQty] = useState("1");
+
+  // Surcharges state: tier -> value
+  const [surcharges, setSurcharges] = useState<Record<string, number>>({});
+
+  // Fetch surcharges on mount
+  useEffect(() => {
+    listSurchargesFn().then((rows) => {
+      const map: Record<string, number> = {};
+      for (const row of rows) {
+        if (row.item_id === item.id) {
+          map[row.tier] = row.surcharge;
+        }
+      }
+      setSurcharges(map);
+    });
+  }, [item.id]);
 
   function addMaterial() {
     if (!newMaterialId) return;
@@ -608,21 +657,40 @@ function EditItemDialog({
     setRecipeIngredients(recipeIngredients.map((r) => (r.ingredient_item_id === id ? { ...r, quantity: qty } : r)));
   }
 
-  function handleSave() {
+  async function handleSave() {
     onSave(form);
-  }
-
-  function handleSaveRecipe() {
-    onUpdateRecipe({
-      item_id: item.id,
-      ingredients: recipeIngredients.map((r) => ({
-        ingredient_item_id: r.ingredient_item_id,
-        quantity: r.quantity,
-      })),
-    });
+    if (recipeIngredients.length > 0 || (item.ingredients ?? []).length > 0) {
+      onUpdateRecipe({
+        item_id: item.id,
+        ingredients: recipeIngredients.map((r) => ({
+          ingredient_item_id: r.ingredient_item_id,
+          quantity: r.quantity,
+        })),
+      });
+    }
+    // Save surcharges
+    for (const tier of TIER_ORDER) {
+      const val = surcharges[tier] ?? 0;
+      await upsertSurchargeFn({ data: { item_id: item.id, tier, surcharge: val } });
+    }
   }
 
   const availableMaterials = materials.filter((m) => !recipeIngredients.some((r) => r.ingredient_item_id === m.id));
+
+  const surchargeMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const tier of TIER_ORDER) {
+      const val = surcharges[tier] ?? 0;
+      if (val > 0) m.set(tier, val);
+    }
+    return m;
+  }, [surcharges]);
+
+  const tierPrices = useMemo(
+    () => computeTierPrices({ ...item, min_sale_price: form.min_sale_price }, surchargeMap),
+    [item, form.min_sale_price, surchargeMap]
+  );
+  const hasTierDiff = tierPrices.some((t) => t.price !== tierPrices[0].price);
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -660,12 +728,6 @@ function EditItemDialog({
                 </select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Subcategoria</label>
-                <Input value={form.subcategory} onChange={(e) => setForm({ ...form, subcategory: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Side</label>
                 <select
                   value={form.side}
@@ -677,31 +739,6 @@ function EditItemDialog({
                   <option value="ambos">Ambos</option>
                 </select>
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Estado</label>
-                <div className="flex items-center gap-2 h-9">
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, active: true })}
-                    className={cn(
-                      "flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors",
-                      form.active ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : "bg-background border-input hover:bg-muted"
-                    )}
-                  >
-                    Activo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, active: false })}
-                    className={cn(
-                      "flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors",
-                      !form.active ? "bg-red-500/15 text-red-400 border-red-500/30" : "bg-background border-input hover:bg-muted"
-                    )}
-                  >
-                    Inactivo
-                  </button>
-                </div>
-              </div>
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">XP Points</label>
@@ -712,22 +749,58 @@ function EditItemDialog({
           <TabsContent value="precos" className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Preço base (oficiais)</label>
-                <Input type="number" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Preço morador</label>
-                <Input type="number" value={form.morador_purchase_price} onChange={(e) => setForm({ ...form, morador_purchase_price: Number(e.target.value) })} />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Preço venda (com material)</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Preço com material</label>
                 <Input type="number" value={form.min_sale_price} onChange={(e) => setForm({ ...form, min_sale_price: Number(e.target.value) })} />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Valor estimado</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Preço sem material</label>
+                <Input type="number" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Valor estimado (sujo)</label>
                 <Input type="number" value={form.estimated_value} onChange={(e) => setForm({ ...form, estimated_value: Number(e.target.value) })} />
               </div>
             </div>
+
+            {/* Acrescimos por cargo */}
+            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-3">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Acréscimos / Decréscimos por cargo (sobre preço com material)
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {TIER_ORDER.map((tier) => (
+                  <div key={tier}>
+                    <label className="text-[10px] text-muted-foreground mb-1 block">{TIER_LABELS[tier]}</label>
+                    <Input
+                      type="number"
+                      value={surcharges[tier] ?? 0}
+                      onChange={(e) => setSurcharges((prev) => ({ ...prev, [tier]: Number(e.target.value) }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tier prices preview */}
+            {hasTierDiff && (
+              <div className="rounded-md border border-border bg-muted/20 p-3">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  Preços finais por nível de morador
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="rounded-md bg-background border border-border p-2 text-center">
+                    <div className="text-[10px] text-muted-foreground">Oficial+</div>
+                    <div className="font-mono text-sm font-semibold text-emerald-400">{fmtPrice(form.min_sale_price)}</div>
+                  </div>
+                  {tierPrices.map((t) => (
+                    <div key={t.tier} className="rounded-md bg-background border border-border p-2 text-center">
+                      <div className="text-[10px] text-muted-foreground">{t.label}</div>
+                      <div className="font-mono text-sm font-semibold text-emerald-400">{fmtPrice(t.price)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="materiais" className="space-y-3">
@@ -771,7 +844,7 @@ function EditItemDialog({
                 return (
                   <div key={ing.ingredient_item_id} className="flex items-center gap-2 rounded-md border border-border bg-card p-2">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{mat?.name ?? `Item #${ing.ingredient_item_id}`}</div>
+                      <div className="text-sm font-medium truncate">{mat?.name ?? `Material #${ing.ingredient_item_id}`}</div>
                       <div className="text-[11px] text-muted-foreground">{getCategoryLabel(mat?.category)}</div>
                     </div>
                     <Input
@@ -792,15 +865,6 @@ function EditItemDialog({
               })}
             </div>
 
-            <Button
-              size="sm"
-              onClick={handleSaveRecipe}
-              disabled={pending}
-              className="w-full"
-            >
-              {pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-              Guardar receita
-            </Button>
           </TabsContent>
         </Tabs>
 
@@ -810,7 +874,7 @@ function EditItemDialog({
           </Button>
           <Button onClick={handleSave} disabled={pending}>
             {pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-            Guardar alterações
+            Guardar
           </Button>
         </DialogFooter>
       </DialogContent>

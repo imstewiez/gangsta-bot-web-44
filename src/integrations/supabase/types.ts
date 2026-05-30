@@ -147,6 +147,41 @@ export type Database = {
         }
         Relationships: []
       }
+      item_tier_surcharges: {
+        Row: {
+          id: number
+          item_id: number
+          tier: string
+          surcharge: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          item_id: number
+          tier: string
+          surcharge?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          item_id?: number
+          tier?: string
+          surcharge?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_tier_surcharges_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       items: {
         Row: {
           id: number

@@ -33,20 +33,20 @@ export const listMembers = createServerFn({ method: "GET" })
       const me = await resolveCurrentMember(context.supabase, context.userId);
       const isManager = me?.is_manager ?? false;
       const rows = await pgQuery<MemberRow>(
-        `select id, ${isManager ? 'discord_id' : 'null as discord_id'}, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle
-         from members
-         where deleted_at is null
-           and (status = 'ativo' or status is null)
+        `select m.id, ${isManager ? 'm.discord_id' : 'null as discord_id'}, m.display_name, m.nickname as nick, m.tier, coalesce(m.role,'bairrista') as role_label, m.joined_at, m.status as status_lifecycle
+         from members m
+         where m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
          order by
-           case coalesce(role,'bairrista')
+           case coalesce(m.role,'bairrista')
              when 'manda_chuva' then 1
              when 'kingpin' then 2
              when 'og' then 3
              when 'real_gangster' then 4
              when 'patrao_di_zona' then 5
              else 6 end,
-           case tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
-           display_name nulls last
+           case m.tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
+           m.display_name nulls last
          limit 500`,
       );
       return rows;
@@ -63,20 +63,20 @@ export const listManagers = createServerFn({ method: "GET" })
       const me = await resolveCurrentMember(context.supabase, context.userId);
       const isManager = me?.is_manager ?? false;
       const rows = await pgQuery<MemberRow>(
-        `select id, ${isManager ? 'discord_id' : 'null as discord_id'}, display_name, nickname as nick, tier, coalesce(role,'bairrista') as role_label, joined_at, status as status_lifecycle
-         from members
-         where deleted_at is null
-           and (status = 'ativo' or status is null)
-           and tier in ('patrao_di_zona', 'kingpin', 'manda_chuva')
+        `select m.id, ${isManager ? 'm.discord_id' : 'null as discord_id'}, m.display_name, m.nickname as nick, m.tier, coalesce(m.role,'bairrista') as role_label, m.joined_at, m.status as status_lifecycle
+         from members m
+         where m.deleted_at is null
+           and (m.status = 'ativo' or m.status is null)
+           and m.tier in ('patrao_di_zona', 'kingpin', 'manda_chuva')
          order by
-           case coalesce(role,'bairrista')
+           case coalesce(m.role,'bairrista')
              when 'manda_chuva' then 1
              when 'kingpin' then 2
              when 'og' then 3
              when 'real_gangster' then 4
              when 'patrao_di_zona' then 5
              else 6 end,
-           display_name nulls last
+           m.display_name nulls last
          limit 200`,
       );
       return rows;

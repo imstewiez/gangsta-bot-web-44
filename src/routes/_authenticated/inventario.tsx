@@ -1,21 +1,17 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { getStock, getLedger, adjustStock, type StockRow as StockRowType } from "@/lib/inventory.functions";
+import { getStock, getLedger, type StockRow as StockRowType } from "@/lib/inventory.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
-import { updateItemPrice } from "@/lib/recipes.admin.functions";
 import { PageHeader } from "@/components/layout/AppShell";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { fmtNum, fmtDate, fmtPrice } from "@/lib/domain";
-import { supabase } from "@/integrations/supabase/client";
-import { Package, History, Pencil, Check, X, Loader2 } from "lucide-react";
+import { Package, History, Loader2 } from "lucide-react";
 import { AccessDenied } from "@/components/domain/AccessDenied";
-import { CategoryIcon, ItemIcon } from "@/components/domain/ItemIcon";
+import { EMPTY_STATE, LOADING } from "@/lib/messages";
+import { ItemIcon } from "@/components/domain/ItemIcon";
 import { CategoryHeader } from "@/components/domain/CategoryHeader";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 import {
@@ -34,11 +30,10 @@ export const Route = createFileRoute("/_authenticated/inventario")({
 
 function classifyRow(r: { category: string | null; subcategory: string | null; item_name: string }): string | null {
   const name = r.item_name.toLowerCase();
-
-  // Esconder materiais que não usamos
+  // Excluir acessórios do stock
+  if (r.category === "acessorios" || r.subcategory === "acessorios" || r.category === "acessorios_armas") return null;
   const excludedItems = getInventoryExcludedItems();
   if (excludedItems.some((h) => name.includes(h.toLowerCase()))) return null;
-
   return filterItemForDisplay(r.item_name, r.category, r.subcategory);
 }
 
@@ -57,30 +52,15 @@ const MOV_LABEL: Record<string, string> = {
 };
 
 function Page() {
-  const qc = useQueryClient();
   useRealtimeSync([{ table: "inventory", queryKeys: [["stock"], ["ledger"]] }]);
   const meFn = useAuthedServerFn(getCurrentMember);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
-  const [editMode, setEditMode] = useState(false);
-  const isManager = me.data?.is_manager ?? false;
-
-  const adjustFn = useAuthedServerFn(adjustStock);
-  const updatePriceFn = useAuthedServerFn(updateItemPrice);
-
-  const adjustMutation = useMutation({
-    mutationFn: (v: { item_id: number; new_qty: number }) => adjustFn({ data: v }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["stock"] }),
-  });
-
-  const priceMutation = useMutation({
-    mutationFn: (v: { item_id: number; purchase_price?: number }) => updatePriceFn({ data: v }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["stock"] }),
-  });
 
   if (me.isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{LOADING.inventory}</p>
       </div>
     );
   }
@@ -97,17 +77,6 @@ function Page() {
         icon={Package}
       />
 
-      {isManager && (
-        <Reveal direction="up" delay={50}>
-          <div className="mb-4 flex justify-end">
-            <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
-              <Pencil className="mr-1 h-3.5 w-3.5" />
-              {editMode ? "Concluir" : "Editar stock/preços"}
-            </Button>
-          </div>
-        </Reveal>
-      )}
-
       <Reveal direction="up" delay={100}>
         <Tabs defaultValue="stock">
           <TabsList>
@@ -120,12 +89,7 @@ function Page() {
           </TabsList>
 
           <TabsContent value="stock" className="mt-4">
-            <StockTable
-              editMode={editMode && isManager}
-              onAdjustStock={(id, qty) => adjustMutation.mutate({ item_id: id, new_qty: qty })}
-              onUpdatePrice={(id, price) => priceMutation.mutate({ item_id: id, purchase_price: price })}
-              pending={adjustMutation.isPending || priceMutation.isPending}
-            />
+            <StockTable />
           </TabsContent>
           <TabsContent value="ledger" className="mt-4">
             <LedgerTable />
@@ -136,17 +100,7 @@ function Page() {
   );
 }
 
-function StockTable({
-  editMode,
-  onAdjustStock,
-  onUpdatePrice,
-  pending,
-}: {
-  editMode: boolean;
-  onAdjustStock: (item_id: number, new_qty: number) => void;
-  onUpdatePrice: (item_id: number, price: number) => void;
-  pending: boolean;
-}) {
+function StockTable() {
   const fn = useAuthedServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
@@ -158,7 +112,6 @@ function StockTable({
     return acc;
   }, {});
 
-  // Build ordered list following ARMORY_CAT_ORDER
   const ordered: [string, typeof rows][] = [];
   for (const cat of ARMORY_CAT_ORDER) {
     const list = groups[cat];
@@ -169,16 +122,19 @@ function StockTable({
 
   if (q.isLoading)
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{LOADING.inventory}</p>
       </div>
     );
   if (!total)
     return (
       <Reveal direction="up" delay={100}>
-        <Card className="interactive-card p-8 text-center text-muted-foreground">
-          Armazém vazio. Mete-te a trabalhar.
-        </Card>
+        <div className="col-span-full text-center py-12">
+          <Package className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+          <p className="text-sm font-medium text-foreground">{EMPTY_STATE.inventory.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.inventory.description}</p>
+        </div>
       </Reveal>
     );
 
@@ -188,15 +144,9 @@ function StockTable({
         const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
         const meta = cfg ?? { label: cat, tone: "muted", order: 99, icon: Package, color: "", bg: "", border: "", headerColor: "" };
         const totalQty = items.reduce((s, r) => s + (r.qty ?? 0), 0);
-        const value = items.reduce(
-          (s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0),
-          0,
-        );
+        const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
         return (
-          <section
-            key={cat}
-            className="overflow-hidden rounded-sm border border-border bg-card"
-          >
+          <section key={cat} className="overflow-hidden rounded-sm border border-border bg-card">
             <div className="border-b">
               <CategoryHeader
                 category={cat}
@@ -208,7 +158,7 @@ function StockTable({
               <table className="w-full text-sm">
                 <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 text-left">Item</th>
+                    <th className="px-3 py-2 text-left">Material</th>
                     <th className="px-3 py-2 text-right">Em casa</th>
                     <th className="px-3 py-2 text-right">Preço unid.</th>
                   </tr>
@@ -218,15 +168,7 @@ function StockTable({
                     .slice()
                     .sort((a, b) => (a.unit_price ?? 0) - (b.unit_price ?? 0))
                     .map((r) => (
-                      <StockRow
-                        key={r.item_id}
-                        r={r}
-                        cat={cat}
-                        editMode={editMode}
-                        onAdjustStock={onAdjustStock}
-                        onUpdatePrice={onUpdatePrice}
-                        pending={pending}
-                      />
+                      <StockRow key={r.item_id} r={r} cat={cat} />
                     ))}
                 </tbody>
               </table>
@@ -238,25 +180,7 @@ function StockTable({
   );
 }
 
-function StockRow({
-  r,
-  cat,
-  editMode,
-  onAdjustStock,
-  onUpdatePrice,
-  pending,
-}: {
-  r: StockRowType;
-  cat: string;
-  editMode: boolean;
-  onAdjustStock: (item_id: number, new_qty: number) => void;
-  onUpdatePrice: (item_id: number, price: number) => void;
-  pending: boolean;
-}) {
-  const [editingQty, setEditingQty] = useState(false);
-  const [editingPrice, setEditingPrice] = useState(false);
-  const [qtyVal, setQtyVal] = useState(String(r.qty));
-  const [priceVal, setPriceVal] = useState(String(r.unit_price ?? 0));
+function StockRow({ r, cat }: { r: StockRowType; cat: string }) {
   const low = r.qty <= 0;
   const warn = r.qty > 0 && r.qty < 5;
 
@@ -269,38 +193,10 @@ function StockRow({
         </span>
       </td>
       <td className={"px-3 py-2 text-right font-mono " + (low ? "text-destructive" : warn ? "text-warning" : "")}>
-        {editMode ? (
-          editingQty ? (
-            <div className="flex items-center justify-end gap-1">
-              <Input type="number" min={0} className="h-5 w-16 text-right text-xs px-1" value={qtyVal} onChange={(e) => setQtyVal(e.target.value)} autoFocus />
-              <button className="text-emerald-400" disabled={pending} onClick={() => { onAdjustStock(r.item_id, Number(qtyVal)); setEditingQty(false); }}><Check className="h-3 w-3" /></button>
-              <button className="text-muted-foreground" onClick={() => { setQtyVal(String(r.qty)); setEditingQty(false); }}><X className="h-3 w-3" /></button>
-            </div>
-          ) : (
-            <button className="flex items-center gap-1 justify-end w-full" onClick={() => { setQtyVal(String(r.qty)); setEditingQty(true); }}>
-              {fmtNum(r.qty)} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-            </button>
-          )
-        ) : (
-          fmtNum(r.qty)
-        )}
+        {fmtNum(r.qty)}
       </td>
       <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-        {editMode ? (
-          editingPrice ? (
-            <div className="flex items-center justify-end gap-1">
-              <Input type="number" min={0} className="h-5 w-20 text-right text-xs px-1" value={priceVal} onChange={(e) => setPriceVal(e.target.value)} autoFocus />
-              <button className="text-emerald-400" disabled={pending} onClick={() => { onUpdatePrice(r.item_id, Number(priceVal)); setEditingPrice(false); }}><Check className="h-3 w-3" /></button>
-              <button className="text-muted-foreground" onClick={() => { setPriceVal(String(r.unit_price ?? 0)); setEditingPrice(false); }}><X className="h-3 w-3" /></button>
-            </div>
-          ) : (
-            <button className="flex items-center gap-1 justify-end w-full" onClick={() => { setPriceVal(String(r.unit_price ?? 0)); setEditingPrice(true); }}>
-              {r.unit_price != null ? fmtPrice(r.unit_price) : "—"} <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-            </button>
-          )
-        ) : (
-          r.unit_price != null ? fmtPrice(r.unit_price) : "—"
-        )}
+        {r.unit_price != null ? fmtPrice(r.unit_price) : "—"}
       </td>
     </tr>
   );
@@ -316,16 +212,19 @@ function LedgerTable() {
 
   if (q.isLoading)
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{LOADING.inventory}</p>
       </div>
     );
   if (!rows.length)
     return (
       <Reveal direction="up" delay={100}>
-        <Card className="interactive-card p-8 text-center text-muted-foreground">
-          Sem movimentos registados.
-        </Card>
+        <div className="col-span-full text-center py-12">
+          <History className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+          <p className="text-sm font-medium text-foreground">{EMPTY_STATE.inventoryLedger.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.inventoryLedger.description}</p>
+        </div>
       </Reveal>
     );
 
@@ -333,45 +232,37 @@ function LedgerTable() {
     <Reveal direction="up" delay={100}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-        <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 text-left">Data</th>
-            <th className="px-3 py-2 text-left">Tipo</th>
-            <th className="px-3 py-2 text-left">Item</th>
-            <th className="px-3 py-2 text-right">Qtd</th>
-            <th className="px-3 py-2 text-left">Membro</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr
-              key={r.id}
-              className="border-t border-border interactive-row"
-            >
-              <td className="px-3 py-2 text-muted-foreground">
-                {fmtDate(r.created_at).split(",")[0]}
-              </td>
-              <td className="px-3 py-2">
-                {MOV_LABEL[r.type] ?? r.type}
-              </td>
-              <td className="px-3 py-2 font-medium">
-                {r.item_name ?? "—"}
-              </td>
-              <td
-                className={
-                  "px-3 py-2 text-right font-mono " +
-                  (r.qty > 0 ? "text-success" : r.qty < 0 ? "text-destructive" : "")
-                }
-              >
-                {r.qty > 0 ? "+" : ""}
-                {fmtNum(r.qty)}
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">
-                {r.member_name ?? "—"}
-              </td>
+          <thead className="bg-secondary/50 text-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 text-left">Data</th>
+              <th className="px-3 py-2 text-left">Tipo</th>
+              <th className="px-3 py-2 text-left">Material</th>
+              <th className="px-3 py-2 text-right">Qtd</th>
+              <th className="px-3 py-2 text-left">Membro</th>
             </tr>
-          ))}
-        </tbody>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t border-border interactive-row">
+                <td className="px-3 py-2 text-muted-foreground">
+                  {fmtDate(r.created_at).split(",")[0]}
+                </td>
+                <td className="px-3 py-2">
+                  {MOV_LABEL[r.type] ?? r.type}
+                </td>
+                <td className="px-3 py-2 font-medium">
+                  {r.item_name ?? "—"}
+                </td>
+                <td className={"px-3 py-2 text-right font-mono " + (r.qty > 0 ? "text-success" : r.qty < 0 ? "text-destructive" : "")}>
+                  {r.qty > 0 ? "+" : ""}
+                  {fmtNum(r.qty)}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {r.member_name ?? "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </Reveal>

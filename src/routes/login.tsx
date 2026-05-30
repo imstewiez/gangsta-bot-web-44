@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { beautifyError } from "@/lib/messages";
 import ballasLogo from "@/assets/ballas-logo.png";
 import { CinematicBackdrop } from "@/components/layout/CinematicBackdrop";
 import { Reveal } from "@/components/layout/Reveal";
@@ -32,7 +33,7 @@ function LoginPage() {
       if (error) throw error;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Algo correu mal.";
-      toast.error(msg);
+      toast.error(beautifyError(msg));
       setLoading(false);
     }
   };

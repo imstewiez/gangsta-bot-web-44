@@ -485,3 +485,12 @@ svg.lucide {
     0 0 20px -6px color-mix(in oklab, var(--primary) 50%, transparent);
 }
 
+
+/* ───────── Shimmer sweep for prize card ───────── */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.animate-shimmer {
+  animation: shimmer 3s linear infinite;
+}

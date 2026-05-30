@@ -4,19 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { supabase } from "@/integrations/supabase/client";
 import { isServer } from "@/lib/auth-helpers";
-import { listAuditLogs } from "@/lib/operations.functions";
+import { listAuditLogs, listAppLogs, getLogStats } from "@/lib/logging.functions";
 import { checkManagerAccess } from "@/lib/access-check.functions";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { fmtDate } from "@/lib/domain";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   Activity, ArrowUpCircle, ArrowDownCircle, UserMinus, UserPlus,
   Pencil, ShoppingBag, CheckCircle2, XCircle, Truck, Package,
   Crosshair, Sparkles, Trophy, Settings2, AlertTriangle, ScrollText,
   Shield, Ban, MessageSquare, HandCoins, Search, Filter, X,
-  type LucideIcon,
+  Bug, Terminal, BarChart3, type LucideIcon,
 } from "lucide-react";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
@@ -159,21 +161,29 @@ export const Route = createFileRoute("/_authenticated/auditoria")({
 /* ────────────── PAGE ────────────── */
 function Page() {
   useRealtimeSync([
-    { table: "audit_logs", queryKeys: [["auditLogs"]] },
+    { table: "audit_logs", queryKeys: [["auditLogs"], ["appLogs"], ["logStats"]] },
+    { table: "app_logs", queryKeys: [["appLogs"], ["logStats"]] },
   ]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("todos");
-  const fn = useAuthedServerFn(listAuditLogs);
-  const logs = useQuery({ queryKey: ["auditLogs"], queryFn: () => fn({ data: { limit: 300 } }) });
+  const [activeTab, setActiveTab] = useState("acoes");
 
-  const filtered = useMemo(() => {
-    let list = logs.data ?? [];
+  const auditFn = useAuthedServerFn(listAuditLogs);
+  const appFn = useAuthedServerFn(listAppLogs);
+  const statsFn = useAuthedServerFn(getLogStats);
+
+  const auditLogs = useQuery({ queryKey: ["auditLogs"], queryFn: () => auditFn() });
+  const appLogs = useQuery({ queryKey: ["appLogs"], queryFn: () => appFn() });
+  const stats = useQuery({ queryKey: ["logStats"], queryFn: () => statsFn() });
+
+  const filteredAudit = useMemo(() => {
+    let list = auditLogs.data ?? [];
     if (category !== "todos") {
-      list = list.filter((l) => actionMeta(l.action).category === category);
+      list = list.filter((l: any) => actionMeta(l.action).category === category);
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((l) =>
+      list = list.filter((l: any) =>
         (l.action?.toLowerCase().includes(q) ?? false) ||
         (l.actor_name?.toLowerCase().includes(q) ?? false) ||
         (l.actor_id?.toLowerCase().includes(q) ?? false) ||
@@ -183,18 +193,41 @@ function Page() {
       );
     }
     return list;
-  }, [logs.data, search, category]);
+  }, [auditLogs.data, search, category]);
+
+  const filteredApp = useMemo(() => {
+    let list = appLogs.data ?? [];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((l: any) =>
+        (l.message?.toLowerCase().includes(q) ?? false) ||
+        (l.category?.toLowerCase().includes(q) ?? false) ||
+        (l.source?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    return list;
+  }, [appLogs.data, search]);
 
   // Group by date
-  const grouped = useMemo(() => {
-    const map = new Map<string, typeof filtered>();
-    for (const l of filtered) {
-      const date = l.created_at.slice(0, 10); // YYYY-MM-DD
+  const groupedAudit = useMemo(() => {
+    const map = new Map<string, typeof filteredAudit>();
+    for (const l of filteredAudit) {
+      const date = l.created_at.slice(0, 10);
       if (!map.has(date)) map.set(date, []);
       map.get(date)!.push(l);
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filtered]);
+  }, [filteredAudit]);
+
+  const groupedApp = useMemo(() => {
+    const map = new Map<string, typeof filteredApp>();
+    for (const l of filteredApp) {
+      const date = l.created_at.slice(0, 10);
+      if (!map.has(date)) map.set(date, []);
+      map.get(date)!.push(l);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredApp]);
 
   function dateLabel(iso: string): string {
     const today = new Date().toISOString().slice(0, 10);
@@ -205,147 +238,276 @@ function Page() {
     return d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
   }
 
+  const s = stats.data;
+
   return (
     <>
-      <PageHeader eyebrow="Direção" title="Auditoria" description="Histórico de ações" icon={ScrollText} />
+      <PageHeader eyebrow="Direção" title="Auditoria" description="Histórico de ações e logs do sistema" icon={ScrollText} />
 
-      {/* Filters */}
-      <Reveal direction="up">
-        <div className="mb-4 space-y-3">
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Procurar por ação, membro, entidade..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Category pills */}
-          <div className="flex flex-wrap gap-1.5">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                onClick={() => setCategory(c.key)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  category === c.key
-                    ? "border-primary bg-primary/20 text-primary"
-                    : "border-border bg-card/40 text-muted-foreground hover:bg-card/80 hover:text-foreground"
-                )}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Result count */}
-          <div className="text-xs text-muted-foreground">
-            {filtered.length} de {(logs.data ?? []).length} registos
-          </div>
+      {/* Stats */}
+      <Reveal direction="up" delay={50}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <Card className="interactive-card">
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <ScrollText className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <div className="text-lg font-bold leading-none">{s?.totalAudit ?? 0}</div>
+                <div className="text-[11px] text-muted-foreground">Ações registadas</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="interactive-card">
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="rounded-lg bg-blue-500/10 p-2">
+                <Terminal className="h-4 w-4 text-blue-400" />
+              </div>
+              <div>
+                <div className="text-lg font-bold leading-none">{s?.totalApp ?? 0}</div>
+                <div className="text-[11px] text-muted-foreground">Logs técnicos</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="interactive-card">
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="rounded-lg bg-red-500/10 p-2">
+                <Bug className="h-4 w-4 text-red-400" />
+              </div>
+              <div>
+                <div className="text-lg font-bold leading-none">{s?.errors24h ?? 0}</div>
+                <div className="text-[11px] text-muted-foreground">Erros 24h</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="interactive-card">
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="rounded-lg bg-amber-500/10 p-2">
+                <BarChart3 className="h-4 w-4 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-lg font-bold leading-none">{s?.errors7d ?? 0}</div>
+                <div className="text-[11px] text-muted-foreground">Erros 7 dias</div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </Reveal>
 
-      {/* Logs */}
-      <div className="space-y-6">
-        {logs.isLoading && (
-          <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl bg-card/40" style={{ animationDelay: `${i * 100}ms` }} />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="acoes" className="interactive-tab">
+            <Shield className="mr-1.5 h-3.5 w-3.5" /> Ações Chefia
+          </TabsTrigger>
+          <TabsTrigger value="erros" className="interactive-tab">
+            <Bug className="mr-1.5 h-3.5 w-3.5" /> Erros do Sistema
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="acoes" className="space-y-4">
+          {/* Filters */}
+          <Reveal direction="up">
+            <div className="mb-4 space-y-3">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Procurar por ação, membro, entidade..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c.key}
+                    onClick={() => setCategory(c.key)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                      category === c.key
+                        ? "border-primary bg-primary/20 text-primary"
+                        : "border-border bg-card/40 text-muted-foreground hover:bg-card/80 hover:text-foreground"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                {filteredAudit.length} de {(auditLogs.data ?? []).length} registos
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Audit Logs */}
+          <div className="space-y-6">
+            {auditLogs.isLoading && (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-20 animate-pulse rounded-xl bg-card/40" style={{ animationDelay: `${i * 100}ms` }} />
+                ))}
+              </div>
+            )}
+
+            {groupedAudit.map(([date, items], gIdx) => (
+              <Reveal key={date} direction="up" delay={gIdx * 80}>
+                <section>
+                  <h3 className="mb-2 text-display text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
+                    {dateLabel(date)}
+                  </h3>
+                  <Stagger className="space-y-2" staggerDelay={60}>
+                    {items.map((l: any) => {
+                      const meta = actionMeta(l.action);
+                      const Icon = meta.icon;
+                      const entity = resolveEntity(l.entity_type, l.entity_id, l.context);
+                      const parsed = parseContext(l.context);
+                      const time = new Date(l.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+
+                      return (
+                        <div
+                          key={l.id}
+                          className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-3 backdrop-blur-sm interactive-card"
+                        >
+                          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", meta.tone.replace("text-", "border-").replace("400", "500/30"), meta.tone.replace("text-", "bg-").replace("400", "500/10"))}>
+                            <Icon className={cn("h-4 w-4", meta.tone)} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span className={cn("text-sm font-semibold", meta.tone)}>{meta.label}</span>
+                              <span className="text-xs text-muted-foreground">• {time}</span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              Por <span className="text-foreground font-medium">{l.actor_name ?? l.actor_id ?? "Sistema"}</span>
+                            </div>
+                            {entity.title !== "—" && (
+                              <div className="mt-1 text-xs">
+                                <span className="text-muted-foreground">Sobre: </span>
+                                <span className="text-foreground font-medium">{entity.title}</span>
+                                {entity.subtitle && <span className="text-muted-foreground/70"> ({entity.subtitle})</span>}
+                              </div>
+                            )}
+                            {parsed.tags.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {parsed.tags.map((tag: string, i: number) => (
+                                  <span key={i} className="inline-flex items-center rounded-sm bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium text-foreground">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                            {parsed.text && (
+                              <div className="mt-1 text-xs text-muted-foreground/80 italic">{parsed.text}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </Stagger>
+                </section>
+              </Reveal>
             ))}
+
+            {!auditLogs.isLoading && !filteredAudit.length && (
+              <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
+                <ScrollText className="mx-auto h-10 w-10 text-muted-foreground/30" />
+                <p className="mt-2 text-sm text-muted-foreground">Sem registos.</p>
+              </div>
+            )}
           </div>
-        )}
+        </TabsContent>
 
-        {grouped.map(([date, items], gIdx) => (
-          <Reveal key={date} direction="up" delay={gIdx * 80}>
-            <section>
-              <h3 className="mb-2 text-display text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
-                {dateLabel(date)}
-              </h3>
-              <Stagger className="space-y-2" staggerDelay={60}>
-                {items.map((l) => {
-                  const meta = actionMeta(l.action);
-                  const Icon = meta.icon;
-                  const entity = resolveEntity(l.entity_type, l.entity_id, l.context);
-                  const parsed = parseContext(l.context);
-                  const time = new Date(l.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+        <TabsContent value="erros" className="space-y-4">
+          <Reveal direction="up">
+            <div className="mb-4 space-y-3">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Procurar erro, categoria, source..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {filteredApp.length} de {(appLogs.data ?? []).length} registos
+              </div>
+            </div>
+          </Reveal>
 
-                  return (
-                    <div
-                      key={l.id}
-                      className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-3 backdrop-blur-sm interactive-card"
-                    >
-                    {/* Icon */}
-                    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", meta.tone.replace("text-", "border-").replace("400", "500/30"), meta.tone.replace("text-", "bg-").replace("400", "500/10"))}>
-                      <Icon className={cn("h-4 w-4", meta.tone)} />
-                    </div>
+          <div className="space-y-6">
+            {appLogs.isLoading && (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-20 animate-pulse rounded-xl bg-card/40" style={{ animationDelay: `${i * 100}ms` }} />
+                ))}
+              </div>
+            )}
 
-                    {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className={cn("text-sm font-semibold", meta.tone)}>{meta.label}</span>
-                        <span className="text-xs text-muted-foreground">• {time}</span>
-                      </div>
+            {groupedApp.map(([date, items], gIdx) => (
+              <Reveal key={date} direction="up" delay={gIdx * 80}>
+                <section>
+                  <h3 className="mb-2 text-display text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
+                    {dateLabel(date)}
+                  </h3>
+                  <Stagger className="space-y-2" staggerDelay={60}>
+                    {items.map((l: any) => {
+                      const time = new Date(l.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+                      const levelColor = l.level === "error" || l.level === "fatal" ? "text-red-400" : l.level === "warn" ? "text-amber-400" : "text-blue-400";
+                      const levelBg = l.level === "error" || l.level === "fatal" ? "bg-red-500/10 border-red-500/30" : l.level === "warn" ? "bg-amber-500/10 border-amber-500/30" : "bg-blue-500/10 border-blue-500/30";
 
-                      {/* Actor */}
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        Por{" "}
-                        <span className="text-foreground font-medium">
-                          {l.actor_name ?? l.actor_id ?? "Sistema"}
-                        </span>
-                      </div>
-
-                      {/* Entity */}
-                      {entity.title !== "—" && (
-                        <div className="mt-1 text-xs">
-                          <span className="text-muted-foreground">Sobre: </span>
-                          <span className="text-foreground font-medium">{entity.title}</span>
-                          {entity.subtitle && (
-                            <span className="text-muted-foreground/70"> ({entity.subtitle})</span>
-                          )}
+                      return (
+                        <div key={l.id} className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-3 backdrop-blur-sm interactive-card">
+                          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", levelBg)}>
+                            <Bug className={cn("h-4 w-4", levelColor)} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span className={cn("text-sm font-semibold", levelColor)}>{l.message}</span>
+                              <span className="text-xs text-muted-foreground">• {time}</span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              {l.category} / {l.source} / <span className="font-mono">{l.level.toUpperCase()}</span>
+                            </div>
+                            {l.error_stack && (
+                              <details className="mt-1.5">
+                                <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">Stack trace</summary>
+                                <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-muted/50 p-2 text-[10px] text-muted-foreground">{l.error_stack}</pre>
+                              </details>
+                            )}
+                            {l.metadata && Object.keys(l.metadata).length > 0 && (
+                              <div className="mt-1 text-[10px] text-muted-foreground/70 font-mono">
+                                {JSON.stringify(l.metadata).slice(0, 200)}
+                                {JSON.stringify(l.metadata).length > 200 ? "..." : ""}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      );
+                    })}
+                  </Stagger>
+                </section>
+              </Reveal>
+            ))}
 
-                      {/* Context tags */}
-                      {parsed.tags.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {parsed.tags.map((tag, i) => (
-                            <span key={i} className="inline-flex items-center rounded-sm bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Context text */}
-                      {parsed.text && (
-                        <div className="mt-1 text-xs text-muted-foreground/80 italic">
-                          {parsed.text}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </Stagger>
-          </section>
-        </Reveal>
-      ))}
-
-        {!logs.isLoading && !filtered.length && (
-          <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
-            <ScrollText className="mx-auto h-10 w-10 text-muted-foreground/30" />
-            <p className="mt-2 text-sm text-muted-foreground">Sem registos.</p>
+            {!appLogs.isLoading && !filteredApp.length && (
+              <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
+                <Bug className="mx-auto h-10 w-10 text-muted-foreground/30" />
+                <p className="mt-2 text-sm text-muted-foreground">Sem logs técnicos.</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

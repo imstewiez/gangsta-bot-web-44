@@ -177,7 +177,7 @@ function BuyTable({
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
-              <th className="px-3 py-2 text-left">Item</th>
+              <th className="px-3 py-2 text-left">Material</th>
               <th className="px-3 py-2 text-center">Pontos</th>
               {isDrogas ? (
                 <><th className="px-3 py-2 text-right">Morador</th><th className="px-3 py-2 text-right">Civil</th></>
@@ -228,7 +228,7 @@ function SellTable({
         <table className="w-full text-sm">
           <thead className="bg-secondary text-display text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
-              <th className="px-3 py-2 text-left">Item</th>
+              <th className="px-3 py-2 text-left">Material</th>
               <th className="px-3 py-2 text-right">Sem material</th>
               <th className="px-3 py-2 text-right">Com material</th>
               <th className="px-3 py-2 text-center w-10"></th>

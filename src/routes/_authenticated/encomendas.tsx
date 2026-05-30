@@ -46,6 +46,7 @@ import {
 } from "@/lib/armory.catalog";
 import { getOrderAllowedCategories } from "@/lib/config.loader";
 import { toast } from "sonner";
+import { beautifyError, EMPTY_STATE, LOADING } from "@/lib/messages";
 import { Plus, ShoppingBag, Trash2, Package, Banknote, X, MessageSquare, Send } from "lucide-react";
 import { PageSkeleton, TableSkeleton, CardGridSkeleton } from "@/components/layout/PageSkeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
@@ -231,12 +232,12 @@ function OrdersList({
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
-      toast.error(_e.message);
+      toast.error(beautifyError(_e));
     },
     onSuccess: (res, vars, ctx) => {
       const r = res as any;
       if (r && "ok" in r && r.ok === false) {
-        toast.error(r.error ?? "Erro");
+        toast.error(beautifyError(r.error));
         if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
         return;
       }
@@ -260,7 +261,7 @@ function OrdersList({
     },
     onError: (_e, _ids, ctx) => {
       if (ctx?.prev) qc.setQueryData(["orders", scope, statusFilter], ctx.prev);
-      toast.error(_e.message);
+      toast.error(beautifyError(_e));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -286,20 +287,28 @@ function OrdersList({
 
   if (orders.isLoading)
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{LOADING.orders}</p>
       </div>
     );
   if (!orders.data?.length)
     return (
       <Card className="p-10 text-center interactive-card">
         <ShoppingBag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-        <p className="text-display text-sm text-muted-foreground">
+        <p className="text-sm font-medium text-foreground">
           {statusFilter === "active"
-            ? "Nenhuma encomenda em aberto"
+            ? EMPTY_STATE.orders.title
             : scope === "mine"
-              ? "Nenhum pedido no histórico"
-              : "Nenhuma encomenda arquivada"}
+              ? EMPTY_STATE.ordersHistory.title
+              : EMPTY_STATE.ordersHistory.title}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {statusFilter === "active"
+            ? EMPTY_STATE.orders.description
+            : scope === "mine"
+              ? EMPTY_STATE.ordersHistory.description
+              : EMPTY_STATE.ordersHistory.description}
         </p>
       </Card>
     );
@@ -418,7 +427,7 @@ function OrdersList({
                         </div>
                       )}
                       {aggregatedIngredients.length === 0 && totalDirtyMoney === 0 && (
-                        <div className="text-muted-foreground">Não requer materiais</div>
+                        <div className="text-muted-foreground">Sem materiais para entregar.</div>
                       )}
                     </>
                   )}
@@ -487,7 +496,7 @@ function OrderCommentThread({ orderId, canComment }: { orderId: number; canComme
       qc.invalidateQueries({ queryKey: ["order_comments", orderId] });
       setText("");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   return (
@@ -501,7 +510,12 @@ function OrderCommentThread({ orderId, canComment }: { orderId: number; canComme
       </button>
       {open && (
         <div className="mt-2 space-y-2">
-          {comments.isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          {comments.isLoading && (
+            <div className="flex flex-col items-center justify-center py-6 gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">{LOADING.comments}</p>
+            </div>
+          )}
           {comments.error && <p className="text-destructive text-xs">{(comments.error as Error).message}</p>}
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {(comments.data ?? []).map((c) => (
@@ -514,7 +528,11 @@ function OrderCommentThread({ orderId, canComment }: { orderId: number; canComme
               </div>
             ))}
             {!comments.isLoading && !(comments.data ?? []).length && (
-              <p className="text-xs text-muted-foreground">Sem comentários ainda.</p>
+              <div className="col-span-full text-center py-6">
+                <MessageSquare className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                <p className="text-sm font-medium text-foreground">{EMPTY_STATE.comments.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.comments.description}</p>
+              </div>
             )}
           </div>
           {canComment && (
@@ -619,7 +637,7 @@ function NewOrder() {
       setPaymentMode("materials_money");
     },
     onError: (e: Error) => {
-      toast.error(e.message || "Erro ao registar encomenda");
+      toast.error(beautifyError(e));
     },
   });
 
@@ -684,9 +702,9 @@ function NewOrder() {
                       setLines(lines.map((x, i) => (i === idx ? { ...x, item_id: v } : x)))
                     }
                     options={options}
-                    placeholder="Item"
+                    placeholder="Material"
                     searchPlaceholder="Procurar item..."
-                    emptyText="Nenhum item encontrado."
+                    emptyText="Nenhum material encontrado."
                   />
                   <Input
                     type="number"
@@ -806,7 +824,7 @@ function NewOrder() {
                 <span className="font-medium">{paymentMode === 'money_only' ? 'Só dinheiro (sem materiais)' : 'Materiais + dinheiro sujo'}</span>
               </div>
 
-              {/* Items */}
+              {/* Materiais */}
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Items</div>
                 <ul className="space-y-0.5 text-sm">
@@ -868,7 +886,7 @@ function NewOrder() {
                       </ul>
                     </div>
                   ) : sim.data ? (
-                    <div className="text-xs text-muted-foreground">Não requer materiais.</div>
+                    <div className="text-xs text-muted-foreground">Sem materiais necessários.</div>
                   ) : null}
                 </>
               )}

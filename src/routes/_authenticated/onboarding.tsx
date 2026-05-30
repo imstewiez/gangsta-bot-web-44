@@ -23,8 +23,9 @@ import {
 } from "@/components/ui/dialog";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
+import { beautifyError, STATUS_LABELS, LOADING, EMPTY_STATE } from "@/lib/messages";
 import { checkManagerAccess } from "@/lib/access-check.functions";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, Tag } from "lucide-react";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -55,7 +56,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["tagRequests"] });
       toast.success("Aprovado");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
   const [denyId, setDenyId] = useState<number | null>(null);
   const [reason, setReason] = useState("");
@@ -67,7 +68,7 @@ function Page() {
       setDenyId(null);
       setReason("");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
   if (managerCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   if (!managerCheck.data?.allowed) {
@@ -91,8 +92,8 @@ function Page() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             {["pending", "approved", "denied", "all"].map((s) => (
-              <TabsTrigger key={s === "pending" ? "Pendentes" : s === "approved" ? "Aprovados" : s === "denied" ? "Recusados" : "Todos"} value={s} className="interactive-tab">
-                {s}
+              <TabsTrigger key={s} value={s} className="interactive-tab">
+                {STATUS_LABELS[s] ?? s}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -100,7 +101,12 @@ function Page() {
       </Reveal>
       <Reveal direction="up" delay={100}>
         <div className="mt-4 space-y-2">
-          {reqs.isLoading && <p className="text-muted-foreground">A carregar</p>}
+          {reqs.isLoading && (
+            <div className="flex flex-col items-center justify-center h-64 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{LOADING.generic}</p>
+            </div>
+          )}
         {(reqs.data ?? []).map((r) => (
           <div
             key={r.id}
@@ -123,7 +129,7 @@ function Page() {
               )}
             </div>
             <span className="rounded-sm bg-muted px-2 py-1 text-xs text-display">
-              {r.status}
+              {STATUS_LABELS[r.status] ?? r.status}
             </span>
             {r.status === "pending" && (
               <div className="flex gap-1">
@@ -144,7 +150,11 @@ function Page() {
           </div>
         ))}
         {!reqs.isLoading && !reqs.data?.length && (
-          <p className="text-muted-foreground">Sem pedidos.</p>
+          <div className="col-span-full text-center py-12">
+            <Tag className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+            <p className="text-sm font-medium text-foreground">{EMPTY_STATE.onboarding.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.onboarding.description}</p>
+          </div>
         )}
       </div>
       </Reveal>

@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { toast } from "sonner";
+import { beautifyError } from "@/lib/messages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,7 +142,7 @@ export function MemberAdminPanel({
       await qc.invalidateQueries({ queryKey: ["member", String(member.id)] });
       await qc.invalidateQueries({ queryKey: ["members"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
+      toast.error(beautifyError(e));
     } finally {
       setBusy(null);
     }

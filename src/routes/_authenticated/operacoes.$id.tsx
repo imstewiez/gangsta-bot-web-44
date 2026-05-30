@@ -30,6 +30,7 @@ import { SaidaStatusBadge } from "@/components/operations/SaidaStatusBadge";
 import { SaidaTimeline } from "@/components/operations/SaidaTimeline";
 import { fmtDate, fmtNum } from "@/lib/domain";
 import { toast } from "sonner";
+import { beautifyError } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 import {
@@ -120,7 +121,7 @@ function Page() {
       toast.success(`Saída liquidada · Líquido ${r.net.toFixed(0)} €`);
       setConfirmLiq(false);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const cancelM = useMutation({
@@ -131,7 +132,7 @@ function Page() {
       toast.success("Saída cancelada");
       setConfirmCancel(false);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const kickM = useMutation({
@@ -142,7 +143,7 @@ function Page() {
       toast.success("Membro removido");
       setKickTarget(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   if (detail.isLoading) {
@@ -746,7 +747,7 @@ function InviteDialog({ operationId, onClose }: { operationId: number; onClose: 
       toast.success("Convites enviados");
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const allMembers = (membersQ.data ?? []) as Array<{

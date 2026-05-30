@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState, useMemo } from "react";
@@ -8,32 +8,22 @@ import {
   computeCraftFeasibility,
   type CraftFeasibility,
 } from "@/lib/recipes.functions";
-import { updateRecipeIngredientQty, updateItemPrice } from "@/lib/recipes.admin.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { fmtNum, fmtPrice } from "@/lib/domain";
-import { cn } from "@/lib/utils";
 
 import { toast } from "sonner";
+import { beautifyError, EMPTY_STATE, LOADING } from "@/lib/messages";
 import {
   Hammer,
   Calculator,
-  Lock,
   Package,
-  Pencil,
-  Check,
-  X,
   ChevronDown,
   ChevronUp,
+  FlaskConical,
+  Loader2,
 } from "lucide-react";
 import type { RecipeRow } from "@/lib/recipes.functions";
 import {
@@ -69,34 +59,36 @@ function printBadge(tier: string | null, itemName: string | null): { label: stri
 
 function RecipeCard({
   r,
-  isManager,
   member,
+  expanded,
+  onToggle,
+  simulateResult,
   onSimulate,
-  editMode,
-  onUpdateIngredient,
-  onUpdatePrice,
-  pending,
 }: {
   r: RecipeRow;
-  isManager: boolean;
   member: { tier: string | null; is_morador: boolean } | null;
-  onSimulate: (id: number) => void;
-  editMode: boolean;
-  onUpdateIngredient: (recipeId: number, ingItemId: number, qty: number) => void;
-  onUpdatePrice: (itemId: number, price: number) => void;
-  pending: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  simulateResult: CraftFeasibility | null;
+  onSimulate: (recipeId: number, qty: number) => void;
 }) {
   const badge = printBadge(r.tier, r.item_name);
-  const [editing, setEditing] = useState<Map<number, string>>(new Map());
-  const [expanded, setExpanded] = useState(false);
-  const [editingPrice, setEditingPrice] = useState(false);
-  const [priceDraft, setPriceDraft] = useState("");
   const salePrice = r.tier_price ?? r.min_sale_price ?? 0;
+  const [qtyDraft, setQtyDraft] = useState("1");
+
+  const handleSimulate = () => {
+    const qty = Math.max(1, Number(qtyDraft) || 1);
+    onSimulate(r.recipe_id, qty);
+  };
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 backdrop-blur-sm interactive-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <div className="rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm interactive-card overflow-hidden">
+      {/* Header — clickable to expand */}
+      <button
+        className="w-full text-left p-4 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
+        onClick={onToggle}
+      >
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-display text-sm font-medium truncate">{r.item_name}</span>
             {badge && (
@@ -109,120 +101,38 @@ function RecipeCard({
             {itemSubLabel(r.category, r.recipe_category)}
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={() => onSimulate(r.recipe_id)}>
-          <Calculator className="mr-1 h-3.5 w-3.5" />
-          Simular
-        </Button>
-      </div>
-
-      <ul className="mt-3 space-y-1 text-xs">
-        {r.ingredients.map((i) => {
-          const isEditing = editing.has(i.item_id);
-          return (
-            <li key={i.item_id} className="flex justify-between border-b border-border/40 py-1 interactive-row">
-              <span className="text-muted-foreground">{i.name}</span>
-              {editMode && isManager ? (
-                isEditing ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-5 w-14 text-right text-[10px] px-1 py-0"
-                      value={editing.get(i.item_id) ?? String(i.quantity)}
-                      onChange={(e) => setEditing((prev) => new Map(prev).set(i.item_id, e.target.value))}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const val = Math.max(0, Number(editing.get(i.item_id) ?? i.quantity));
-                          onUpdateIngredient(r.recipe_id, i.item_id, val);
-                          setEditing((prev) => { const n = new Map(prev); n.delete(i.item_id); return n; });
-                        }
-                      }}
-                      autoFocus
-                    />
-                    <button className="text-emerald-400 hover:text-emerald-300" disabled={pending} onClick={() => {
-                      const val = Math.max(0, Number(editing.get(i.item_id) ?? i.quantity));
-                      onUpdateIngredient(r.recipe_id, i.item_id, val);
-                      setEditing((prev) => { const n = new Map(prev); n.delete(i.item_id); return n; });
-                    }}><Check className="h-3 w-3" /></button>
-                    <button className="text-muted-foreground hover:text-foreground" onClick={() => setEditing((prev) => { const n = new Map(prev); n.delete(i.item_id); return n; })}><X className="h-3 w-3" /></button>
-                  </div>
-                ) : (
-                  <button className="flex items-center gap-1 font-mono text-muted-foreground/70 hover:text-foreground" onClick={() => setEditing((prev) => new Map(prev).set(i.item_id, String(i.quantity)))}>
-                    {i.quantity}× <Pencil className="h-2.5 w-2.5" />
-                  </button>
-                )
-              ) : (
-                <span className="text-muted-foreground/70 font-mono">
-                  {i.quantity} {i.quantity === 1 ? "unidade" : "unidades"}
-                </span>
-              )}
-            </li>
-          );
-        })}
-        {!r.ingredients.length && (
-          <li className="text-muted-foreground">Sem ingredientes registados</li>
-        )}
-      </ul>
-
-      <div className="mt-3">
-        <div className="flex items-center justify-between text-xs">
-          {isManager && editingPrice ? (
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                min={0}
-                className="h-5 w-24 text-right text-[10px] px-1 py-0"
-                value={priceDraft}
-                onChange={(e) => setPriceDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = Math.max(0, Number(priceDraft));
-                    onUpdatePrice(r.item_id, val);
-                    setEditingPrice(false);
-                  }
-                }}
-                autoFocus
-              />
-              <button
-                className="text-emerald-400 hover:text-emerald-300"
-                onClick={() => {
-                  const val = Math.max(0, Number(priceDraft));
-                  onUpdatePrice(r.item_id, val);
-                  setEditingPrice(false);
-                }}
-              >
-                <Check className="h-3 w-3" />
-              </button>
-              <button className="text-muted-foreground hover:text-foreground" onClick={() => setEditingPrice(false)}>
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ) : (
-            <button
-              className="flex items-center gap-1 font-medium text-foreground"
-              onClick={() => {
-                if (isManager) {
-                  setEditingPrice(true);
-                  setPriceDraft(String(Math.round(salePrice)));
-                }
-              }}
-            >
-              {fmtPrice(Math.round(salePrice))}
-              {isManager && <Pencil className="h-2.5 w-2.5 text-muted-foreground" />}
-            </button>
-          )}
-          {isManager && (
-            <button
-              className="inline-flex items-center gap-1 text-muted-foreground/70 hover:text-foreground"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </button>
-          )}
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-xs font-mono text-foreground">{fmtPrice(Math.round(salePrice))}</span>
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </div>
+      </button>
 
-        {isManager && expanded && (
-          <div className="mt-2 rounded-md border border-border/50 bg-muted/20 p-2 text-[11px] space-y-1">
+      {/* Expanded panel */}
+      {expanded && (
+        <div className="border-t border-border/40 px-4 pb-4 space-y-4">
+          {/* Ingredients */}
+          <div className="pt-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1">
+              <FlaskConical className="h-3 w-3" />
+              Materiais
+            </div>
+            <div className="space-y-2">
+              {r.ingredients.map((ing) => (
+                <div key={ing.item_id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{ing.name}</span>
+                  <span className="font-mono text-muted-foreground/70">
+                    {ing.quantity} × {fmtPrice(Math.round(ing.unit_cost))}
+                  </span>
+                </div>
+              ))}
+              {!r.ingredients.length && (
+                <p className="text-xs text-muted-foreground">Sem ingredientes registados</p>
+              )}
+            </div>
+          </div>
+
+          {/* Cost breakdown */}
+          <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-1.5 text-[11px]">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
               Detalhe de custos
             </div>
@@ -247,49 +157,94 @@ function RecipeCard({
               </span>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Simulation */}
+          <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+              <Calculator className="h-3 w-3" />
+              Simular fabricação
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                className="h-7 w-24 text-sm"
+                value={qtyDraft}
+                onChange={(e) => setQtyDraft(e.target.value)}
+                placeholder="Qtd"
+              />
+              <Button size="sm" className="h-7 text-xs" onClick={handleSimulate}>
+                <Hammer className="mr-1 h-3 w-3" />
+                Calcular
+              </Button>
+            </div>
+
+            {simulateResult && simulateResult.recipe_id === r.recipe_id && (
+              <div className="mt-2 space-y-2 text-xs">
+                <div className="font-medium text-sm">
+                  {simulateResult.item_name} × {simulateResult.requested_qty}
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Materiais necessários</div>
+                  <ul className="space-y-1">
+                    {simulateResult.ingredients.map((ing) => (
+                      <li key={ing.name} className="flex justify-between items-center">
+                        <span>{ing.name}</span>
+                        <span className="text-muted-foreground">
+                          {ing.qty_per_recipe} × {simulateResult.requested_qty} = {fmtNum(ing.needed)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {simulateResult.ingredients.length > 0 && (
+                  <div className="border-t border-border/50 pt-2">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Custo estimado</div>
+                    <ul className="space-y-1">
+                      {simulateResult.ingredients.map((ing) => (
+                        <li key={`cost-${ing.name}`} className="flex justify-between text-muted-foreground/70">
+                          <span>{ing.name}</span>
+                          <span className="font-mono">{fmtPrice(ing.unit_cost)} × {fmtNum(ing.needed)} = {fmtPrice(Math.round(ing.line_cost))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="border-t border-border pt-2">
+                  <div className="flex justify-between items-center font-semibold text-sm">
+                    <span>Total a pagar:</span>
+                    <span className="text-emerald-400">
+                      {fmtPrice(Math.round((simulateResult.tier_price ?? simulateResult.min_sale_price ?? 0) * simulateResult.requested_qty))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function Page() {
   useRealtimeSync([
-    "recipes",
-    { table: "items", queryKeys: [["catalog"], ["adminItems"]] },
-    // Nota: recipe_ingredients removido — receitas vêm de config.json estático
+    { table: "items", queryKeys: [["catalog"], ["adminItems"], ["recipes"]] },
+    { table: "recipe_ingredients", queryKeys: [["recipes"], ["adminRecipes"]] },
   ]);
-  const qc = useQueryClient();
   const fn = useAuthedServerFn(listRecipes);
   const calcFn = useAuthedServerFn(computeCraftFeasibility);
   const meFn = useAuthedServerFn(getCurrentMember);
-  const updateFn = useAuthedServerFn(updateRecipeIngredientQty);
-  const updatePriceFn = useAuthedServerFn(updateItemPrice);
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
-  const isManager = me.data?.is_manager ?? false;
   const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => fn() });
-  const [calcRecipe, setCalcRecipe] = useState<number | null>(null);
-  const [qtyStr, setQtyStr] = useState("1");
-  const [result, setResult] = useState<CraftFeasibility | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [editMode, setEditMode] = useState(false);
+  const [simulateResult, setSimulateResult] = useState<CraftFeasibility | null>(null);
 
   const calc = useMutation({
-    mutationFn: () => calcFn({ data: { recipe_id: calcRecipe!, quantity: Math.max(1, Number(qtyStr) || 1) } }),
-    onSuccess: (r) => setResult(r),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateIng = useMutation({
-    mutationFn: (v: { recipe_id: number; ingredient_item_id: number; quantity: number }) => updateFn({ data: v }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["recipes"] }); toast.success("Atualizado"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updatePrice = useMutation({
-    mutationFn: (v: { item_id: number; estimated_value: number }) => updatePriceFn({ data: v }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["recipes"] }); toast.success("Preço atualizado"); },
-    onError: (e: Error) => toast.error(e.message),
+    mutationFn: (v: { recipe_id: number; quantity: number }) => calcFn({ data: v }),
+    onSuccess: (r) => setSimulateResult(r),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const grouped = useMemo(() => {
@@ -334,29 +289,20 @@ function Page() {
       <Reveal direction="up">
         <div className="mb-5 flex items-center gap-3">
           <div className="max-w-sm flex-1">
-            <Input placeholder="Procurar item" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder="Procurar material" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          {isManager && (
-            <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
-              <Pencil className="mr-1 h-3.5 w-3.5" />
-              {editMode ? "Concluir" : "Editar"}
-            </Button>
-          )}
         </div>
       </Reveal>
 
       {recipes.isLoading && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-32 animate-pulse rounded-xl bg-card/40" />
-          ))}
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">{LOADING.recipes}</p>
         </div>
       )}
 
       <div className="space-y-8">
         {grouped.map(([category, items], idx) => {
-          const cfg = (ARMORY_CAT_CONFIG as any)[category];
-          const Icon = cfg?.icon ?? Package;
           return (
             <Reveal key={category} direction="up" delay={idx * 100}>
               <section className="animate-rise">
@@ -371,13 +317,14 @@ function Page() {
                     <RecipeCard
                       key={r.recipe_id}
                       r={r}
-                      isManager={isManager}
                       member={me.data ?? null}
-                      editMode={editMode}
-                      pending={updateIng.isPending || updatePrice.isPending}
-                      onUpdateIngredient={(rid, iid, qty) => updateIng.mutate({ recipe_id: rid, ingredient_item_id: iid, quantity: qty })}
-                      onUpdatePrice={(itemId, price) => updatePrice.mutate({ item_id: itemId, estimated_value: price })}
-                      onSimulate={(id) => { setCalcRecipe(id); setQtyStr("1"); setResult(null); }}
+                      expanded={expandedId === r.recipe_id}
+                      onToggle={() => {
+                        setExpandedId((prev) => (prev === r.recipe_id ? null : r.recipe_id));
+                        setSimulateResult(null);
+                      }}
+                      simulateResult={simulateResult}
+                      onSimulate={(rid, qty) => calc.mutate({ recipe_id: rid, quantity: qty })}
                     />
                   ))}
                 </Stagger>
@@ -389,80 +336,13 @@ function Page() {
 
       {!recipes.isLoading && !grouped.length && (
         <Reveal direction="up">
-          <div className="rounded-xl border border-dashed border-border/50 bg-card/30 py-12 text-center">
-            <Package className="mx-auto h-10 w-10 text-muted-foreground/30" />
-            <p className="mt-2 text-sm text-muted-foreground">Sem receitas.</p>
+          <div className="col-span-full text-center py-12">
+            <FlaskConical className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+            <p className="text-sm font-medium text-foreground">{EMPTY_STATE.recipes.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.recipes.description}</p>
           </div>
         </Reveal>
       )}
-
-      <Dialog open={calcRecipe != null} onOpenChange={(v) => !v && setCalcRecipe(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Simular fabricação</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
-            <div>
-              <label className="text-xs text-muted-foreground">Quantidade a fabricar</label>
-              <Input type="number" min={1} value={qtyStr} onChange={(e) => setQtyStr(e.target.value)} />
-            </div>
-            {result && (
-              <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs space-y-3">
-                <div className="font-medium text-sm">{result.item_name} × {result.requested_qty}</div>
-                
-                {/* Materiais necessários */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Materiais necessários</div>
-                  <ul className="space-y-1">
-                    {result.ingredients.map((ing) => (
-                      <li key={ing.name} className="flex justify-between items-center interactive-row">
-                        <span className="text-foreground">{ing.name}</span>
-                        <span className="text-muted-foreground">
-                          {ing.qty_per_recipe} × {result.requested_qty} = {fmtNum(ing.needed)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                
-                {/* Custos — apenas chefia */}
-                {isManager && result.ingredients.length > 0 && (
-                  <div className="border-t border-border/50 pt-2">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Custo estimado (chefia)</div>
-                    <ul className="space-y-1">
-                      {result.ingredients.map((ing) => (
-                        <li key={`cost-${ing.name}`} className="flex justify-between items-center text-muted-foreground/70 interactive-row">
-                          <span>{ing.name}</span>
-                          <span className="font-mono">{fmtPrice(ing.unit_cost)} × {fmtNum(ing.needed)} = {fmtPrice(Math.round(ing.line_cost))}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                
-                {/* Preço de venda */}
-                {(() => {
-                  const unitPrice = result.tier_price ?? result.min_sale_price ?? 0;
-                  const total = Math.round(unitPrice * result.requested_qty);
-                  return (
-                    <div className="border-t border-border pt-2">
-                      <div className="flex justify-between items-center font-semibold text-sm">
-                        <span>Total a pagar:</span>
-                        <span className="text-emerald-400">{fmtPrice(total)}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCalcRecipe(null)}>Fechar</Button>
-            <Button onClick={() => calc.mutate()} disabled={calc.isPending}>
-              <Hammer className="mr-1 h-4 w-4" />
-              {calc.isPending ? "" : "Calcular"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

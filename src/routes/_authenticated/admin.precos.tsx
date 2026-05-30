@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { beautifyError } from "@/lib/messages";
 import { Save, Pencil, X, Check } from "lucide-react";
 import { useState } from "react";
 import { fmtNum, fmtPrice } from "@/lib/domain";
@@ -58,7 +59,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["catalog"] });
       toast.success("Preço atualizado");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   const filtered = (items.data ?? []).filter((i) =>
@@ -104,7 +105,7 @@ function Page() {
       <PageHeader
         eyebrow="Chefia"
         title="Editar Preços"
-        description="Editar preços dos items"
+        description="Editar preços dos materiais"
       />
 
       <Reveal direction="up">

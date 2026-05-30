@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { enqueueNotification } from "./notifier.server";
+import { logAdminAction } from "./logging.functions";
 import { z } from "zod";
 import { IdSchema, NameSchema, SpotSchema, OperationTypeSchema, ScheduledAtSchema, NotesSchema } from "./security";
 
@@ -165,6 +166,15 @@ export const createOperation = createServerFn({ method: "POST" })
         `web:${context.userId}`,
       ],
     );
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    await logAdminAction(context.supabase, {
+      action: "operation_created",
+      actorId: context.userId,
+      actorName: me?.display_name ?? "Membro",
+      targetType: "operation",
+      targetId: row?.id ?? 0,
+      details: `Saída criada: ${data.operation_type} · ${data.spot ?? "#" + row?.id}`,
+    });
     return { id: row?.id ?? null };
   });
 
@@ -206,6 +216,15 @@ export const createOperationWithParticipants = createServerFn({ method: "POST" }
     );
 
     if (!opId?.sp_create_operation_with_participants) throw new Error("Falha ao criar saída");
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    await logAdminAction(context.supabase, {
+      action: "operation_created",
+      actorId: context.userId,
+      actorName: me?.display_name ?? "Membro",
+      targetType: "operation",
+      targetId: opId.sp_create_operation_with_participants,
+      details: `Saída criada: ${data.operation_type} · ${data.spot ?? "#" + opId.sp_create_operation_with_participants} (${data.participants?.length ?? 0} participantes)`,
+    });
     return { id: opId.sp_create_operation_with_participants };
   });
 
@@ -251,6 +270,14 @@ export const cancelOperation = createServerFn({ method: "POST" })
         },
       });
     }
+    await logAdminAction(context.supabase, {
+      action: "operation_cancelled",
+      actorId: context.userId,
+      actorName: me?.display_name ?? "Direção",
+      targetType: "operation",
+      targetId: data.id,
+      details: `Saída cancelada: ${op.operation_type ?? "saída"} · ${op.spot ?? "#" + op.id}`,
+    });
     return { ok: true };
   });
 

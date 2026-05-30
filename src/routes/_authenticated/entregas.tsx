@@ -8,7 +8,7 @@ import {
   createDelivery,
   decideDelivery,
 } from "@/lib/deliveries.functions";
-import { getCatalog, getCurrentMember } from "@/lib/pricing.functions";
+import { getCatalog, getBuyCatalog, getCurrentMember } from "@/lib/pricing.functions";
 import { listManagers } from "@/lib/members.functions";
 import type { CatalogItem } from "@/lib/pricing.shared";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -40,6 +40,7 @@ import {
   filterItemForDisplay,
 } from "@/lib/armory.catalog";
 import { toast } from "sonner";
+import { beautifyError, EMPTY_STATE, LOADING } from "@/lib/messages";
 import {
   Plus,
   Trash2,
@@ -49,6 +50,7 @@ import {
   Package,
   Coins,
   Wrench,
+  Loader2,
 } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
@@ -171,7 +173,7 @@ function DelList({
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(["deliveries", scope], ctx.prev);
-      toast.error(_e.message);
+      toast.error(beautifyError(_e));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
@@ -183,15 +185,25 @@ function DelList({
   });
 
   if (list.isLoading)
-    return <p className="text-muted-foreground">A carregar entregas</p>;
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{LOADING.deliveries}</p>
+      </div>
+    );
   if (!list.data?.length)
     return (
       <Card className="interactive-card p-10 text-center">
         <PackageOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-        <p className="text-display text-sm text-muted-foreground">
+        <p className="text-sm font-medium text-foreground">
           {scope === "mine"
-            ? "Nenhum registo"
-            : "Nenhuma pendente"}
+            ? EMPTY_STATE.deliveries.title
+            : EMPTY_STATE.deliveriesPending.title}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {scope === "mine"
+            ? EMPTY_STATE.deliveries.description
+            : EMPTY_STATE.deliveriesPending.description}
         </p>
       </Card>
     );
@@ -296,6 +308,7 @@ function NewDelivery() {
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState<"entrega" | "venda">("entrega");
   const catFn = useAuthedServerFn(getCatalog);
+  const buyCatFn = useAuthedServerFn(getBuyCatalog);
   const createFn = useAuthedServerFn(createDelivery);
   const qc = useQueryClient();
   const cat = useQuery({
@@ -303,7 +316,18 @@ function NewDelivery() {
     queryFn: () => catFn(),
     enabled: open,
   });
-  const items = (cat.data ?? []).filter(
+  const buyCat = useQuery({
+    queryKey: ["buyCatalog"],
+    queryFn: () => buyCatFn(),
+    enabled: open,
+  });
+  const allItems = (() => {
+    const map = new Map<number, CatalogItem>();
+    for (const i of (cat.data ?? [])) map.set(i.id, i);
+    for (const i of (buyCat.data ?? [])) map.set(i.id, i);
+    return Array.from(map.values());
+  })();
+  const items = allItems.filter(
     (i: CatalogItem) =>
       tipo === "entrega"
         ? i.side === "compra" || i.side === "ambos"
@@ -345,7 +369,7 @@ function NewDelivery() {
       setTipo("entrega");
       setResponsavel("");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -453,7 +477,7 @@ function NewDelivery() {
                     )
                   }
                   options={deliveryOptions}
-                  placeholder="Item"
+                  placeholder="Material"
                   searchPlaceholder="Procurar item..."
                   emptyText="Nenhum item encontrado."
                 />

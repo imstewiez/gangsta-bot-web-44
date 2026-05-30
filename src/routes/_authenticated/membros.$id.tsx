@@ -34,9 +34,11 @@ import {
   Loader2,
   Eye,
   X,
+  File,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
+import { STATUS_LABELS, EMPTY_STATE } from "@/lib/messages";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/membros/$id")({
@@ -85,15 +87,11 @@ function Page() {
     );
   if (!data?.member)
     return (
-      <div className="p-6 space-y-4">
-        <p className="text-destructive font-semibold">Membro não encontrado.</p>
-        <div className="bg-muted/40 rounded-lg p-4 text-xs font-mono space-y-1">
-          <p><strong>URL id:</strong> {id}</p>
-          <p><strong>Number(id):</strong> {String(Number(id))}</p>
-          <p><strong>data:</strong> {JSON.stringify(data, null, 2)}</p>
-
-        </div>
-        <Link to="/membros" className="text-primary interactive-link cursor-pointer">
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <File className="mx-auto h-10 w-10 text-muted-foreground/30" />
+        <p className="text-sm font-medium text-foreground">{EMPTY_STATE.memberProfileRecords.title}</p>
+        <p className="text-xs text-muted-foreground">{EMPTY_STATE.memberProfileRecords.description}</p>
+        <Link to="/membros" className="text-primary interactive-link cursor-pointer text-sm">
           Voltar
         </Link>
       </div>
@@ -211,7 +209,11 @@ function Page() {
             </CardHeader>
             <CardContent>
               {(data.contributions?.length ?? 0) === 0 ? (
-                <p className="text-sm text-muted-foreground">Sem registos.</p>
+                <div className="col-span-full text-center py-6">
+                  <File className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm font-medium text-foreground">{EMPTY_STATE.memberProfileRecords.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.memberProfileRecords.description}</p>
+                </div>
               ) : (
                 <ul className="space-y-1.5">
                   {data.contributions.map((c) => (
@@ -233,7 +235,11 @@ function Page() {
             </CardHeader>
             <CardContent>
               {(data.recentMovements?.length ?? 0) === 0 ? (
-                <p className="text-sm text-muted-foreground">Sem movimentos.</p>
+                <div className="col-span-full text-center py-6">
+                  <ArrowDownUp className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm font-medium text-foreground">{EMPTY_STATE.memberProfileMovements.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.memberProfileMovements.description}</p>
+                </div>
               ) : (
                 <ul className="space-y-1">
                   {data.recentMovements.map((mv) => (
@@ -275,7 +281,7 @@ function Page() {
                       {POSITION_LABELS[m.tier ?? "bairrista"]}
                     </Badge>
                     {preview.data?.member.is_manager && (
-                      <Badge variant="default" className="text-[10px]">Manager</Badge>
+                      <Badge variant="default" className="text-[10px]">Chefia</Badge>
                     )}
                   </DialogTitle>
                 </DialogHeader>
@@ -298,7 +304,11 @@ function Page() {
                       </CardHeader>
                       <CardContent>
                         {preview.data.orders.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">Sem encomendas visíveis.</p>
+                          <div className="col-span-full text-center py-6">
+                            <ShoppingBag className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                            <p className="text-sm font-medium text-foreground">{EMPTY_STATE.memberProfileOrders.title}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.memberProfileOrders.description}</p>
+                          </div>
                         ) : (
                           <ul className="space-y-1.5 max-h-64 overflow-y-auto">
                             {preview.data.orders.map((o) => (
@@ -307,7 +317,7 @@ function Page() {
                                 <span className="truncate max-w-[180px]">{o.item_name ?? "—"}</span>
                                 <span className="font-mono">{o.quantity}x</span>
                                 <Badge variant={o.status === "fulfilled" ? "default" : o.status === "pending" ? "secondary" : "outline"} className="text-[10px]">
-                                  {o.status}
+                                  {STATUS_LABELS[o.status] ?? o.status}
                                 </Badge>
                               </li>
                             ))}
@@ -326,7 +336,11 @@ function Page() {
                       </CardHeader>
                       <CardContent>
                         {preview.data.deliveries.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">Sem entregas/vendas visíveis.</p>
+                          <div className="col-span-full text-center py-6">
+                            <Truck className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                            <p className="text-sm font-medium text-foreground">{EMPTY_STATE.memberProfileDeliveries.title}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.memberProfileDeliveries.description}</p>
+                          </div>
                         ) : (
                           <ul className="space-y-1.5 max-h-64 overflow-y-auto">
                             {preview.data.deliveries.map((d) => (
@@ -335,7 +349,7 @@ function Page() {
                                 <span className="truncate max-w-[180px]">{d.requester_name ?? "—"}</span>
                                 <span className="font-mono">{d.total_qty}x</span>
                                 <Badge variant={d.status === "approved" ? "default" : d.status === "pending" ? "secondary" : "outline"} className="text-[10px]">
-                                  {d.tipo}
+                                  {d.tipo === "entrega" ? "Entrega" : d.tipo === "venda" ? "Venda" : d.tipo}
                                 </Badge>
                               </li>
                             ))}

@@ -5,10 +5,11 @@ import { pgQuery } from "./pg.server";
 import type { CurrentMember, CatalogItem } from "./pricing.shared";
 import {
   getAllItems,
-  getTierPrice,
   getCategoryLabel,
   getNumericId,
 } from "./config.loader";
+import { resolveItemPrices } from "./pricing.resolver";
+import { getSurchargesForItems } from "./tier-pricing.functions";
 
 export const getCurrentMember = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -34,14 +35,20 @@ export const getCatalog = createServerFn({ method: "GET" })
       side: string | null;
       purchase_price: number | null;
       min_sale_price: number | null;
+      morador_purchase_price: number | null;
       xp_points: number | null;
     }>(
       `select id, name, category, subcategory, side,
               purchase_price::float as purchase_price,
               min_sale_price::float as min_sale_price,
+              morador_purchase_price::float as morador_purchase_price,
               xp_points
        from items where active = true`,
     );
+
+    // Buscar surcharges em lote para todos os items
+    const allDbIds = dbItems.map((d) => d.id);
+    const surchargeMap = await getSurchargesForItems(allDbIds);
 
     const result: CatalogItem[] = [];
     const seenDbIds = new Set<number>();
@@ -56,25 +63,28 @@ export const getCatalog = createServerFn({ method: "GET" })
     // First pass: items from config.json with DB overrides
     for (const [id, item] of Object.entries(configItems)) {
       const db = dbItems.find((d) => d.name === item.name);
-      if (!db) continue;
-      seenDbIds.add(db.id);
-      const effectiveSide = db.side ?? item.side ?? "venda";
+      if (db) seenDbIds.add(db.id);
+      const effectiveSide = db?.side ?? item.side ?? "venda";
       if (effectiveSide !== "venda" && effectiveSide !== "ambos") continue;
 
-      const baseSalePrice = priceOr(db.min_sale_price, item.sellPrice);
-      const tierPrice = getTierPrice(id, tier) ?? baseSalePrice ?? item.estimatedValue ?? 0;
+      const prices = resolveItemPrices(
+        db ?? null,
+        item,
+        tier,
+        db ? (surchargeMap.get(db.id) ?? null) : null,
+      );
 
       result.push({
-        id: db.id,
+        id: db?.id ?? getNumericId(id),
         name: item.name,
         category: item.category ?? "outros",
         subcategory: item.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: priceOr(db.purchase_price, item.buyPrice),
-        morador_purchase_price: null,
-        min_sale_price: baseSalePrice,
-        xp_points: db.xp_points ?? item.xpPoints ?? 0,
-        tier_price: tierPrice,
+        purchase_price: prices.purchase_price,
+        morador_purchase_price: prices.morador_purchase_price,
+        min_sale_price: prices.min_sale_price,
+        xp_points: db?.xp_points ?? item.xpPoints ?? 0,
+        tier_price: prices.tier_price,
       });
     }
 
@@ -84,17 +94,24 @@ export const getCatalog = createServerFn({ method: "GET" })
       const effectiveSide = db.side ?? "venda";
       if (effectiveSide !== "venda" && effectiveSide !== "ambos") continue;
 
+      const prices = resolveItemPrices(
+        db,
+        null,
+        tier,
+        surchargeMap.get(db.id) ?? null,
+      );
+
       result.push({
         id: db.id,
         name: db.name,
         category: db.category ?? "outros",
         subcategory: db.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: priceOr(db.purchase_price, null),
-        morador_purchase_price: null,
-        min_sale_price: priceOr(db.min_sale_price, null),
+        purchase_price: prices.purchase_price,
+        morador_purchase_price: prices.morador_purchase_price,
+        min_sale_price: prices.min_sale_price,
         xp_points: db.xp_points ?? 0,
-        tier_price: priceOr(db.min_sale_price, null) ?? 0,
+        tier_price: prices.tier_price,
       });
     }
 
@@ -136,21 +153,20 @@ export const getBuyCatalog = createServerFn({ method: "GET" })
     // First pass: items from config.json with DB overrides
     for (const [id, item] of Object.entries(configItems)) {
       const db = dbItems.find((d) => d.name === item.name);
-      if (!db) continue;
-      seenDbIds.add(db.id);
-      const effectiveSide = db.side ?? item.side ?? "compra";
+      if (db) seenDbIds.add(db.id);
+      const effectiveSide = db?.side ?? item.side ?? "compra";
       if (effectiveSide !== "compra" && effectiveSide !== "ambos") continue;
 
       result.push({
-        id: db.id,
+        id: db?.id ?? getNumericId(id),
         name: item.name,
         category: item.category ?? "outros",
         subcategory: item.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: priceOr(db.purchase_price, item.buyPrice),
+        purchase_price: priceOr(db?.purchase_price ?? null, item.buyPrice),
         morador_purchase_price: null,
-        min_sale_price: priceOr(db.min_sale_price, item.sellPrice),
-        xp_points: db.xp_points ?? item.xpPoints ?? 0,
+        min_sale_price: priceOr(db?.min_sale_price ?? null, item.sellPrice),
+        xp_points: db?.xp_points ?? item.xpPoints ?? 0,
         tier_price: null,
       });
     }

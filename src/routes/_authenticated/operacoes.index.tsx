@@ -16,11 +16,13 @@ import {
 import { SaidaCard } from "@/components/operations/SaidaCard";
 import { SaidaStats } from "@/components/operations/SaidaStats";
 import { SaidaFilters, filterSaidas } from "@/components/operations/SaidaFilters";
-import { SaidaEmptyState, SaidaEmptyFilterState } from "@/components/operations/SaidaEmptyState";
-import { Plus } from "lucide-react";
+import { SaidaEmptyFilterState } from "@/components/operations/SaidaEmptyState";
+import { Plus, Crosshair, Loader2 } from "lucide-react";
 import redwoodLogo from "@/assets/ballas-logo.png";
 import { toast } from "sonner";
+import { beautifyError } from "@/lib/messages";
 import { SaidaWizard } from "@/components/operations/SaidaWizard";
+import { EMPTY_STATE, LOADING } from "@/lib/messages";
 import type { SaidaFilter } from "@/components/operations/SaidaFilters";
 import { Reveal, Stagger } from "@/components/layout/Reveal";
 
@@ -91,16 +93,11 @@ function Page() {
       <Reveal direction="up" delay={150}>
         <div className="mt-5">
           {isLoading && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-48 animate-pulse rounded-xl bg-card/40"
-                style={{ animationDelay: `${i * 100}ms` }}
-              />
-            ))}
-          </div>
-        )}
+            <div className="flex flex-col items-center justify-center h-64 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{LOADING.operations}</p>
+            </div>
+          )}
 
         {!isLoading && filtered.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -111,7 +108,11 @@ function Page() {
         )}
 
         {!isLoading && filtered.length === 0 && !hasFilters && data && data.length === 0 && (
-          <SaidaEmptyState onCreate={() => {}} />
+          <div className="col-span-full text-center py-12">
+            <Crosshair className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
+            <p className="text-sm font-medium text-foreground">{EMPTY_STATE.operations.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.operations.description}</p>
+          </div>
         )}
 
         {!isLoading && filtered.length === 0 && hasFilters && (
@@ -160,7 +161,7 @@ function NewSaidaWizard({ onClose }: { onClose: () => void }) {
       qc.invalidateQueries({ queryKey: ["saidas"] });
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
   return (

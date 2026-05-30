@@ -566,7 +566,7 @@
       "weight": 0,
       "xpPoints": 4,
       "side": "compra",
-      "category": "equipamento",
+      "category": "materiais",
       "subcategory": null
     },
     "material_cobre": {
@@ -1166,7 +1166,7 @@
       "quantity": 1,
       "inputs": {
         "material_molde_arma": 1,
-        "material_sucata": 10
+        "material_sucata": 20
       }
     },
     "recipe_body_xm3": {
@@ -1174,7 +1174,7 @@
       "quantity": 1,
       "inputs": {
         "material_molde_arma": 1,
-        "material_sucata": 10
+        "material_sucata": 20
       }
     },
     "recipe_body_micro_smg": {
@@ -1182,7 +1182,7 @@
       "quantity": 1,
       "inputs": {
         "material_molde_arma": 1,
-        "material_sucata": 15
+        "material_sucata": 20
       }
     },
     "recipe_body_tec9": {
@@ -1190,7 +1190,7 @@
       "quantity": 1,
       "inputs": {
         "material_molde_arma": 1,
-        "material_sucata": 15
+        "material_sucata": 20
       }
     },
     "recipe_body_tec_pistol": {
@@ -1377,6 +1377,7 @@
         "o_gunao",
         "gangster_fodido",
         "patrao_di_zona",
+        "real_gangster",
         "og",
         "kingpin",
         "manda_chuva"
@@ -1400,19 +1401,21 @@
         "manda_chuva"
       ],
       "labels": {
-        "young_blood": "Young Blood",
-        "o_gunao": "O Gunão",
-        "gangster_fodido": "Gangster Fodido",
-        "patrao_di_zona": "Patrão di Zona",
-        "og": "OG",
-        "kingpin": "Kingpin",
-        "manda_chuva": "Manda Chuva"
+        "young_blood": "Bairrista-1",
+        "o_gunao": "Bairrista-2",
+        "gangster_fodido": "Bairrista-3",
+        "patrao_di_zona": "Chefe de Moradores",
+        "real_gangster": "Oficiais-1",
+        "og": "Oficiais-2",
+        "kingpin": "Sub-Chefe",
+        "manda_chuva": "Chefe"
       },
       "gradients": {
         "young_blood": "from-slate-500 to-slate-400",
         "o_gunao": "from-emerald-600 to-emerald-400",
         "gangster_fodido": "from-blue-600 to-blue-400",
         "patrao_di_zona": "from-violet-600 to-violet-400",
+        "real_gangster": "from-purple-600 to-purple-400",
         "og": "from-amber-600 to-amber-400",
         "kingpin": "from-rose-600 to-rose-400",
         "manda_chuva": "from-red-700 to-red-500"
@@ -1422,43 +1425,49 @@
         "o_gunao": "#34d399",
         "gangster_fodido": "#60a5fa",
         "patrao_di_zona": "#a78bfa",
+        "real_gangster": "#c084fc",
         "og": "#fbbf24",
         "kingpin": "#fb7185",
         "manda_chuva": "#ef4444"
       },
       "positions": {
-        "young_blood": "Recruta",
-        "o_gunao": "Membro",
-        "gangster_fodido": "Veterano",
-        "patrao_di_zona": "Chefe de Rua",
-        "og": "Veterano Sénior",
-        "kingpin": "Líder",
-        "manda_chuva": "Dono"
+        "young_blood": "Bairrista-1",
+        "o_gunao": "Bairrista-2",
+        "gangster_fodido": "Bairrista-3",
+        "patrao_di_zona": "Chefe de Moradores",
+        "real_gangster": "Oficiais-1",
+        "og": "Oficiais-2",
+        "kingpin": "Sub-Chefe",
+        "manda_chuva": "Chefe"
       },
       "benefits": {
         "young_blood": [
-          "Acesso ao preçário",
+          "Acesso ao pre��rio",
           "Pode fazer encomendas"
         ],
         "o_gunao": [
-          "Desconto em armas",
-          "Acesso ao armazém"
+          "Acesso ao armaz�m",
+          "Entregas oficiais"
         ],
         "gangster_fodido": [
-          "Preços de morador",
+          "Pre�os de morador",
           "Prioridade nas encomendas"
         ],
         "patrao_di_zona": [
-          "Gestão de entregas",
-          "Acesso a relatórios"
+          "Gest�o de entregas",
+          "Acesso a relat�rios"
+        ],
+        "real_gangster": [
+          "Acesso a opera��es especiais",
+          "Gest�o de sa�das"
         ],
         "og": [
           "Descontos especiais",
           "Acesso total"
         ],
         "kingpin": [
-          "Administração",
-          "Gestão de membros"
+          "Administra��o",
+          "Gest�o de membros"
         ],
         "manda_chuva": [
           "Controlo total",

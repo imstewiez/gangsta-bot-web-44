@@ -25,7 +25,8 @@ export const checkMemberAccess = createServerFn({ method: "GET" })
     }>(
       `select id, status, lifecycle_state, deleted_at 
        from members 
-       where discord_id = $1 
+       where discord_id = $1 and deleted_at is null
+       order by id desc
        limit 1`,
       [profile.data.discord_id],
     );

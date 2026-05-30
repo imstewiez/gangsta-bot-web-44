@@ -7,7 +7,7 @@ import { assertSuperAdmin } from "./admin.functions";
 
 const ADVISORY_LOCK_KEY = 424242;
 const MAX_RUNTIME_MS = 25000;
-const RECALC_WEEKS = 4;
+const RECALC_WEEKS = 8;
 
 export async function doRecalcWeeklyRankings(): Promise<{
   rows_updated: number;

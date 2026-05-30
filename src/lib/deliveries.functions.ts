@@ -4,6 +4,7 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, UuidSchema } from "./security";
+import { logAdminAction } from "./logging.functions";
 
 
 type DeliveryLine = {
@@ -159,6 +160,14 @@ export const createDelivery = createServerFn({ method: "POST" })
         data.responsavel_member_id ?? null,
       ],
     );
+    await logAdminAction(context.supabase, {
+      action: data.tipo === "venda" ? "delivery_request_created" : "delivery_created",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Membro",
+      targetType: "delivery",
+      targetId: row?.id ?? "",
+      details: `${data.tipo === "venda" ? "Venda" : "Entrega"} de ${totalQty} items (${data.lines.map((l) => `${l.qty}× #${l.item_id}`).join(", ")})`,
+    });
     return { id: row?.id };
   });
 
@@ -206,6 +215,14 @@ export const decideDelivery = createServerFn({ method: "POST" })
         me.discord_id,
       ],
     );
+    await logAdminAction(context.supabase, {
+      action: data.approve ? "delivery_approved" : "delivery_rejected",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direção",
+      targetType: "delivery",
+      targetId: data.id,
+      details: `${data.approve ? "Aprovada" : "Recusada"} ${before.tipo === "venda" ? "venda" : "entrega"} de ${before.requester_member_id}${data.reason ? " (" + data.reason + ")" : ""}`,
+    });
     if (data.approve) {
       // Atomic delivery approval via stored procedure (batch insert + stats update)
       await pgQuery(

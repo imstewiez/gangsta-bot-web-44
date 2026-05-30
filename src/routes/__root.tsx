@@ -11,24 +11,32 @@ import { Toaster } from "@/components/ui/sonner";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { AuthProvider } from "@/lib/auth";
+import { AlertTriangle } from "lucide-react";
 
 import appCss from "../styles.css?url";
+
+import { MapPinOff, RotateCcw, Home } from "lucide-react";
+import { ERROR_PAGE } from "@/lib/messages";
 
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-display text-7xl font-bold text-primary">404</h1>
-        <h2 className="mt-4 text-xl font-semibold">Página não encontrada</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Território desconhecido. Redireciona para a base.
+      <div className="max-w-md text-center animate-rise">
+        <div className="relative mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-primary/10 ring-1 ring-primary/30">
+          <MapPinOff className="h-9 w-9 text-primary" />
+          <span className="absolute inset-0 rounded-full bg-primary/10 blur-xl animate-pulse" />
+        </div>
+        <h1 className="text-display text-2xl font-bold tracking-wide">{ERROR_PAGE.notFoundTitle}</h1>
+        <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+          {ERROR_PAGE.notFoundDescription}
         </p>
         <div className="mt-6">
           <Link
             to="/"
             className="inline-flex cursor-pointer items-center justify-center rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
-            Voltar
+            <Home className="mr-1.5 h-4 w-4" />
+            {ERROR_PAGE.notFoundButton}
           </Link>
         </div>
       </div>
@@ -41,24 +49,32 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold">Erro a carregar</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+      <div className="max-w-md text-center animate-rise">
+        <div className="relative mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-destructive/10 ring-1 ring-destructive/30">
+          <AlertTriangle className="h-9 w-9 text-destructive" />
+          <span className="absolute inset-0 rounded-full bg-destructive/10 blur-xl animate-pulse" />
+        </div>
+        <h1 className="text-display text-xl font-bold tracking-wide">{ERROR_PAGE.genericTitle}</h1>
+        <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+          {ERROR_PAGE.genericDescription}
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="cursor-pointer rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="cursor-pointer rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 inline-flex items-center"
           >
-            Tentar de novo
+            <RotateCcw className="mr-1.5 h-4 w-4" />
+            {ERROR_PAGE.genericButton}
           </button>
           <a
             href="/"
-            className="rounded-sm border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+            className="rounded-sm border border-border px-4 py-2 text-sm font-medium hover:bg-accent inline-flex items-center"
           >
-            Início
+            <Home className="mr-1.5 h-4 w-4" />
+            {ERROR_PAGE.notFoundButton}
           </a>
         </div>
       </div>
@@ -80,9 +96,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         },
         { property: "og:title", content: "Ballas Gang" },
         { name: "twitter:title", content: "Ballas Gang" },
-        { name: "description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
-        { property: "og:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
-        { name: "twitter:description", content: "A web application for managing an organization's operations, inventory, and member roles with a customized, thematic interface." },
+        { name: "description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
+        { property: "og:description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
+        { name: "twitter:description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
         { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
         { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
         { name: "twitter:card", content: "summary_large_image" },
