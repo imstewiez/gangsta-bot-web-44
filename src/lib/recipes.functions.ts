@@ -147,10 +147,26 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<CraftFeasibility> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
+
+    // Map DB recipe_id -> item name (handles both DB IDs and config numeric IDs)
+    const dbItem = await pgQuery<{ id: number; name: string }>(
+      `select id, name from items where id = $1 and active = true`,
+      [data.recipe_id],
+    );
+    const targetName = dbItem[0]?.name ?? null;
+
     const allRecipes = getAllRecipes();
     let targetRecipe: ReturnType<typeof getRecipeById> = undefined;
     let targetRecipeId = "";
+
     for (const [rid, r] of Object.entries(allRecipes)) {
+      // Try match by DB item name, or fallback to numeric IDs for config-based recipes
+      const outItem = getItemById(r.output);
+      if (targetName && outItem?.name === targetName) {
+        targetRecipe = r;
+        targetRecipeId = rid;
+        break;
+      }
       if (getNumericId(rid) === data.recipe_id || getNumericId(r.output) === data.recipe_id) {
         targetRecipe = r;
         targetRecipeId = rid;
@@ -227,16 +243,27 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<CraftFeasibilityBatch> => {
     try {
+      // Map DB item_ids to names so we can look up recipes from config.json
+      const itemIds = data.lines.map((l) => l.item_id);
+      const dbItems = await pgQuery<{ id: number; name: string }>(
+        `select id, name from items where id = any($1::int[]) and active = true`,
+        [itemIds],
+      );
+      const nameById = new Map(dbItems.map((i) => [i.id, i.name]));
+
       const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
       let dirty_money = 0;
       let full_material_cost = 0;
       const items: CraftFeasibilityBatch["items"] = [];
 
       for (const line of data.lines) {
-        const item = getItemByNumericId(line.item_id);
+        const itemName = nameById.get(line.item_id);
+        if (!itemName) continue;
+
+        const item = getItemByName(itemName);
         if (!item) continue;
 
-        const recipe = getRecipeForItemName(item.name);
+        const recipe = getRecipeForItemName(itemName);
         if (!recipe) continue;
 
         items.push({ item_name: item.name, requested_qty: line.quantity });

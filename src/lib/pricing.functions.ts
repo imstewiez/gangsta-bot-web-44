@@ -46,6 +46,13 @@ export const getCatalog = createServerFn({ method: "GET" })
     const result: CatalogItem[] = [];
     const seenDbIds = new Set<number>();
 
+    // Helper: use DB price only if it's a positive finite number, else fallback to config
+    const priceOr = (dbVal: number | null, configVal: number | null): number | null => {
+      if (dbVal != null && Number.isFinite(dbVal) && dbVal > 0) return dbVal;
+      if (configVal != null && Number.isFinite(configVal) && configVal > 0) return configVal;
+      return null;
+    };
+
     // First pass: items from config.json with DB overrides
     for (const [id, item] of Object.entries(configItems)) {
       const db = dbItems.find((d) => d.name === item.name);
@@ -54,7 +61,8 @@ export const getCatalog = createServerFn({ method: "GET" })
       const effectiveSide = db.side ?? item.side ?? "venda";
       if (effectiveSide !== "venda" && effectiveSide !== "ambos") continue;
 
-      const tierPrice = getTierPrice(id, tier) ?? db.min_sale_price ?? item.sellPrice ?? item.estimatedValue ?? 0;
+      const baseSalePrice = priceOr(db.min_sale_price, item.sellPrice);
+      const tierPrice = getTierPrice(id, tier) ?? baseSalePrice ?? item.estimatedValue ?? 0;
 
       result.push({
         id: db.id,
@@ -62,9 +70,9 @@ export const getCatalog = createServerFn({ method: "GET" })
         category: item.category ?? "outros",
         subcategory: item.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: db.purchase_price ?? item.buyPrice ?? null,
+        purchase_price: priceOr(db.purchase_price, item.buyPrice),
         morador_purchase_price: null,
-        min_sale_price: db.min_sale_price ?? item.sellPrice ?? null,
+        min_sale_price: baseSalePrice,
         xp_points: db.xp_points ?? item.xpPoints ?? 0,
         tier_price: tierPrice,
       });
@@ -82,11 +90,11 @@ export const getCatalog = createServerFn({ method: "GET" })
         category: db.category ?? "outros",
         subcategory: db.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: db.purchase_price ?? null,
+        purchase_price: priceOr(db.purchase_price, null),
         morador_purchase_price: null,
-        min_sale_price: db.min_sale_price ?? null,
+        min_sale_price: priceOr(db.min_sale_price, null),
         xp_points: db.xp_points ?? 0,
-        tier_price: db.min_sale_price ?? 0,
+        tier_price: priceOr(db.min_sale_price, null) ?? 0,
       });
     }
 
@@ -118,6 +126,13 @@ export const getBuyCatalog = createServerFn({ method: "GET" })
     const result: CatalogItem[] = [];
     const seenDbIds = new Set<number>();
 
+    // Helper: use DB price only if it's a positive finite number, else fallback to config
+    const priceOr = (dbVal: number | null, configVal: number | null): number | null => {
+      if (dbVal != null && Number.isFinite(dbVal) && dbVal > 0) return dbVal;
+      if (configVal != null && Number.isFinite(configVal) && configVal > 0) return configVal;
+      return null;
+    };
+
     // First pass: items from config.json with DB overrides
     for (const [id, item] of Object.entries(configItems)) {
       const db = dbItems.find((d) => d.name === item.name);
@@ -132,9 +147,9 @@ export const getBuyCatalog = createServerFn({ method: "GET" })
         category: item.category ?? "outros",
         subcategory: item.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: db.purchase_price ?? item.buyPrice ?? null,
+        purchase_price: priceOr(db.purchase_price, item.buyPrice),
         morador_purchase_price: null,
-        min_sale_price: db.min_sale_price ?? item.sellPrice ?? null,
+        min_sale_price: priceOr(db.min_sale_price, item.sellPrice),
         xp_points: db.xp_points ?? item.xpPoints ?? 0,
         tier_price: null,
       });
@@ -152,9 +167,9 @@ export const getBuyCatalog = createServerFn({ method: "GET" })
         category: db.category ?? "outros",
         subcategory: db.subcategory,
         side: effectiveSide as "venda" | "compra" | "ambos",
-        purchase_price: db.purchase_price ?? null,
+        purchase_price: priceOr(db.purchase_price, null),
         morador_purchase_price: null,
-        min_sale_price: db.min_sale_price ?? null,
+        min_sale_price: priceOr(db.min_sale_price, null),
         xp_points: db.xp_points ?? 0,
         tier_price: null,
       });
