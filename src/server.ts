@@ -177,7 +177,20 @@ export default {
         });
       }
 
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      // Prevent browser/CDN from caching HTML pages — always fetch fresh chunks
+      const htmlResponse = new Response(normalized.body, {
+        status: normalized.status,
+        statusText: normalized.statusText,
+        headers: new Headers(normalized.headers),
+      });
+      const contentType = htmlResponse.headers.get("content-type") ?? "";
+      if (contentType.includes("text/html")) {
+        htmlResponse.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        htmlResponse.headers.set("Pragma", "no-cache");
+        htmlResponse.headers.set("Expires", "0");
+      }
+      return htmlResponse;
     } catch (error) {
       logger.error("request_unhandled_exception", {
         path: url.pathname,
