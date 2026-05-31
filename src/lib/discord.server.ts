@@ -4,6 +4,7 @@
 
 import { enqueueNotification } from "./notifier.server";
 import { logger } from "./logger.server";
+import { getEnv } from "./env.server";
 
 export type DiscordEvent =
   | { action: "rename"; discord_id: string; new_name: string }
@@ -41,11 +42,9 @@ const TIMEOUT_MS = 10000;
 function isAllowedUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    // Allow only HTTPS
+    // Allow only HTTPS. The target should be controlled by us and protected by
+    // DISCORD_BOT_SECRET on the receiving side.
     if (u.protocol !== "https:") return false;
-    // Optional: restrict to known domains
-    // const allowed = ["discord.com", "your-bot-domain.com"];
-    // return allowed.some((d) => u.hostname === d || u.hostname.endsWith(`.${d}`));
     return true;
   } catch {
     return false;
@@ -88,8 +87,8 @@ async function attemptNotify(
 export async function notifyBot(
   ev: DiscordEvent,
 ): Promise<{ ok: boolean; error?: string }> {
-  const url = process.env.DISCORD_BOT_URL;
-  const secret = process.env.DISCORD_BOT_SECRET;
+  const url = getEnv("DISCORD_BOT_URL");
+  const secret = getEnv("DISCORD_BOT_SECRET");
   if (!url) {
     logger.warn("discord_not_configured", { event: ev.action });
     return { ok: false, error: "bot_not_configured" };
@@ -102,7 +101,7 @@ export async function notifyBot(
 
   const payload = JSON.stringify({
     ...ev,
-    guild_id: process.env.DISCORD_GUILD_ID,
+    guild_id: getEnv("DISCORD_GUILD_ID"),
     ts: Date.now(),
   });
 
@@ -127,6 +126,7 @@ export async function notifyBot(
   // Fallback: enqueue to pending_notifications so the external bot worker can pick it up later
   try {
     await enqueueNotification({
+      dedupKey: `discord_failed:${ev.action}:${ev.discord_id}:${Date.now()}`,
       embed: {
         title: `Discord event failed: ${ev.action}`,
         description: `Event for <@${ev.discord_id}> failed after ${RETRY_DELAYS_MS.length + 1} attempts. Check bot health.`,
