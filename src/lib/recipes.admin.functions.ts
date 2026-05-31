@@ -13,12 +13,7 @@ export type AdminRecipeRow = {
   subcategory: string | null;
   recipe_category: string | null;
   tier: string | null;
-  ingredients: Array<{
-    item_id: number;
-    name: string;
-    quantity: number;
-    unit_cost: number;
-  }>;
+  ingredients: Array<{ item_id: number; name: string; quantity: number; unit_cost: number }>;
 };
 
 export type AdminItemRow = {
@@ -45,12 +40,33 @@ type AdminDbItemRow = {
   active: boolean;
   in_config: boolean;
   recipe_id: number | null;
-  ingredients: Array<{
-    recipe_id: number;
-    ingredient_item_id: number;
-    quantity: number;
-    ingredient_name: string;
-  }>;
+  ingredients: Array<{ recipe_id: number; ingredient_item_id: number; quantity: number; ingredient_name: string }>;
+};
+
+type ItemPricingInput = {
+  name?: string;
+  category?: string | null;
+  subcategory?: string | null;
+  side?: string | null;
+  purchase_price?: number | null;
+  morador_purchase_price?: number | null;
+  min_sale_price?: number | null;
+  estimated_value?: number | null;
+  xp_points?: number | null;
+  active?: boolean | null;
+};
+
+type NormalizedItemPricing = {
+  name: string;
+  category: string;
+  subcategory: string | null;
+  side: "venda" | "compra" | "ambos";
+  purchase_price: number | null;
+  morador_purchase_price: number | null;
+  min_sale_price: number | null;
+  estimated_value: number | null;
+  xp_points: number;
+  active: boolean;
 };
 
 const VALID_SIDES = new Set(["venda", "compra", "ambos"]);
@@ -81,6 +97,10 @@ function cleanXp(value: unknown): number {
   return Math.round(n);
 }
 
+function moneyValue(value: number | null | undefined): number {
+  return Number.isFinite(Number(value)) ? Number(value ?? 0) : 0;
+}
+
 function inferCategory(name: string, category?: string | null): string {
   const n = name.toLowerCase();
   if (n.includes("colete")) return "coletes";
@@ -94,6 +114,52 @@ function inferSubcategory(name: string, category: string, subcategory?: string |
   return subcategory ?? (category === "coletes" ? "coletes" : null);
 }
 
+function normalizeSide(value: unknown): "venda" | "compra" | "ambos" {
+  const side = cleanText(value, "venda");
+  if (!VALID_SIDES.has(side)) throw new Error("Lado inválido");
+  return side as "venda" | "compra" | "ambos";
+}
+
+function normalizeItemPricing(input: ItemPricingInput, existing?: Partial<NormalizedItemPricing>): NormalizedItemPricing {
+  const name = cleanText(input.name, existing?.name ?? "");
+  if (!name) throw new Error("Nome obrigatório");
+
+  const side = normalizeSide(input.side ?? existing?.side ?? "venda");
+  const category = inferCategory(name, cleanText(input.category ?? existing?.category, "outros"));
+  const subcategory = inferSubcategory(name, category, cleanNullableText(input.subcategory ?? existing?.subcategory));
+
+  let purchase_price = input.purchase_price !== undefined ? cleanMoney(input.purchase_price) : (existing?.purchase_price ?? null);
+  let morador_purchase_price = input.morador_purchase_price !== undefined ? cleanMoney(input.morador_purchase_price) : (existing?.morador_purchase_price ?? null);
+  let min_sale_price = input.min_sale_price !== undefined ? cleanMoney(input.min_sale_price) : (existing?.min_sale_price ?? null);
+  let estimated_value = input.estimated_value !== undefined ? cleanMoney(input.estimated_value) : (existing?.estimated_value ?? null);
+  const xp_points = input.xp_points !== undefined ? cleanXp(input.xp_points) : (existing?.xp_points ?? 0);
+  const active = input.active !== undefined && input.active !== null ? Boolean(input.active) : (existing?.active ?? true);
+
+  // Canonical semantics:
+  // compra: purchase_price = preço civil, morador_purchase_price = preço organização.
+  // venda: min_sale_price = com material, purchase_price = sem material, estimated_value = custo.
+  if (side === "compra") {
+    min_sale_price = null;
+    estimated_value = null;
+  }
+  if (side === "venda") {
+    morador_purchase_price = null;
+  }
+
+  if (active) {
+    const hasBuyPrice = moneyValue(purchase_price) > 0 || moneyValue(morador_purchase_price) > 0;
+    const hasSellPrice = moneyValue(min_sale_price) > 0 || moneyValue(purchase_price) > 0;
+    if ((side === "compra" || side === "ambos") && !hasBuyPrice) {
+      throw new Error("Define pelo menos um preço de compra para este material.");
+    }
+    if ((side === "venda" || side === "ambos") && !hasSellPrice) {
+      throw new Error("Define preço com material ou preço sem material para este item.");
+    }
+  }
+
+  return { name, category, subcategory, side, purchase_price, morador_purchase_price, min_sale_price, estimated_value, xp_points, active };
+}
+
 async function assertManager(context: any) {
   const me = await resolveCurrentMember(context.supabase, context.userId);
   if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
@@ -101,16 +167,9 @@ async function assertManager(context: any) {
 }
 
 async function getOrCreateRecipeId(itemId: number): Promise<number> {
-  const existing = await pgOne<{ id: number }>(
-    `select id from craft_recipes where item_id = $1 limit 1`,
-    [itemId],
-  );
+  const existing = await pgOne<{ id: number }>(`select id from craft_recipes where item_id = $1 limit 1`, [itemId]);
   if (existing) return existing.id;
-
-  const inserted = await pgOne<{ id: number }>(
-    `insert into craft_recipes (item_id, quantity) values ($1, 1) returning id`,
-    [itemId],
-  );
+  const inserted = await pgOne<{ id: number }>(`insert into craft_recipes (item_id, quantity) values ($1, 1) returning id`, [itemId]);
   if (!inserted) throw new Error("Erro ao criar receita");
   return inserted.id;
 }
@@ -119,26 +178,18 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminRecipeRow[]> => {
     await assertManager(context);
-
     const recipes = getAllRecipes();
     const result: AdminRecipeRow[] = [];
 
     for (const [recipeId, recipe] of Object.entries(recipes)) {
       const outputItem = getItemById(recipe.output);
       if (!outputItem) continue;
-
       const ingredients: AdminRecipeRow["ingredients"] = [];
       for (const [ingId, qty] of Object.entries(recipe.inputs)) {
         const ingItem = getItemById(ingId);
         if (!ingItem) continue;
-        ingredients.push({
-          item_id: getNumericId(ingId),
-          name: ingItem.name,
-          quantity: Number(qty),
-          unit_cost: ingItem.buyPrice ?? ingItem.estimatedValue ?? 0,
-        });
+        ingredients.push({ item_id: getNumericId(ingId), name: ingItem.name, quantity: Number(qty), unit_cost: ingItem.buyPrice ?? ingItem.estimatedValue ?? 0 });
       }
-
       result.push({
         recipe_id: getNumericId(recipeId),
         item_id: getNumericId(recipe.output),
@@ -150,7 +201,6 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
         ingredients,
       });
     }
-
     return result.sort((a, b) => (a.recipe_category ?? "").localeCompare(b.recipe_category ?? "") || a.item_name.localeCompare(b.item_name));
   });
 
@@ -158,7 +208,7 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminItemRow[]> => {
     await assertManager(context);
-    const rows = await pgQuery<AdminItemRow>(
+    return pgQuery<AdminItemRow>(
       `select id, name, category, subcategory,
               estimated_value::float as estimated_value,
               purchase_price::float as purchase_price,
@@ -167,7 +217,6 @@ export const listItemsAdmin = createServerFn({ method: "GET" })
        where coalesce(active, true) = true and deleted_at is null
        order by category, name`,
     );
-    return rows;
   });
 
 export const listDbItemsAdmin = createServerFn({ method: "GET" })
@@ -178,7 +227,6 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
     const configItems = getAllItems();
     const configNames = new Set(Object.values(configItems).map((i) => i.name));
     const configRecipes = getAllRecipes();
-
     const rows = await pgQuery<{
       id: number;
       name: string;
@@ -205,27 +253,17 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
     );
 
     const dbIdByName = new Map(rows.map((r) => [r.name, r.id]));
-
-    const recipeRows = await pgQuery<{ recipe_id: number; item_id: number }>(
-      `select id as recipe_id, item_id from craft_recipes`,
-    );
+    const recipeRows = await pgQuery<{ recipe_id: number; item_id: number }>(`select id as recipe_id, item_id from craft_recipes`);
     const recipeItemByRecipeId = new Map(recipeRows.map((r) => [r.recipe_id, r.item_id]));
-
-    const ingredientRows = await pgQuery<{
-      recipe_id: number;
-      ingredient_item_id: number;
-      quantity: number;
-      ingredient_name: string;
-    }>(
+    const ingredientRows = await pgQuery<{ recipe_id: number; ingredient_item_id: number; quantity: number; ingredient_name: string }>(
       `select ri.recipe_id, ri.ingredient_item_id, ri.quantity::float as quantity, i.name as ingredient_name
        from recipe_ingredients ri
-       join items i on i.id = ri.ingredient_item_id`,
+       join items i on i.id = ri.ingredient_item_id
+       where coalesce(i.active, true) = true and i.deleted_at is null`,
     );
 
     const recipeMap = new Map<number, { recipe_id: number; ingredients: typeof ingredientRows }>();
-    for (const r of recipeRows) {
-      recipeMap.set(r.item_id, { recipe_id: r.recipe_id, ingredients: [] });
-    }
+    for (const r of recipeRows) recipeMap.set(r.item_id, { recipe_id: r.recipe_id, ingredients: [] });
     for (const ing of ingredientRows) {
       const itemId = recipeItemByRecipeId.get(ing.recipe_id);
       if (!itemId) continue;
@@ -238,21 +276,14 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
       if (!outputItem) continue;
       const outputDbId = dbIdByName.get(outputItem.name);
       if (!outputDbId || recipeMap.has(outputDbId)) continue;
-
       const syntheticIngredients = [];
       for (const [ingConfigId, qty] of Object.entries(recipe.inputs)) {
         const ingItem = configItems[ingConfigId];
         if (!ingItem) continue;
         const ingDbId = dbIdByName.get(ingItem.name);
         if (!ingDbId) continue;
-        syntheticIngredients.push({
-          recipe_id: -1,
-          ingredient_item_id: ingDbId,
-          quantity: Number(qty),
-          ingredient_name: ingItem.name,
-        });
+        syntheticIngredients.push({ recipe_id: -1, ingredient_item_id: ingDbId, quantity: Number(qty), ingredient_name: ingItem.name });
       }
-
       recipeMap.set(outputDbId, { recipe_id: -1, ingredients: syntheticIngredients });
     }
 
@@ -293,106 +324,66 @@ export const updateItemPrice = createServerFn({ method: "POST" })
 
 export const updateItemAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    item_id: number;
-    name?: string;
-    category?: string;
-    subcategory?: string | null;
-    side?: string;
-    purchase_price?: number | null;
-    morador_purchase_price?: number | null;
-    min_sale_price?: number | null;
-    estimated_value?: number | null;
-    xp_points?: number;
-    active?: boolean;
-  }) => {
+  .inputValidator((d: ItemPricingInput & { item_id: number }) => {
     if (!Number.isFinite(d.item_id) || d.item_id <= 0) throw new Error("item_id inválido");
     return d;
   })
   .handler(async ({ context, data }): Promise<void> => {
     const me = await assertManager(context);
+    const existing = await pgOne<NormalizedItemPricing>(
+      `select name, category, subcategory, side,
+              purchase_price::float as purchase_price,
+              morador_purchase_price::float as morador_purchase_price,
+              min_sale_price::float as min_sale_price,
+              estimated_value::float as estimated_value,
+              xp_points,
+              coalesce(active, true) as active
+       from items where id = $1 and deleted_at is null`,
+      [data.item_id],
+    );
+    if (!existing) throw new Error("Item não encontrado");
+    const item = normalizeItemPricing(data, existing);
 
-    const name = data.name !== undefined ? cleanText(data.name) : undefined;
-    const category = data.category !== undefined ? inferCategory(name ?? "", cleanText(data.category, "outros")) : undefined;
-    const subcategory = data.subcategory !== undefined || category !== undefined
-      ? inferSubcategory(name ?? "", category ?? "outros", cleanNullableText(data.subcategory))
-      : undefined;
-    const side = data.side !== undefined ? cleanText(data.side, "venda") : undefined;
-    if (side !== undefined && !VALID_SIDES.has(side)) throw new Error("Lado inválido");
-
-    const sets: string[] = [];
-    const vals: (number | string | boolean | null)[] = [];
-    if (name !== undefined) { sets.push(`name = $${sets.length + 1}`); vals.push(name); }
-    if (category !== undefined) { sets.push(`category = $${sets.length + 1}`); vals.push(category); }
-    if (subcategory !== undefined) { sets.push(`subcategory = $${sets.length + 1}`); vals.push(subcategory); }
-    if (side !== undefined) { sets.push(`side = $${sets.length + 1}`); vals.push(side); }
-    if (data.purchase_price !== undefined) { sets.push(`purchase_price = $${sets.length + 1}`); vals.push(cleanMoney(data.purchase_price)); }
-    if (data.morador_purchase_price !== undefined) { sets.push(`morador_purchase_price = $${sets.length + 1}`); vals.push(cleanMoney(data.morador_purchase_price)); }
-    if (data.min_sale_price !== undefined) { sets.push(`min_sale_price = $${sets.length + 1}`); vals.push(cleanMoney(data.min_sale_price)); }
-    if (data.estimated_value !== undefined) { sets.push(`estimated_value = $${sets.length + 1}`); vals.push(cleanMoney(data.estimated_value)); }
-    if (data.xp_points !== undefined) { sets.push(`xp_points = $${sets.length + 1}`); vals.push(cleanXp(data.xp_points)); }
-    if (data.active !== undefined) { sets.push(`active = $${sets.length + 1}`); vals.push(Boolean(data.active)); }
-    if (sets.length === 0) return;
-
-    vals.push(data.item_id);
-    await pgQuery(`update items set ${sets.join(", ")}, updated_at = now() where id = $${vals.length}`, vals);
+    await pgQuery(
+      `update items set name = $2, category = $3, subcategory = $4, side = $5,
+         purchase_price = $6, morador_purchase_price = $7, min_sale_price = $8,
+         estimated_value = $9, xp_points = $10, active = $11, updated_at = now()
+       where id = $1`,
+      [data.item_id, item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points, item.active],
+    );
     await logAdminAction(context.supabase, {
       action: "item_updated",
       actorId: context.userId,
       actorName: me.display_name ?? "Direção",
       targetType: "item",
       targetId: data.item_id,
-      details: `Item atualizado (${sets.length} campos)`,
-      afterState: { fields_changed: sets.map((s) => s.split(" ")[0]) },
+      details: `Item atualizado: ${item.name}`,
+      afterState: item,
     });
   });
 
 export const createItemAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    name: string;
-    category: string;
-    subcategory?: string | null;
-    side?: string;
-    purchase_price?: number | null;
-    morador_purchase_price?: number | null;
-    min_sale_price?: number | null;
-    estimated_value?: number | null;
-    xp_points?: number;
-  }) => {
+  .inputValidator((d: ItemPricingInput & { name: string; category: string }) => {
     if (!cleanText(d.name)) throw new Error("Nome obrigatório");
     if (!cleanText(d.category)) throw new Error("Categoria obrigatória");
     return d;
   })
   .handler(async ({ context, data }): Promise<{ id: number }> => {
     const me = await assertManager(context);
-    const name = cleanText(data.name);
-    const category = inferCategory(name, cleanText(data.category, "outros"));
-    const subcategory = inferSubcategory(name, category, cleanNullableText(data.subcategory));
-    const side = cleanText(data.side, "venda");
-    if (!VALID_SIDES.has(side)) throw new Error("Lado inválido");
-
+    const item = normalizeItemPricing(data, { active: true });
     const existing = await pgOne<{ id: number; active: boolean | null; deleted_at: string | null }>(
       `select id, active, deleted_at from items where lower(name) = lower($1) order by id desc limit 1`,
-      [name],
+      [item.name],
     );
+
     if (existing?.deleted_at) {
       await pgQuery(
         `update items set category = $2, subcategory = $3, side = $4,
              purchase_price = $5, morador_purchase_price = $6, min_sale_price = $7,
              estimated_value = $8, xp_points = $9, active = true, deleted_at = null, updated_at = now()
          where id = $1`,
-        [
-          existing.id,
-          category,
-          subcategory,
-          side,
-          cleanMoney(data.purchase_price),
-          cleanMoney(data.morador_purchase_price),
-          cleanMoney(data.min_sale_price),
-          cleanMoney(data.estimated_value),
-          cleanXp(data.xp_points),
-        ],
+        [existing.id, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points],
       );
       return { id: existing.id };
     }
@@ -403,17 +394,7 @@ export const createItemAdmin = createServerFn({ method: "POST" })
          (name, category, subcategory, side, purchase_price, morador_purchase_price, min_sale_price, estimated_value, xp_points, active)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
        returning id`,
-      [
-        name,
-        category,
-        subcategory,
-        side,
-        cleanMoney(data.purchase_price),
-        cleanMoney(data.morador_purchase_price),
-        cleanMoney(data.min_sale_price),
-        cleanMoney(data.estimated_value),
-        cleanXp(data.xp_points),
-      ],
+      [item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points],
     );
     if (!result) throw new Error("Erro ao criar item");
     await logAdminAction(context.supabase, {
@@ -422,8 +403,8 @@ export const createItemAdmin = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Direção",
       targetType: "item",
       targetId: result.id,
-      details: `Material criado: ${name}`,
-      afterState: { name, category, side },
+      details: `Material criado: ${item.name}`,
+      afterState: item,
     });
     return { id: result.id };
   });
@@ -432,12 +413,7 @@ export const getMaterialItemsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertManager(context);
-    return pgQuery<{
-      id: number;
-      name: string;
-      category: string | null;
-      purchase_price: number | null;
-    }>(
+    return pgQuery<{ id: number; name: string; category: string | null; purchase_price: number | null }>(
       `select id, name, category, purchase_price::float as purchase_price
        from items
        where coalesce(active, true) = true
@@ -449,10 +425,7 @@ export const getMaterialItemsAdmin = createServerFn({ method: "GET" })
 
 export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    item_id: number;
-    ingredients: Array<{ ingredient_item_id: number; quantity: number }>;
-  }) => {
+  .inputValidator((d: { item_id: number; ingredients: Array<{ ingredient_item_id: number; quantity: number }> }) => {
     if (!Number.isFinite(d.item_id) || d.item_id <= 0) throw new Error("item_id inválido");
     if (!Array.isArray(d.ingredients)) throw new Error("ingredients inválido");
     for (const ing of d.ingredients) {
@@ -463,15 +436,38 @@ export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }): Promise<void> => {
     await assertManager(context);
+    const output = await pgOne<{ id: number; side: string | null; name: string }>(
+      `select id, side, name from items where id = $1 and coalesce(active, true) = true and deleted_at is null`,
+      [data.item_id],
+    );
+    if (!output) throw new Error("Item não encontrado");
+    if (output.side === "compra") throw new Error("Itens de compra não têm receita.");
+
+    const aggregated = new Map<number, number>();
+    for (const ing of data.ingredients) {
+      if (ing.ingredient_item_id === data.item_id) throw new Error("Um item não pode ser ingrediente de si próprio.");
+      if (ing.quantity > 0) aggregated.set(ing.ingredient_item_id, (aggregated.get(ing.ingredient_item_id) ?? 0) + Math.round(Number(ing.quantity)));
+    }
+
+    if (aggregated.size > 0) {
+      const validRows = await pgQuery<{ id: number }>(
+        `select id from items
+         where id = any($1::int[])
+           and coalesce(active, true) = true
+           and deleted_at is null
+           and coalesce(side, 'compra') in ('compra','ambos')`,
+        [Array.from(aggregated.keys())],
+      );
+      const valid = new Set(validRows.map((r) => r.id));
+      for (const id of aggregated.keys()) {
+        if (!valid.has(id)) throw new Error("A receita só pode usar materiais ativos de compra/ambos.");
+      }
+    }
+
     const recipeId = await getOrCreateRecipeId(data.item_id);
     await pgQuery(`delete from recipe_ingredients where recipe_id = $1`, [recipeId]);
-    for (const ing of data.ingredients) {
-      if (ing.quantity > 0) {
-        await pgQuery(
-          `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
-          [recipeId, ing.ingredient_item_id, ing.quantity],
-        );
-      }
+    for (const [ingredientId, quantity] of aggregated.entries()) {
+      await pgQuery(`insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`, [recipeId, ingredientId, quantity]);
     }
   });
 
@@ -485,16 +481,11 @@ export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }): Promise<void> => {
     await assertManager(context);
+    if (data.ingredient_item_id === data.item_id) throw new Error("Um item não pode ser ingrediente de si próprio.");
     const recipeId = await getOrCreateRecipeId(data.item_id);
-    await pgQuery(
-      `delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`,
-      [recipeId, data.ingredient_item_id],
-    );
+    await pgQuery(`delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`, [recipeId, data.ingredient_item_id]);
     if (data.quantity > 0) {
-      await pgQuery(
-        `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
-        [recipeId, data.ingredient_item_id, data.quantity],
-      );
+      await pgQuery(`insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`, [recipeId, data.ingredient_item_id, Math.round(Number(data.quantity))]);
     }
   });
 
@@ -548,7 +539,5 @@ async function deleteItemsByIds(ids: number[]): Promise<void> {
   if (Number(pendingOrders?.count ?? 0) > 0) {
     throw new Error(`Não é possível eliminar: existem ${pendingOrders?.count} encomenda(s) pendente(s) associadas a estes materiais. Resolve as encomendas primeiro.`);
   }
-
-  // Soft delete only. Do not delete movements/history; production data must stay auditable.
   await pgQuery(`update items set active = false, deleted_at = now(), updated_at = now() where id = any($1::int[])`, [ids]);
 }
