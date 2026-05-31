@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
+import { ViewAsSwitcher } from "./ViewAsSwitcher";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Reveal } from "./Reveal";
@@ -15,7 +16,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex h-full flex-1 flex-col overflow-hidden">
           <header className="shrink-0 z-40 flex h-14 items-center gap-2 border-b border-border/40 bg-background/60 px-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/40">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
-            <div className="ml-auto flex items-center gap-3" />
+            <div className="ml-auto flex items-center gap-3">
+              <ViewAsSwitcher />
+            </div>
             <div aria-hidden className="absolute inset-x-0 -bottom-px hairline-top opacity-60" />
           </header>
 
