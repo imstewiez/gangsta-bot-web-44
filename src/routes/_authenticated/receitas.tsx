@@ -19,7 +19,6 @@ import { beautifyError, EMPTY_STATE, LOADING } from "@/lib/messages";
 import {
   Hammer,
   Calculator,
-  Package,
   ChevronDown,
   ChevronUp,
   FlaskConical,
@@ -28,7 +27,6 @@ import {
 import type { RecipeRow } from "@/lib/recipes.functions";
 import {
   ARMORY_CAT_ORDER,
-  ARMORY_CAT_CONFIG,
   itemSubLabel,
   PRINT_LABELS,
   PRINT_BADGE_CLASS,
@@ -59,14 +57,14 @@ function printBadge(tier: string | null, itemName: string | null): { label: stri
 
 function RecipeCard({
   r,
-  member,
+  canSeeCosts,
   expanded,
   onToggle,
   simulateResult,
   onSimulate,
 }: {
   r: RecipeRow;
-  member: { tier: string | null; is_morador: boolean } | null;
+  canSeeCosts: boolean;
   expanded: boolean;
   onToggle: () => void;
   simulateResult: CraftFeasibility | null;
@@ -83,7 +81,6 @@ function RecipeCard({
 
   return (
     <div className="rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm interactive-card overflow-hidden">
-      {/* Header — clickable to expand */}
       <button
         className="w-full text-left p-4 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
         onClick={onToggle}
@@ -107,10 +104,8 @@ function RecipeCard({
         </div>
       </button>
 
-      {/* Expanded panel */}
       {expanded && (
         <div className="border-t border-border/40 px-4 pb-4 space-y-4">
-          {/* Ingredients */}
           <div className="pt-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1">
               <FlaskConical className="h-3 w-3" />
@@ -121,48 +116,46 @@ function RecipeCard({
                 <div key={ing.item_id} className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">{ing.name}</span>
                   <span className="font-mono text-muted-foreground/70">
-                    {ing.quantity} × {fmtPrice(Math.round(ing.unit_cost))}
+                    {fmtNum(ing.quantity)}×
                   </span>
                 </div>
               ))}
-              {!r.ingredients.length && (
-                <p className="text-xs text-muted-foreground">Sem ingredientes registados</p>
-              )}
+              {!r.ingredients.length && <p className="text-xs text-muted-foreground">Sem ingredientes registados</p>}
             </div>
           </div>
 
-          {/* Cost breakdown */}
-          <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-1.5 text-[11px]">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-              Detalhe de custos
-            </div>
-            {r.ingredients.map((ing) => (
-              <div key={ing.item_id} className="flex justify-between text-muted-foreground/80">
-                <span>{ing.name}</span>
+          {canSeeCosts && (
+            <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-1.5 text-[11px]">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+                Detalhe de custos
+              </div>
+              {r.ingredients.map((ing) => (
+                <div key={ing.item_id} className="flex justify-between text-muted-foreground/80">
+                  <span>{ing.name}</span>
+                  <span className="font-mono">
+                    {fmtPrice(Math.round(ing.line_cost))}
+                    <span className="text-muted-foreground/50"> ({fmtNum(Math.round(ing.unit_cost))} × {ing.quantity})</span>
+                  </span>
+                </div>
+              ))}
+              <div className="border-t border-border/40 pt-1 mt-1 flex justify-between font-medium text-foreground">
+                <span>Custo total</span>
+                <span className="font-mono">{fmtPrice(Math.round(r.total_cost))}</span>
+              </div>
+              <div className="flex justify-between text-emerald-400">
+                <span>Margem</span>
                 <span className="font-mono">
-                  {fmtPrice(Math.round(ing.line_cost))}
-                  <span className="text-muted-foreground/50"> ({fmtNum(Math.round(ing.unit_cost))} × {ing.quantity})</span>
+                  {fmtPrice(Math.round(r.margin))}
+                  {r.margin_pct !== null ? ` (${r.margin_pct.toFixed(1)}%)` : ""}
                 </span>
               </div>
-            ))}
-            <div className="border-t border-border/40 pt-1 mt-1 flex justify-between font-medium text-foreground">
-              <span>Custo total</span>
-              <span className="font-mono">{fmtPrice(Math.round(r.total_cost))}</span>
             </div>
-            <div className="flex justify-between text-emerald-400">
-              <span>Margem</span>
-              <span className="font-mono">
-                {fmtPrice(Math.round(r.margin))}
-                {r.margin_pct !== null ? ` (${r.margin_pct.toFixed(1)}%)` : ""}
-              </span>
-            </div>
-          </div>
+          )}
 
-          {/* Simulation */}
           <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-2">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
               <Calculator className="h-3 w-3" />
-              Simular fabricação
+              Simular materiais
             </div>
             <div className="flex items-center gap-2">
               <Input
@@ -191,13 +184,13 @@ function RecipeCard({
                       <li key={ing.name} className="flex justify-between items-center">
                         <span>{ing.name}</span>
                         <span className="text-muted-foreground">
-                          {ing.qty_per_recipe} × {simulateResult.requested_qty} = {fmtNum(ing.needed)}
+                          {fmtNum(ing.qty_per_recipe)} × {fmtNum(simulateResult.requested_qty)} = {fmtNum(ing.needed)}
                         </span>
                       </li>
                     ))}
                   </ul>
                 </div>
-                {simulateResult.ingredients.length > 0 && (
+                {canSeeCosts && simulateResult.ingredients.length > 0 && (
                   <div className="border-t border-border/50 pt-2">
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Custo estimado</div>
                     <ul className="space-y-1">
@@ -240,6 +233,7 @@ function Page() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [simulateResult, setSimulateResult] = useState<CraftFeasibility | null>(null);
+  const canSeeCosts = me.data?.is_manager ?? false;
 
   const calc = useMutation({
     mutationFn: (v: { recipe_id: number; quantity: number }) => calcFn({ data: v }),
@@ -248,11 +242,8 @@ function Page() {
   });
 
   const grouped = useMemo(() => {
-    const all = (recipes.data ?? []).filter((r) => {
-      return filterItemForDisplay(r.item_name, r.category, r.subcategory) !== null;
-    });
+    const all = (recipes.data ?? []).filter((r) => filterItemForDisplay(r.item_name, r.category, r.subcategory) !== null);
     const filtered = search ? all.filter((r) => r.item_name.toLowerCase().includes(search.toLowerCase())) : all;
-
     const map = new Map<string, RecipeRow[]>();
     for (const r of filtered) {
       const key = filterItemForDisplay(r.item_name, r.category, r.subcategory);
@@ -260,10 +251,7 @@ function Page() {
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
     }
-
-    for (const list of map.values()) {
-      list.sort((a, b) => (a.tier_price ?? a.min_sale_price ?? 0) - (b.tier_price ?? b.min_sale_price ?? 0));
-    }
+    for (const list of map.values()) list.sort((a, b) => (a.tier_price ?? a.min_sale_price ?? 0) - (b.tier_price ?? b.min_sale_price ?? 0));
     return Array.from(map.entries()).sort((a, b) => {
       const ia = ARMORY_CAT_ORDER.indexOf(a[0] as any);
       const ib = ARMORY_CAT_ORDER.indexOf(b[0] as any);
@@ -274,16 +262,14 @@ function Page() {
     });
   }, [recipes.data, search]);
 
-  const totalRecipes = (recipes.data ?? []).filter(r => {
-    return filterItemForDisplay(r.item_name, r.category, r.subcategory) !== null;
-  }).length;
+  const totalRecipes = (recipes.data ?? []).filter((r) => filterItemForDisplay(r.item_name, r.category, r.subcategory) !== null).length;
 
   return (
     <>
       <PageHeader
         eyebrow="Material"
         title="Receitas"
-        description={`${totalRecipes} receitas organizadas por categoria. Custo real com base nos preços de compra.`}
+        description={`${totalRecipes} receitas organizadas por categoria. Consulta de materiais necessários por item.`}
       />
 
       <Reveal direction="up">
@@ -302,36 +288,31 @@ function Page() {
       )}
 
       <div className="space-y-8">
-        {grouped.map(([category, items], idx) => {
-          return (
-            <Reveal key={category} direction="up" delay={idx * 100}>
-              <section className="animate-rise">
-                <div className="mb-3">
-                  <CategoryHeader
-                    category={category}
-                    right={`${items.length} receita${items.length !== 1 ? "s" : ""}`}
+        {grouped.map(([category, items], idx) => (
+          <Reveal key={category} direction="up" delay={idx * 100}>
+            <section className="animate-rise">
+              <div className="mb-3">
+                <CategoryHeader category={category} right={`${items.length} receita${items.length !== 1 ? "s" : ""}`} />
+              </div>
+              <Stagger className="grid gap-3 md:grid-cols-2" staggerDelay={80}>
+                {items.map((r) => (
+                  <RecipeCard
+                    key={r.recipe_id}
+                    r={r}
+                    canSeeCosts={canSeeCosts}
+                    expanded={expandedId === r.recipe_id}
+                    onToggle={() => {
+                      setExpandedId((prev) => (prev === r.recipe_id ? null : r.recipe_id));
+                      setSimulateResult(null);
+                    }}
+                    simulateResult={simulateResult}
+                    onSimulate={(rid, qty) => calc.mutate({ recipe_id: rid, quantity: qty })}
                   />
-                </div>
-                <Stagger className="grid gap-3 md:grid-cols-2" staggerDelay={80}>
-                  {items.map((r) => (
-                    <RecipeCard
-                      key={r.recipe_id}
-                      r={r}
-                      member={me.data ?? null}
-                      expanded={expandedId === r.recipe_id}
-                      onToggle={() => {
-                        setExpandedId((prev) => (prev === r.recipe_id ? null : r.recipe_id));
-                        setSimulateResult(null);
-                      }}
-                      simulateResult={simulateResult}
-                      onSimulate={(rid, qty) => calc.mutate({ recipe_id: rid, quantity: qty })}
-                    />
-                  ))}
-                </Stagger>
-              </section>
-            </Reveal>
-          );
-        })}
+                ))}
+              </Stagger>
+            </section>
+          </Reveal>
+        ))}
       </div>
 
       {!recipes.isLoading && !grouped.length && (
