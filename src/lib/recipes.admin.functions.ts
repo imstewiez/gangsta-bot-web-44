@@ -100,6 +100,21 @@ async function assertManager(context: any) {
   return me;
 }
 
+async function getOrCreateRecipeId(itemId: number): Promise<number> {
+  const existing = await pgOne<{ id: number }>(
+    `select id from craft_recipes where item_id = $1 limit 1`,
+    [itemId],
+  );
+  if (existing) return existing.id;
+
+  const inserted = await pgOne<{ id: number }>(
+    `insert into craft_recipes (item_id, quantity) values ($1, 1) returning id`,
+    [itemId],
+  );
+  if (!inserted) throw new Error("Erro ao criar receita");
+  return inserted.id;
+}
+
 export const listRecipesAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminRecipeRow[]> => {
@@ -448,18 +463,14 @@ export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }): Promise<void> => {
     await assertManager(context);
-    const existing = await pgOne<{ id: number }>(`select id from craft_recipes where item_id = $1 limit 1`, [data.item_id]);
-    let recipeId: number;
-    if (existing) recipeId = existing.id;
-    else {
-      const inserted = await pgOne<{ id: number }>(`insert into craft_recipes (item_id, quantity) values ($1, 1) returning id`, [data.item_id]);
-      if (!inserted) throw new Error("Erro ao criar receita");
-      recipeId = inserted.id;
-    }
+    const recipeId = await getOrCreateRecipeId(data.item_id);
     await pgQuery(`delete from recipe_ingredients where recipe_id = $1`, [recipeId]);
     for (const ing of data.ingredients) {
       if (ing.quantity > 0) {
-        await pgQuery(`insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`, [recipeId, ing.ingredient_item_id, ing.quantity]);
+        await pgQuery(
+          `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
+          [recipeId, ing.ingredient_item_id, ing.quantity],
+        );
       }
     }
   });
@@ -473,7 +484,18 @@ export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ context, data }): Promise<void> => {
-    await updateItemRecipeAdmin({ data: { item_id: data.item_id, ingredients: [{ ingredient_item_id: data.ingredient_item_id, quantity: data.quantity }] } } as never);
+    await assertManager(context);
+    const recipeId = await getOrCreateRecipeId(data.item_id);
+    await pgQuery(
+      `delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`,
+      [recipeId, data.ingredient_item_id],
+    );
+    if (data.quantity > 0) {
+      await pgQuery(
+        `insert into recipe_ingredients (recipe_id, ingredient_item_id, quantity) values ($1, $2, $3)`,
+        [recipeId, data.ingredient_item_id, data.quantity],
+      );
+    }
   });
 
 export const deleteItemAdmin = createServerFn({ method: "POST" })
