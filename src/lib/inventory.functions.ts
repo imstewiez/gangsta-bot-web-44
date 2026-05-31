@@ -13,7 +13,7 @@ async function gateInventory(supabase: unknown, userId: string) {
   return me;
 }
 
-function getRecipeIngredientNames(): Set<string> {
+function getConfigRecipeIngredientNames(): Set<string> {
   const recipes = getAllRecipes();
   const names = new Set<string>();
   for (const recipe of Object.values(recipes)) {
@@ -25,15 +25,11 @@ function getRecipeIngredientNames(): Set<string> {
   return names;
 }
 
-function isInventoryVisible(
-  side: string | null | undefined,
-  itemName: string,
-  itemByName: Map<string, { side?: string }>,
-  recipeIngredients: Set<string>,
-): boolean {
-  const effectiveSide = side ?? itemByName.get(itemName)?.side ?? "venda";
+function isInventoryVisible(side: string | null | undefined, itemName: string, recipeIngredientNames: Set<string>, recipeIngredientIds: Set<number>, itemId?: number): boolean {
+  const effectiveSide = side ?? "venda";
   if (effectiveSide === "venda" || effectiveSide === "ambos") return true;
-  if (effectiveSide === "compra" && recipeIngredients.has(itemName)) return true;
+  if (effectiveSide === "compra" && recipeIngredientNames.has(itemName)) return true;
+  if (effectiveSide === "compra" && itemId && recipeIngredientIds.has(itemId)) return true;
   return false;
 }
 
@@ -46,38 +42,63 @@ export type StockRow = {
   unit_price: number | null;
 };
 
+async function getInventoryVisibleItems(): Promise<Array<{
+  id: number;
+  name: string;
+  category: string | null;
+  subcategory: string | null;
+  side: string | null;
+  purchase_price: number | null;
+  min_sale_price: number | null;
+  estimated_value: number | null;
+  morador_purchase_price: number | null;
+}>> {
+  const configItems = getAllItems();
+  const configByName = new Map(Object.values(configItems).map((i) => [i.name, i]));
+  const recipeIngredientNames = getConfigRecipeIngredientNames();
+  const recipeIngredientIdRows = await pgQuery<{ ingredient_item_id: number }>(
+    `select distinct ingredient_item_id from recipe_ingredients where ingredient_item_id is not null`,
+  );
+  const recipeIngredientIds = new Set(recipeIngredientIdRows.map((r) => r.ingredient_item_id));
+
+  const dbItems = await pgQuery<{
+    id: number;
+    name: string;
+    category: string | null;
+    subcategory: string | null;
+    side: string | null;
+    purchase_price: number | null;
+    min_sale_price: number | null;
+    estimated_value: number | null;
+    morador_purchase_price: number | null;
+  }>(
+    `select id, name, category, subcategory, side,
+            purchase_price::float as purchase_price,
+            min_sale_price::float as min_sale_price,
+            estimated_value::float as estimated_value,
+            morador_purchase_price::float as morador_purchase_price
+     from items
+     where coalesce(active, true) = true and deleted_at is null
+     order by category, name`,
+  );
+
+  return dbItems.filter((i) => {
+    const config = configByName.get(i.name);
+    return isInventoryVisible(i.side ?? config?.side, i.name, recipeIngredientNames, recipeIngredientIds, i.id);
+  });
+}
+
 export const getStock = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<StockRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const items = getAllItems();
-    const itemNames = Object.values(items).map((i) => i.name);
-    const recipeIngredients = getRecipeIngredientNames();
-
-    // Map config names to real DB IDs + side + prices (DB é espelho do config)
-    const dbItems = await pgQuery<{
-      id: number; name: string; side: string | null;
-      purchase_price: number | null; min_sale_price: number | null; estimated_value: number | null;
-    }>(
-      `select id, name, side,
-              purchase_price::float as purchase_price,
-              min_sale_price::float as min_sale_price,
-              estimated_value::float as estimated_value
-       from items where name = any($1::text[])`,
-      [itemNames],
-    );
-    const dbByName = new Map(dbItems.map((i) => [i.name, i]));
-    const itemByName = new Map(Object.entries(items).map(([, v]) => [v.name, v]));
-    const dbIds = dbItems
-      .filter((i) => isInventoryVisible(i.side, i.name, itemByName, recipeIngredients))
-      .map((i) => i.id);
-
+    const configItems = getAllItems();
+    const configByName = new Map(Object.values(configItems).map((i) => [i.name, i]));
+    const visibleItems = await getInventoryVisibleItems();
+    const dbIds = visibleItems.map((i) => i.id);
     if (dbIds.length === 0) return [];
 
-    const balances = await pgQuery<{
-      item_id: number;
-      balance: number;
-    }>(
+    const balances = await pgQuery<{ item_id: number; balance: number }>(
       `select i.id as item_id, coalesce(ib.balance, 0)::float as balance
        from items i
        left join inventory_balance ib on ib.item_id = i.id
@@ -85,25 +106,20 @@ export const getStock = createServerFn({ method: "GET" })
        order by i.purchase_price desc nulls last`,
       [dbIds],
     );
-
     const balanceMap = new Map(balances.map((b) => [b.item_id, b.balance]));
 
-    return Object.values(items)
-      .map((item) => {
-        const db = dbByName.get(item.name);
-        if (!db) return null;
-        if (!isInventoryVisible(db.side, item.name, itemByName, recipeIngredients)) return null;
-        const prices = resolveItemPrices(db, item);
-        return {
-          item_id: db.id,
-          item_name: item.name,
-          category: item.category ?? null,
-          subcategory: item.subcategory ?? null,
-          qty: balanceMap.get(db.id) ?? 0,
-          unit_price: prices.purchase_price ?? prices.estimated_value ?? null,
-        };
-      })
-      .filter(Boolean) as StockRow[];
+    return visibleItems.map((db) => {
+      const config = configByName.get(db.name) ?? null;
+      const prices = resolveItemPrices(db, config);
+      return {
+        item_id: db.id,
+        item_name: db.name,
+        category: db.category ?? config?.category ?? null,
+        subcategory: db.subcategory ?? config?.subcategory ?? null,
+        qty: balanceMap.get(db.id) ?? 0,
+        unit_price: prices.purchase_price ?? prices.estimated_value ?? null,
+      };
+    });
   });
 
 export type LedgerRow = {
@@ -121,15 +137,15 @@ export type LedgerRow = {
 export const adjustStock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { item_id: number; new_qty: number }) => {
-    return z
-      .object({
-        item_id: IdSchema,
-        new_qty: z.number().finite(),
-      })
-      .parse(d);
+    return z.object({ item_id: IdSchema, new_qty: z.number().finite() }).parse(d);
   })
   .handler(async ({ data, context }) => {
     await gateInventory(context.supabase, context.userId);
+    const item = await pgOne<{ id: number }>(
+      `select id from items where id = $1 and coalesce(active, true) = true and deleted_at is null`,
+      [data.item_id],
+    );
+    if (!item) throw new Error("Item não encontrado ou inativo.");
     const result = await pgOne<{ sp_adjust_stock: number }>(
       `SELECT public.sp_adjust_stock($1, $2, $3, $4) as sp_adjust_stock`,
       [data.item_id, data.new_qty, `web:${context.userId}`, null],
@@ -139,27 +155,14 @@ export const adjustStock = createServerFn({ method: "POST" })
 
 export const getLedger = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { limit?: number; type?: string | null }) => ({
-      limit: Math.min(Math.max(d?.limit ?? 100, 1), 500),
-      type: z.string().max(50).nullable().optional().parse(d?.type) ?? null,
-    }),
-  )
+  .inputValidator((d: { limit?: number; type?: string | null }) => ({
+    limit: Math.min(Math.max(d?.limit ?? 100, 1), 500),
+    type: z.string().max(50).nullable().optional().parse(d?.type) ?? null,
+  }))
   .handler(async ({ data, context }): Promise<LedgerRow[]> => {
     await gateInventory(context.supabase, context.userId);
-    const items = getAllItems();
-    const itemNames = Object.values(items).map((i) => i.name);
-    const recipeIngredients = getRecipeIngredientNames();
-    const itemByName = new Map(Object.entries(items).map(([, v]) => [v.name, v]));
-
-    // Only show movements for items existing in config.json (venda + ambos + recipe ingredients)
-    const dbItems = await pgQuery<{ id: number; name: string; side: string | null }>(
-      `select id, name, side from items where name = any($1::text[])`,
-      [itemNames],
-    );
-    const dbIds = dbItems
-      .filter((i) => isInventoryVisible(i.side, i.name, itemByName, recipeIngredients))
-      .map((i) => i.id);
+    const visibleItems = await getInventoryVisibleItems();
+    const dbIds = visibleItems.map((i) => i.id);
     if (dbIds.length === 0) return [];
 
     const params: unknown[] = [data.limit, dbIds];
