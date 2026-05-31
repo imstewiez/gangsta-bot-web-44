@@ -4,6 +4,7 @@
 
 import { Redis } from "@upstash/redis";
 import { logger } from "./logger.server";
+import { getEnv } from "./env.server";
 
 // ---------------------------------------------------------------------------
 // Redis client (lazy init)
@@ -13,8 +14,8 @@ let redis: Redis | null = null;
 function getRedis(): Redis | null {
   if (redis) return redis;
 
-  const url = getEnvVar("UPSTASH_REDIS_REST_URL");
-  const token = getEnvVar("UPSTASH_REDIS_REST_TOKEN");
+  const url = getEnv("UPSTASH_REDIS_REST_URL");
+  const token = getEnv("UPSTASH_REDIS_REST_TOKEN");
 
   if (!url || !token) {
     return null;
@@ -27,12 +28,6 @@ function getRedis(): Redis | null {
     logger.error("redis_init_failed", { error: String(e) });
     return null;
   }
-}
-
-function getEnvVar(name: string): string | undefined {
-  // Cloudflare Workers env via globalThis, else Node process.env
-  const env = (globalThis as any).__cloudflareEnv as Record<string, string> | undefined;
-  return env?.[name] ?? process.env[name];
 }
 
 // ---------------------------------------------------------------------------
