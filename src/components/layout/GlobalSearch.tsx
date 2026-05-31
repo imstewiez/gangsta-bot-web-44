@@ -18,24 +18,22 @@ import {
 } from "@/components/ui/dialog";
 
 const PAGES = [
-  { label: "Casa", path: "/", icon: null },
+  { label: "Casa", path: "/dashboard", icon: null },
   { label: "Inventário", path: "/inventario", icon: Package },
   { label: "Preçário", path: "/precario", icon: ShoppingBag },
   { label: "Receitas", path: "/receitas", icon: null },
   { label: "Encomendas", path: "/encomendas", icon: ShoppingBag },
   { label: "Entregas", path: "/entregas", icon: Truck },
-  { label: "Operações", path: "/operacoes", icon: Crosshair },
+  { label: "Saídas", path: "/operacoes", icon: Crosshair },
   { label: "Membros", path: "/membros", icon: Users },
-  { label: "Tops", path: "/tops", icon: null },
+  { label: "Classificação", path: "/tops", icon: null },
   { label: "Prémios", path: "/premios", icon: null },
   { label: "Auditoria", path: "/auditoria", icon: null },
-
-  { label: "Liquidação", path: "/liquidacao", icon: null },
   { label: "Definições", path: "/admin", icon: null },
 ];
 
 const ACTIONS = [
-  { label: "Nova operação", path: "/operacoes", icon: Crosshair, keywords: "operacao saida criar" },
+  { label: "Nova saída", path: "/operacoes", icon: Crosshair, keywords: "operacao saida criar" },
   { label: "Entrega de stock", path: "/entregas", icon: Truck, keywords: "entrega material stock" },
   { label: "Nova encomenda", path: "/encomendas", icon: ShoppingBag, keywords: "pedido compra encomendar" },
   { label: "Ver membros", path: "/membros", icon: Users, keywords: "membro operacional" },
