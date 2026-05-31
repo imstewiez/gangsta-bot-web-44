@@ -41,6 +41,8 @@ type DeliveryRow = {
   decision_reason: string;
 };
 
+const SQL_NORMALIZED_NAME = "translate(lower(name), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')";
+
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -86,7 +88,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean): Promise<
        and deleted_at is null
        and (
          id = any($1::int[])
-         or lower(unaccent(name)) = any($2::text[])
+         or ${SQL_NORMALIZED_NAME} = any($2::text[])
        )`,
     [Array.from(ids), Array.from(names)],
   );
@@ -102,9 +104,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean): Promise<
     const item = (rawId ? byId.get(rawId) : undefined) ?? (rawName ? byName.get(normalizeText(rawName)) : undefined);
 
     if (!qty || !item) {
-      if (strict) {
-        throw new Error(`Linha de entrega inválida: ${JSON.stringify(line)}`);
-      }
+      if (strict) throw new Error(`Linha de entrega inválida: ${JSON.stringify(line)}`);
       normalized.push({
         item_id: rawId ?? 0,
         item_name: rawName ?? "Item inválido",
@@ -118,12 +118,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean): Promise<
     const lineValue = asOptionalNumber(line.lineValue);
     const unit = explicitUnit ?? (lineValue != null ? lineValue / qty : null) ?? item.morador_purchase_price ?? item.purchase_price ?? 0;
 
-    normalized.push({
-      item_id: item.id,
-      item_name: item.name,
-      qty,
-      unit_value: unit,
-    });
+    normalized.push({ item_id: item.id, item_name: item.name, qty, unit_value: unit });
   }
 
   return normalized;
@@ -177,34 +172,20 @@ export const listDeliveries = createServerFn({ method: "GET" })
     return Promise.all(rows.map(async (row) => {
       const lines = await normalizeDeliveryLines(row.lines, false);
       const totals = deliveryTotals(lines);
-      return {
-        ...row,
-        lines,
-        total_qty: row.total_qty || totals.totalQty,
-        total_value: row.total_value || totals.totalValue,
-      };
+      return { ...row, lines, total_qty: row.total_qty || totals.totalQty, total_value: row.total_value || totals.totalValue };
     }));
   });
 
 export const createDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: {
-      lines: { item_id: number; qty: number }[];
-      notes?: string | null;
-      tipo?: "entrega" | "venda";
-      responsavel_member_id?: number | null;
-    }) => {
-      if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Sem linhas");
-      for (const l of d.lines) {
-        if (!Number.isFinite(l.item_id) || !Number.isFinite(l.qty) || l.qty <= 0) throw new Error("Linha inválida");
-      }
-      if (d.responsavel_member_id != null && (!Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0)) {
-        throw new Error("Responsável inválido");
-      }
-      return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
-    },
-  )
+  .inputValidator((d: { lines: { item_id: number; qty: number }[]; notes?: string | null; tipo?: "entrega" | "venda"; responsavel_member_id?: number | null }) => {
+    if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Sem linhas");
+    for (const l of d.lines) {
+      if (!Number.isFinite(l.item_id) || !Number.isFinite(l.qty) || l.qty <= 0) throw new Error("Linha inválida");
+    }
+    if (d.responsavel_member_id != null && (!Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0)) throw new Error("Responsável inválido");
+    return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
+  })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
@@ -219,17 +200,7 @@ export const createDelivery = createServerFn({ method: "POST" })
          (id, requester_member_id, requester_discord_id, status, lines, notes, total_qty, total_value, created_by, tipo, responsavel_member_id)
        values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, $8, $9)
        returning id`,
-      [
-        me.id,
-        me.discord_id,
-        JSON.stringify(enriched),
-        data.notes ?? "",
-        totalQty,
-        totalValue,
-        `web:${context.userId}`,
-        data.tipo,
-        data.responsavel_member_id ?? null,
-      ],
+      [me.id, me.discord_id, JSON.stringify(enriched), data.notes ?? "", totalQty, totalValue, `web:${context.userId}`, data.tipo, data.responsavel_member_id ?? null],
     );
 
     await logAdminAction(context.supabase, {
@@ -245,25 +216,16 @@ export const createDelivery = createServerFn({ method: "POST" })
 
 export const decideDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { id: string; approve: boolean; reason?: string | null }) => z.object({
-      id: UuidSchema,
-      approve: z.boolean(),
-      reason: z.string().max(500).nullable().optional(),
-    }).parse(d),
-  )
+  .inputValidator((d: { id: string; approve: boolean; reason?: string | null }) => z.object({
+    id: UuidSchema,
+    approve: z.boolean(),
+    reason: z.string().max(500).nullable().optional(),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
 
-    const before = await pgOne<{
-      requester_member_id: number;
-      requester_discord_id: string;
-      tipo: string;
-      lines: unknown;
-      status: string;
-      responsavel_member_id: number | null;
-    }>(
+    const before = await pgOne<{ requester_member_id: number; requester_discord_id: string; tipo: string; lines: unknown; status: string; responsavel_member_id: number | null }>(
       `select requester_member_id, requester_discord_id, tipo, lines, status, responsavel_member_id
        from inventory_delivery_requests
        where id = $1`,
@@ -276,21 +238,13 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (data.approve) {
       const normalizedLines = await normalizeDeliveryLines(before.lines, true);
       const { totalQty, totalValue } = deliveryTotals(normalizedLines);
-
-      // Normalize legacy delivery payloads before the stored procedure reads the
-      // request. Old rows may use itemId/quantity/itemName while the SP expects
-      // canonical item_id/qty/item_name.
       await pgQuery(
         `update inventory_delivery_requests
          set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now()
          where id = $1 and status = 'pending'`,
         [data.id, JSON.stringify(normalizedLines), totalQty, totalValue],
       );
-
-      await pgQuery(
-        `SELECT public.sp_approve_delivery($1, $2, $3)`,
-        [data.id, `web:${context.userId}`, me.discord_id],
-      );
+      await pgQuery(`SELECT public.sp_approve_delivery($1, $2, $3)`, [data.id, `web:${context.userId}`, me.discord_id]);
     } else {
       const rejected = await pgOne<{ id: string }>(
         `update inventory_delivery_requests set
