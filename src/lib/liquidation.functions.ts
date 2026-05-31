@@ -111,13 +111,9 @@ export const getSaidaDetail = createServerFn({ method: "GET" })
   });
 
 /**
- * Liquidação completa de uma saída:
- * - Para cada participante, calcula valores (issued / returned / lost / consumed) a partir de operation_materials
- * - Marca todos os participantes como settled
- * - Atualiza agregados na operation (supplied/returned/lost/consumed, gross e net)
- * - Marca a operação como 'concluida' com end_time = now()
- * - Enfileira notificação Discord
- * Tudo dentro de uma única transação.
+ * Fecho financeiro de uma saída/operação.
+ * Mantido porque a página de operações ainda chama esta server function para
+ * fechar resultados e atualizar estatísticas da saída.
  */
 export const liquidateSaida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -128,7 +124,7 @@ export const liquidateSaida = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
-    // Atomic liquidation via stored procedure
+    // Atomic close via stored procedure
     const result = await pgOne<{
       supplied: number;
       returned: number;
@@ -146,9 +142,10 @@ export const liquidateSaida = createServerFn({ method: "POST" })
     if (!result) throw new Error("Falha na liquidação");
 
     await enqueueNotification({
+      dedupKey: `operation_closed:${data.id}`,
       embed: {
-        title: `Saída #${data.id} liquidada`,
-        description: `${result.op.operation_type ?? "Saída"} · ${result.op.spot ?? "—"}\nNet: ${result.net.toFixed(0)} €`,
+        title: `Saída #${data.id} fechada`,
+        description: `${result.operation_type ?? "Saída"} · ${result.spot ?? "—"}\nLíquido: ${result.net.toFixed(0)} €`,
         color: result.net >= 0 ? 0x10b981 : 0xef4444,
         fields: [
           {
