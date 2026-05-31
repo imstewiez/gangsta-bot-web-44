@@ -5,6 +5,7 @@ import { renderErrorPage } from "./lib/error-page";
 import { doRecalcWeeklyRankings } from "./lib/data-recovery.functions";
 import { logger } from "./lib/logger.server";
 import { rateLimit, cronRateLimiter, apiRateLimiter } from "./lib/rate-limit.server";
+import { getEnv, setCloudflareEnv } from "./lib/env.server";
 
 type ServerEntry = {
   fetch: (
@@ -90,8 +91,8 @@ export default {
     const url = new URL(request.url);
     const startTime = Date.now();
 
-    // Set global env for downstream functions
-    (globalThis as any).__cloudflareEnv = env;
+    // Set global env for downstream functions.
+    setCloudflareEnv(env);
 
     // Health check endpoint (must be before rate limiting to allow monitoring)
     if (url.pathname === "/api/health") {
@@ -114,8 +115,8 @@ export default {
       }
 
       const secret = request.headers.get("x-cron-secret");
-      const expected = (env as any).CRON_SECRET || process.env.CRON_SECRET;
-      if (!secret || secret !== expected) {
+      const expected = getEnv("CRON_SECRET");
+      if (!secret || !expected || secret !== expected) {
         logger.warn("cron_unauthorized", { path: url.pathname, ip: request.headers.get("cf-connecting-ip") });
         return new Response("Unauthorized", { status: 401 });
       }
@@ -202,7 +203,7 @@ export default {
   },
 
   async scheduled(controller: any, env: unknown, ctx: unknown) {
-    (globalThis as any).__cloudflareEnv = env;
+    setCloudflareEnv(env);
     logger.info("scheduled_recalc_start", { timestamp: new Date().toISOString() });
     try {
       const result = await doRecalcWeeklyRankings();
