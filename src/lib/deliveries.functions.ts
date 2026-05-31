@@ -57,6 +57,16 @@ function asOptionalNumber(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+async function assertResponsibleExists(memberId: number) {
+  const row = await pgOne<{ id: number }>(
+    `select id from members
+     where id = $1 and deleted_at is null
+       and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`,
+    [memberId],
+  );
+  if (!row) throw new Error("Responsável inválido ou inativo.");
+}
+
 async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "entrega" | "venda" = "entrega"): Promise<DeliveryLine[]> {
   if (!Array.isArray(lines)) {
     if (strict) throw new Error("Linhas da entrega inválidas");
@@ -77,10 +87,11 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
   const items = await pgQuery<{
     id: number;
     name: string;
+    side: string | null;
     purchase_price: number | null;
     morador_purchase_price: number | null;
   }>(
-    `select id, name,
+    `select id, name, side,
             purchase_price::float as purchase_price,
             morador_purchase_price::float as morador_purchase_price
      from items
@@ -102,8 +113,10 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
     const rawName = line.item_name ?? line.itemName;
     const qty = asPositiveNumber(line.qty ?? line.quantity ?? line.amount);
     const item = (rawId ? byId.get(rawId) : undefined) ?? (rawName ? byName.get(normalizeText(rawName)) : undefined);
+    const side = item?.side ?? (tipo === "entrega" ? "compra" : "venda");
+    const allowed = item && (tipo === "entrega" ? side === "compra" || side === "ambos" : side === "venda" || side === "ambos");
 
-    if (!qty || !item) {
+    if (!qty || !item || !allowed) {
       if (strict) throw new Error(`Linha de entrega inválida: ${JSON.stringify(line)}`);
       normalized.push({
         item_id: rawId ?? 0,
@@ -121,6 +134,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
     normalized.push({ item_id: item.id, item_name: item.name, qty, unit_value: unit });
   }
 
+  if (strict && normalized.length === 0) throw new Error("Seleciona pelo menos uma linha válida.");
   return normalized;
 }
 
@@ -150,9 +164,10 @@ export const listDeliveries = createServerFn({ method: "GET" })
       where += ` and r.requester_member_id = $${params.length}`;
     } else {
       if (!me?.is_manager) return [];
+      where += ` and r.status = 'pending'`;
       if (!me.is_superadmin) {
         params.push(me.id);
-        where += ` and r.responsavel_member_id = $${params.length}`;
+        where += ` and (r.responsavel_member_id = $${params.length} or r.responsavel_member_id is null)`;
       }
     }
 
@@ -173,12 +188,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
       const tipo = row.tipo === "venda" ? "venda" : "entrega";
       const lines = await normalizeDeliveryLines(row.lines, false, tipo);
       const totals = deliveryTotals(lines);
-      return {
-        ...row,
-        lines,
-        total_qty: row.total_qty || totals.totalQty,
-        total_value: tipo === "entrega" ? 0 : (row.total_value || totals.totalValue),
-      };
+      return { ...row, lines, total_qty: row.total_qty || totals.totalQty, total_value: tipo === "entrega" ? 0 : (row.total_value || totals.totalValue) };
     }));
   });
 
@@ -187,16 +197,17 @@ export const createDelivery = createServerFn({ method: "POST" })
   .inputValidator((d: { lines: { item_id: number; qty: number }[]; notes?: string | null; tipo?: "entrega" | "venda"; responsavel_member_id?: number | null }) => {
     if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Sem linhas");
     for (const l of d.lines) {
-      if (!Number.isFinite(l.item_id) || !Number.isFinite(l.qty) || l.qty <= 0) throw new Error("Linha inválida");
+      if (!Number.isFinite(l.item_id) || l.item_id <= 0 || !Number.isFinite(l.qty) || l.qty <= 0) throw new Error("Linha inválida");
     }
-    if (d.responsavel_member_id != null && (!Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0)) throw new Error("Responsável inválido");
-    return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega" };
+    if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) throw new Error("Tens de escolher um responsável.");
+    return { ...d, tipo: d.tipo === "venda" ? "venda" : "entrega", responsavel_member_id: Number(d.responsavel_member_id) };
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
     if (!Number.isFinite(me.id) || me.id <= 0) throw new Error("ID de membro inválido");
     if (!me.discord_id) throw new Error("Membro sem Discord ID");
+    await assertResponsibleExists(data.responsavel_member_id);
 
     const enriched = await normalizeDeliveryLines(data.lines, true, data.tipo);
     const { totalQty, totalValue } = deliveryTotals(enriched);
@@ -206,7 +217,7 @@ export const createDelivery = createServerFn({ method: "POST" })
          (id, requester_member_id, requester_discord_id, status, lines, notes, total_qty, total_value, created_by, tipo, responsavel_member_id)
        values (gen_random_uuid(), $1, $2, 'pending', $3::jsonb, $4, $5, $6, $7, $8, $9)
        returning id`,
-      [me.id, me.discord_id, JSON.stringify(enriched), data.notes ?? "", totalQty, totalValue, `web:${context.userId}`, data.tipo, data.responsavel_member_id ?? null],
+      [me.id, me.discord_id, JSON.stringify(enriched), data.notes ?? "", totalQty, totalValue, `web:${context.userId}`, data.tipo, data.responsavel_member_id],
     );
 
     await logAdminAction(context.supabase, {
@@ -238,7 +249,7 @@ export const decideDelivery = createServerFn({ method: "POST" })
       [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
-    if (!me.is_superadmin && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
+    if (!me.is_superadmin && before.responsavel_member_id != null && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
     if (before.status !== "pending") throw new Error("Já decidido");
 
     if (data.approve) {
@@ -247,20 +258,20 @@ export const decideDelivery = createServerFn({ method: "POST" })
       const { totalQty, totalValue } = deliveryTotals(normalizedLines);
       await pgQuery(
         `update inventory_delivery_requests
-         set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now()
+         set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now(), responsavel_member_id = coalesce(responsavel_member_id, $5)
          where id = $1 and status = 'pending'`,
-        [data.id, JSON.stringify(normalizedLines), totalQty, tipo === "entrega" ? 0 : totalValue],
+        [data.id, JSON.stringify(normalizedLines), totalQty, tipo === "entrega" ? 0 : totalValue, me.id],
       );
       await pgQuery(`SELECT public.sp_approve_delivery($1, $2, $3)`, [data.id, `web:${context.userId}`, me.discord_id]);
     } else {
       const rejected = await pgOne<{ id: string }>(
         `update inventory_delivery_requests set
            status = 'rejected', decision_by = $2, decision_reason = $3,
-           decided_at = now(), updated_at = now(),
+           decided_at = now(), updated_at = now(), responsavel_member_id = coalesce(responsavel_member_id, $5),
            approver_discord_id = coalesce(approver_discord_id, $4)
          where id = $1 and status = 'pending'
          returning id`,
-        [data.id, `web:${context.userId}`, data.reason ?? "", me.discord_id],
+        [data.id, `web:${context.userId}`, data.reason ?? "", me.discord_id, me.id],
       );
       if (!rejected) throw new Error("Já decidido");
     }
