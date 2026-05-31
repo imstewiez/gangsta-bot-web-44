@@ -185,7 +185,7 @@ export const decideDelivery = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
-    const status = data.approve ? "approved" : "rejected";
+
     const before = await pgOne<{
       requester_member_id: number;
       requester_discord_id: string;
@@ -194,27 +194,44 @@ export const decideDelivery = createServerFn({ method: "POST" })
       status: string;
       responsavel_member_id: number | null;
     }>(
-      `select requester_member_id, requester_discord_id, tipo, lines, status, responsavel_member_id from inventory_delivery_requests where id = $1`,
+      `select requester_member_id, requester_discord_id, tipo, lines, status, responsavel_member_id
+       from inventory_delivery_requests
+       where id = $1`,
       [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
-    if (!me?.is_superadmin && me?.id !== before.responsavel_member_id) {
+    if (!me.is_superadmin && me.id !== before.responsavel_member_id) {
       throw new Error("Sem permissão — só o responsável pode tratar este pedido");
     }
     if (before.status !== "pending") throw new Error("Já decidido");
-    await pgQuery(
-      `update inventory_delivery_requests set
-         status = $2, decision_by = $3, decision_reason = $4, decided_at = now(), updated_at = now(),
-         approver_discord_id = coalesce(approver_discord_id, $5)
-       where id = $1`,
-      [
-        data.id,
-        status,
-        `web:${context.userId}`,
-        data.reason ?? "",
-        me.discord_id,
-      ],
-    );
+
+    if (data.approve) {
+      // A stored procedure already locks the request, marks it as approved,
+      // inserts the inventory movements and updates member stats atomically.
+      // Do not pre-update the status here, otherwise the procedure sees a
+      // non-pending request and raises "Já decidido".
+      await pgQuery(
+        `SELECT public.sp_approve_delivery($1, $2, $3)`,
+        [data.id, `web:${context.userId}`, me.discord_id],
+      );
+    } else {
+      const rejected = await pgOne<{ id: string }>(
+        `update inventory_delivery_requests set
+           status = 'rejected', decision_by = $2, decision_reason = $3,
+           decided_at = now(), updated_at = now(),
+           approver_discord_id = coalesce(approver_discord_id, $4)
+         where id = $1 and status = 'pending'
+         returning id`,
+        [
+          data.id,
+          `web:${context.userId}`,
+          data.reason ?? "",
+          me.discord_id,
+        ],
+      );
+      if (!rejected) throw new Error("Já decidido");
+    }
+
     await logAdminAction(context.supabase, {
       action: data.approve ? "delivery_approved" : "delivery_rejected",
       actorId: context.userId,
@@ -223,12 +240,6 @@ export const decideDelivery = createServerFn({ method: "POST" })
       targetId: data.id,
       details: `${data.approve ? "Aprovada" : "Recusada"} ${before.tipo === "venda" ? "venda" : "entrega"} de ${before.requester_member_id}${data.reason ? " (" + data.reason + ")" : ""}`,
     });
-    if (data.approve) {
-      // Atomic delivery approval via stored procedure (batch insert + stats update)
-      await pgQuery(
-        `SELECT public.sp_approve_delivery($1, $2, $3)`,
-        [data.id, `web:${context.userId}`, me.discord_id],
-      );
-    }
+
     return { ok: true };
   });
