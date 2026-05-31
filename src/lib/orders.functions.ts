@@ -36,6 +36,14 @@ type OrderRow = {
 const ORDER_STATUSES = ["pending", "approved", "in_progress", "ready", "fulfilled", "denied", "cancelled"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+const TERMINAL_STATUSES = new Set<OrderStatus>(["fulfilled", "denied", "cancelled"]);
+const ALLOWED_TRANSITIONS: Record<string, OrderStatus[]> = {
+  pending: ["approved", "denied", "cancelled"],
+  approved: ["in_progress", "cancelled"],
+  in_progress: ["ready", "cancelled"],
+  ready: ["fulfilled", "cancelled"],
+};
+
 type PriceLike = {
   tier_price?: number | null;
   min_sale_price?: number | null;
@@ -43,6 +51,8 @@ type PriceLike = {
   purchase_price?: number | null;
   estimated_value?: number | null;
 };
+
+type OrderIngredient = { name: string; needed: number };
 
 function positive(value: unknown): number | null {
   const parsed = Number(value);
@@ -55,6 +65,47 @@ function priceWithMaterials(prices: PriceLike): number {
 
 function priceWithoutMaterials(prices: PriceLike): number {
   return Number(positive(prices.purchase_price) ?? positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? positive(prices.morador_purchase_price) ?? positive(prices.estimated_value) ?? 0);
+}
+
+async function getOrderIngredients(itemId: number, itemName: string, quantity: number): Promise<OrderIngredient[]> {
+  const dbRows = await pgQuery<{ name: string; qty: number }>(
+    `select i.name, ri.quantity::float as qty
+     from craft_recipes cr
+     join recipe_ingredients ri on ri.recipe_id = cr.id
+     join items i on i.id = ri.ingredient_item_id
+     where cr.item_id = $1
+       and coalesce(i.active, true) = true
+       and i.deleted_at is null
+       and coalesce(ri.quantity, 0) > 0
+     order by i.name`,
+    [itemId],
+  );
+  if (dbRows.length > 0) {
+    return dbRows.map((row) => ({ name: row.name, needed: Number(row.qty) * quantity }));
+  }
+
+  // Legacy fallback for config recipes that have not been migrated into DB yet.
+  const configItems = getAllItems();
+  const legacy = await getMergedRecipeForItemName(itemName);
+  if (!legacy) return [];
+  return Object.entries(legacy.inputs)
+    .map(([ingId, qty]) => {
+      const ing = configItems[ingId];
+      return ing ? { name: ing.name, needed: Number(qty) * quantity } : null;
+    })
+    .filter((x): x is OrderIngredient => Boolean(x));
+}
+
+async function insertOrderHistory(orderId: number, oldStatus: string, newStatus: string, changedBy: string, notes?: string | null) {
+  try {
+    await pgQuery(
+      `insert into order_status_history (order_id, old_status, new_status, changed_by, notes, created_at)
+       values ($1, $2, $3, $4, $5, now())`,
+      [orderId, oldStatus, newStatus, changedBy, notes ?? null],
+    );
+  } catch {
+    // History is useful, but missing legacy tables must not block operational flow.
+  }
 }
 
 export const listOrders = createServerFn({ method: "GET" })
@@ -102,7 +153,7 @@ export const listOrders = createServerFn({ method: "GET" })
               mr.display_name as responsavel_name,
               o.ingredients_json,
               o.batch_id,
-              case when o.payment_mode = 'materials_money' then o.total_price else o.dirty_money end::float as dirty_money,
+              o.total_price::float as dirty_money,
               o.payment_mode,
               o.material_cost::float as material_cost,
               o.money_cost::float as money_cost
@@ -123,7 +174,7 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
     if (d.lines.length > 50) throw new Error("Máximo 50 itens por encomenda");
     for (const l of d.lines) {
-      if (!Number.isFinite(l.item_id)) throw new Error("Item inválido");
+      if (!Number.isFinite(l.item_id) || l.item_id <= 0) throw new Error("Item inválido");
       if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("Quantidade inválida");
     }
     if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) {
@@ -136,6 +187,12 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
+
+    const responsible = await pgOne<{ id: number }>(
+      `select id from members where id = $1 and deleted_at is null and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`,
+      [data.responsavel_member_id],
+    );
+    if (!responsible) throw new Error("Responsável inválido");
 
     const cfgItems = getAllItems();
     const itemIds = data.lines.map((l) => l.item_id);
@@ -160,7 +217,6 @@ export const createOrder = createServerFn({ method: "POST" })
       [itemIds],
     );
     const itemMap = new Map(items.map((i) => [i.id, i]));
-
     const batchId = crypto.randomUUID();
     const results: { id: number; item_name: string; quantity: number }[] = [];
 
@@ -174,33 +230,14 @@ export const createOrder = createServerFn({ method: "POST" })
       const itemPrices = resolveItemPrices(dbItem, configItem, me.tier ?? null, itemSurcharges);
       const withMaterialsUnit = Math.round(priceWithMaterials(itemPrices));
       const withoutMaterialsUnit = Math.round(priceWithoutMaterials(itemPrices));
-
-      const recipe = await getMergedRecipeForItemName(dbItem.name);
-      let ingredientsJson: Array<{ name: string; needed: number }> = [];
-      let hasMaterials = false;
-
-      if (recipe && Object.keys(recipe.inputs).length > 0) {
-        const outConfig = cfgItems[recipe.output];
-        const isOrange = outConfig?.tier === "orange" || outConfig?.category === "armas_orange";
-        const relevantInputs = Object.entries(recipe.inputs).filter(([ingId]) => {
-          const ingItem = cfgItems[ingId];
-          if (!ingItem) return false;
-          return !isOrange || ingItem.name.toLowerCase().includes("peça");
-        });
-        hasMaterials = relevantInputs.length > 0;
-        ingredientsJson = relevantInputs.map(([ingId, qty]) => {
-          const ingItem = cfgItems[ingId];
-          return { name: ingItem?.name ?? ingId, needed: Number(qty) * line.quantity };
-        });
-      }
-
+      const ingredients = await getOrderIngredients(dbItem.id, dbItem.name, line.quantity);
+      const hasMaterials = ingredients.length > 0;
       const effectivePaymentMode = data.payment_mode === "materials_money" && hasMaterials ? "materials_money" : "money_only";
       const unit = effectivePaymentMode === "materials_money" ? withMaterialsUnit : withoutMaterialsUnit;
       if (unit <= 0) throw new Error(`Preço inválido para ${dbItem.name}. Corrige o item na Gestão de Materiais.`);
 
       const total = unit * line.quantity;
-      const ingredientsJsonStr = effectivePaymentMode === "materials_money" && ingredientsJson.length > 0 ? JSON.stringify(ingredientsJson) : null;
-
+      const ingredientsJsonStr = effectivePaymentMode === "materials_money" ? JSON.stringify(ingredients) : null;
       const row = await pgOne<{ id: number }>(
         `insert into orders
            (member_id, item_id, quantity, status, unit_price, total_price, notes, markup_percent, created_at, updated_at, updated_by, responsavel_member_id, ingredients_json, batch_id, dirty_money, payment_mode, material_cost, money_cost)
@@ -214,7 +251,7 @@ export const createOrder = createServerFn({ method: "POST" })
           total,
           data.notes ?? null,
           `web:${context.userId}`,
-          data.responsavel_member_id ?? null,
+          data.responsavel_member_id,
           ingredientsJsonStr,
           batchId,
           total,
@@ -244,15 +281,39 @@ export const transitionOrder = createServerFn({ method: "POST" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
 
-    const current = await pgOne<{ responsavel_member_id: number | null }>(`select responsavel_member_id from orders where id = $1`, [data.id]);
+    const current = await pgOne<{ status: OrderStatus; member_id: number; item_id: number | null; quantity: number; item_name: string | null; responsavel_member_id: number | null }>(
+      `select o.status, o.member_id, o.item_id, o.quantity, i.name as item_name, o.responsavel_member_id
+       from orders o
+       left join items i on i.id = o.item_id
+       where o.id = $1`,
+      [data.id],
+    );
     if (!current) throw new Error("Encomenda não encontrada");
     if (!me.is_superadmin && current.responsavel_member_id !== me.id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
+    if (TERMINAL_STATUSES.has(current.status)) throw new Error("Esta encomenda já está fechada.");
+    if (!(ALLOWED_TRANSITIONS[current.status] ?? []).includes(data.to)) throw new Error("Transição inválida para esta encomenda.");
 
-    const result = await pgOne<{ old_status: string; member_id: number; item_id: number | null; quantity: number; item_name: string | null; responsavel_member_id: number | null }>(
-      `SELECT * FROM public.sp_transition_order($1, $2, $3, $4)`,
-      [data.id, data.to, `web:${context.userId}`, data.notes ?? null],
+    if (data.to === "fulfilled" && current.item_id) {
+      await pgQuery(
+        `insert into inventory_movements (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
+         values ('venda_bairrista', $1, $2, $3, 'armazem', $4, $5, now())`,
+        [current.item_id, -Math.abs(Number(current.quantity)), current.member_id, `order:${data.id}`, `web:${context.userId}`],
+      );
+    }
+
+    await pgQuery(
+      `update orders set
+         status = $2,
+         updated_at = now(),
+         updated_by = $3,
+         delivered_at = case when $2 = 'fulfilled' then now() else delivered_at end,
+         resolved_at = case when $2 in ('fulfilled','denied','cancelled') then now() else resolved_at end,
+         approved_by = case when $2 = 'approved' and approved_by is null then $3 else approved_by end,
+         fulfilled_by = case when $2 = 'fulfilled' then $3 else fulfilled_by end
+       where id = $1`,
+      [data.id, data.to, `web:${context.userId}`],
     );
-    if (!result) throw new Error("Encomenda não encontrada");
+    await insertOrderHistory(data.id, current.status, data.to, `web:${context.userId}`, data.notes ?? null);
 
     const actionMap: Record<string, string> = { approved: "order_approved", denied: "order_denied", fulfilled: "order_fulfilled", cancelled: "order_cancelled", ready: "order_updated", in_progress: "order_updated" };
     await logAdminAction(context.supabase, {
@@ -261,8 +322,8 @@ export const transitionOrder = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Direção",
       targetType: "order",
       targetId: data.id,
-      details: `Encomenda #${data.id} (${result.item_name ?? "?"} × ${result.quantity}) alterada de "${result.old_status}" para "${data.to}"`,
-      afterState: { old_status: result.old_status, new_status: data.to },
+      details: `Encomenda #${data.id} (${current.item_name ?? "?"} × ${current.quantity}) alterada de "${current.status}" para "${data.to}"`,
+      afterState: { old_status: current.status, new_status: data.to },
     });
 
     return { ok: true as const };
@@ -313,9 +374,17 @@ export const cancelOwnOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
-    const beforeRows = await pgQuery<{ id: number; status: string; member_id: number }>(`select o.id, o.status, o.member_id from orders o where o.id = ANY($1::int[])`, [data.ids]);
+    const beforeRows = await pgQuery<{ id: number; status: OrderStatus; member_id: number }>(`select o.id, o.status, o.member_id from orders o where o.id = ANY($1::int[])`, [data.ids]);
     if (beforeRows.length === 0) throw new Error("Encomenda(s) não encontrada(s)");
     if (beforeRows.some((r) => r.member_id !== me.id)) throw new Error("Não podes cancelar encomendas de outrem.");
-    const cancelled = await pgOne<{ sp_cancel_orders: number }>(`SELECT public.sp_cancel_orders($1, $2, $3) as sp_cancel_orders`, [data.ids, `web:${context.userId}`, "Cancelado pelo utilizador"]);
-    return { ok: true as const, cancelled: cancelled?.sp_cancel_orders ?? 0 };
+    const cancelable = beforeRows.filter((r) => !TERMINAL_STATUSES.has(r.status)).map((r) => r.id);
+    if (cancelable.length === 0) return { ok: true as const, cancelled: 0 };
+
+    await pgQuery(
+      `update orders set status = 'cancelled', updated_at = now(), updated_by = $2, resolved_at = now()
+       where id = any($1::int[]) and status not in ('fulfilled','denied','cancelled')`,
+      [cancelable, `web:${context.userId}`],
+    );
+    await Promise.all(beforeRows.filter((r) => cancelable.includes(r.id)).map((r) => insertOrderHistory(r.id, r.status, "cancelled", `web:${context.userId}`, "Cancelado pelo utilizador")));
+    return { ok: true as const, cancelled: cancelable.length };
   });
