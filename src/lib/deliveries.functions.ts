@@ -57,7 +57,7 @@ function asOptionalNumber(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-async function normalizeDeliveryLines(lines: unknown, strict: boolean): Promise<DeliveryLine[]> {
+async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "entrega" | "venda" = "entrega"): Promise<DeliveryLine[]> {
   if (!Array.isArray(lines)) {
     if (strict) throw new Error("Linhas da entrega inválidas");
     return [];
@@ -109,14 +109,14 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean): Promise<
         item_id: rawId ?? 0,
         item_name: rawName ?? "Item inválido",
         qty: qty ?? 0,
-        unit_value: asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.effectivePrice ?? line.basePrice) ?? 0,
+        unit_value: tipo === "entrega" ? 0 : (asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.effectivePrice ?? line.basePrice) ?? 0),
       });
       continue;
     }
 
     const explicitUnit = asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.effectivePrice ?? line.basePrice);
     const lineValue = asOptionalNumber(line.lineValue);
-    const unit = explicitUnit ?? (lineValue != null ? lineValue / qty : null) ?? item.morador_purchase_price ?? item.purchase_price ?? 0;
+    const unit = tipo === "entrega" ? 0 : (explicitUnit ?? (lineValue != null ? lineValue / qty : null) ?? item.morador_purchase_price ?? item.purchase_price ?? 0);
 
     normalized.push({ item_id: item.id, item_name: item.name, qty, unit_value: unit });
   }
@@ -170,9 +170,15 @@ export const listDeliveries = createServerFn({ method: "GET" })
     );
 
     return Promise.all(rows.map(async (row) => {
-      const lines = await normalizeDeliveryLines(row.lines, false);
+      const tipo = row.tipo === "venda" ? "venda" : "entrega";
+      const lines = await normalizeDeliveryLines(row.lines, false, tipo);
       const totals = deliveryTotals(lines);
-      return { ...row, lines, total_qty: row.total_qty || totals.totalQty, total_value: row.total_value || totals.totalValue };
+      return {
+        ...row,
+        lines,
+        total_qty: row.total_qty || totals.totalQty,
+        total_value: tipo === "entrega" ? 0 : (row.total_value || totals.totalValue),
+      };
     }));
   });
 
@@ -192,7 +198,7 @@ export const createDelivery = createServerFn({ method: "POST" })
     if (!Number.isFinite(me.id) || me.id <= 0) throw new Error("ID de membro inválido");
     if (!me.discord_id) throw new Error("Membro sem Discord ID");
 
-    const enriched = await normalizeDeliveryLines(data.lines, true);
+    const enriched = await normalizeDeliveryLines(data.lines, true, data.tipo);
     const { totalQty, totalValue } = deliveryTotals(enriched);
 
     const row = await pgOne<{ id: string }>(
@@ -236,13 +242,14 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (before.status !== "pending") throw new Error("Já decidido");
 
     if (data.approve) {
-      const normalizedLines = await normalizeDeliveryLines(before.lines, true);
+      const tipo = before.tipo === "venda" ? "venda" : "entrega";
+      const normalizedLines = await normalizeDeliveryLines(before.lines, true, tipo);
       const { totalQty, totalValue } = deliveryTotals(normalizedLines);
       await pgQuery(
         `update inventory_delivery_requests
          set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now()
          where id = $1 and status = 'pending'`,
-        [data.id, JSON.stringify(normalizedLines), totalQty, totalValue],
+        [data.id, JSON.stringify(normalizedLines), totalQty, tipo === "entrega" ? 0 : totalValue],
       );
       await pgQuery(`SELECT public.sp_approve_delivery($1, $2, $3)`, [data.id, `web:${context.userId}`, me.discord_id]);
     } else {
