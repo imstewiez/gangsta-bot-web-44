@@ -108,7 +108,7 @@ export const listOrders = createServerFn({ method: "GET" })
               mr.display_name as responsavel_name,
               o.ingredients_json,
               o.batch_id,
-              o.dirty_money::float as dirty_money,
+              case when o.payment_mode = 'materials_money' then o.total_price else o.dirty_money end::float as dirty_money,
               o.payment_mode,
               o.material_cost::float as material_cost,
               o.money_cost::float as money_cost
@@ -230,7 +230,7 @@ export const createOrder = createServerFn({ method: "POST" })
         ? Math.round(baseUnit + materialCostPerUnit + baseUnit * MONEY_ONLY_MARKUP)
         : Math.round(baseUnit);
       const total = unit * line.quantity;
-      const dirtyMoney = effectivePaymentMode === "materials_money" ? baseUnit * line.quantity : 0;
+      const dirtyMoney = effectivePaymentMode === "materials_money" ? total : 0;
       const materialCost = effectivePaymentMode === "money_only" && hasMaterials ? Math.round(materialCostPerUnit * line.quantity) : null;
       const moneyCost = effectivePaymentMode === "money_only" ? total : null;
       const ingredientsJsonStr = effectivePaymentMode === "materials_money" && ingredientsJson.length > 0 ? JSON.stringify(ingredientsJson) : null;
