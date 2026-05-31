@@ -33,47 +33,39 @@ type OrderRow = {
   money_cost: number | null;
 };
 
-const ORDER_STATUSES = [
-  "pending",
-  "approved",
-  "in_progress",
-  "ready",
-  "fulfilled",
-  "denied",
-  "cancelled",
-] as const;
+const ORDER_STATUSES = ["pending", "approved", "in_progress", "ready", "fulfilled", "denied", "cancelled"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-const MONEY_ONLY_MARKUP = 0.20;
-
-function orderBasePrice(prices: {
+type PriceLike = {
   tier_price?: number | null;
   min_sale_price?: number | null;
   morador_purchase_price?: number | null;
   purchase_price?: number | null;
   estimated_value?: number | null;
-}): number {
-  return Number(
-    prices.tier_price ??
-    prices.min_sale_price ??
-    prices.morador_purchase_price ??
-    prices.purchase_price ??
-    prices.estimated_value ??
-    0,
-  );
+};
+
+function positive(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function priceWithMaterials(prices: PriceLike): number {
+  return Number(positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? positive(prices.purchase_price) ?? positive(prices.morador_purchase_price) ?? positive(prices.estimated_value) ?? 0);
+}
+
+function priceWithoutMaterials(prices: PriceLike): number {
+  return Number(positive(prices.purchase_price) ?? positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? positive(prices.morador_purchase_price) ?? positive(prices.estimated_value) ?? 0);
 }
 
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { scope?: "mine" | "manage"; status?: string | null; statuses?: string[] | null }) => {
-      const scope = DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine";
-      const status = OrderStatusSchema.optional().nullable().parse(d?.status) ?? null;
-      const statusesRaw = z.array(OrderStatusSchema).optional().nullable().parse(d?.statuses);
-      const statuses = statusesRaw && statusesRaw.length > 0 ? statusesRaw : null;
-      return { scope, status, statuses };
-    },
-  )
+  .inputValidator((d: { scope?: "mine" | "manage"; status?: string | null; statuses?: string[] | null }) => {
+    const scope = DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine";
+    const status = OrderStatusSchema.optional().nullable().parse(d?.status) ?? null;
+    const statusesRaw = z.array(OrderStatusSchema).optional().nullable().parse(d?.statuses);
+    const statuses = statusesRaw && statusesRaw.length > 0 ? statusesRaw : null;
+    return { scope, status, statuses };
+  })
   .handler(async ({ data, context }): Promise<OrderRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const params: unknown[] = [];
@@ -90,6 +82,7 @@ export const listOrders = createServerFn({ method: "GET" })
         conds.push(`o.responsavel_member_id = $${params.length}`);
       }
     }
+
     if (data.statuses) {
       params.push(data.statuses);
       conds.push(`o.status = ANY($${params.length})`);
@@ -97,6 +90,7 @@ export const listOrders = createServerFn({ method: "GET" })
       params.push(data.status);
       conds.push(`o.status = $${params.length}`);
     }
+
     const where = conds.length ? `where ${conds.join(" and ")}` : "";
     return pgQuery<OrderRow>(
       `select o.id, o.member_id, m.display_name as member_name,
@@ -125,22 +119,20 @@ export const listOrders = createServerFn({ method: "GET" })
 
 export const createOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: "materials_money" | "money_only" }) => {
-      if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
-      if (d.lines.length > 50) throw new Error("Máximo 50 itens por encomenda");
-      for (const l of d.lines) {
-        if (!Number.isFinite(l.item_id)) throw new Error("Item inválido");
-        if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("Quantidade inválida");
-      }
-      if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) {
-        throw new Error("Tens de escolher um responsável");
-      }
-      const paymentMode = d.payment_mode ?? "materials_money";
-      if (paymentMode !== "materials_money" && paymentMode !== "money_only") throw new Error("Modo de pagamento inválido");
-      return { ...d, payment_mode: paymentMode, notes: NotesSchema.parse(d.notes) };
-    },
-  )
+  .inputValidator((d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: "materials_money" | "money_only" }) => {
+    if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
+    if (d.lines.length > 50) throw new Error("Máximo 50 itens por encomenda");
+    for (const l of d.lines) {
+      if (!Number.isFinite(l.item_id)) throw new Error("Item inválido");
+      if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("Quantidade inválida");
+    }
+    if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) {
+      throw new Error("Tens de escolher um responsável");
+    }
+    const paymentMode = d.payment_mode ?? "materials_money";
+    if (paymentMode !== "materials_money" && paymentMode !== "money_only") throw new Error("Modo de pagamento inválido");
+    return { ...d, payment_mode: paymentMode, notes: NotesSchema.parse(d.notes) };
+  })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
@@ -169,39 +161,22 @@ export const createOrder = createServerFn({ method: "POST" })
     );
     const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    const allConfigNames = Object.values(cfgItems).map((i) => i.name);
-    const dbPrices = await pgQuery<{
-      name: string;
-      purchase_price: number | null;
-      estimated_value: number | null;
-    }>(
-      `select name, purchase_price::float as purchase_price, estimated_value::float as estimated_value
-       from items
-       where name = ANY($1::text[])
-         and coalesce(active, true) = true
-         and deleted_at is null`,
-      [allConfigNames],
-    );
-    const dbPriceMap = new Map(dbPrices.map((p) => [p.name, p]));
-
     const batchId = crypto.randomUUID();
     const results: { id: number; item_name: string; quantity: number }[] = [];
 
     for (const line of data.lines) {
       const dbItem = itemMap.get(line.item_id);
       if (!dbItem) throw new Error(`Item não encontrado: ${line.item_id}`);
-      if (dbItem.side !== "venda" && dbItem.side !== "ambos") {
-        throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
-      }
+      if (dbItem.side !== "venda" && dbItem.side !== "ambos") throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
 
       const configItem = Object.values(cfgItems).find((i) => i.name === dbItem.name) ?? null;
       const itemSurcharges = await getSurchargeForItem(dbItem.id);
       const itemPrices = resolveItemPrices(dbItem, configItem, me.tier ?? null, itemSurcharges);
-      const baseUnit = orderBasePrice({ ...itemPrices, purchase_price: dbItem.purchase_price });
+      const withMaterialsUnit = Math.round(priceWithMaterials(itemPrices));
+      const withoutMaterialsUnit = Math.round(priceWithoutMaterials(itemPrices));
 
       const recipe = await getMergedRecipeForItemName(dbItem.name);
       let ingredientsJson: Array<{ name: string; needed: number }> = [];
-      let materialCostPerUnit = 0;
       let hasMaterials = false;
 
       if (recipe && Object.keys(recipe.inputs).length > 0) {
@@ -213,12 +188,6 @@ export const createOrder = createServerFn({ method: "POST" })
           return !isOrange || ingItem.name.toLowerCase().includes("peça");
         });
         hasMaterials = relevantInputs.length > 0;
-        materialCostPerUnit = relevantInputs.reduce((sum, [ingId, qty]) => {
-          const ingItem = cfgItems[ingId];
-          const ingDb = ingItem ? dbPriceMap.get(ingItem.name) : null;
-          const ingPrices = resolveItemPrices(ingDb, ingItem);
-          return sum + Number(ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0) * Number(qty);
-        }, 0);
         ingredientsJson = relevantInputs.map(([ingId, qty]) => {
           const ingItem = cfgItems[ingId];
           return { name: ingItem?.name ?? ingId, needed: Number(qty) * line.quantity };
@@ -226,19 +195,16 @@ export const createOrder = createServerFn({ method: "POST" })
       }
 
       const effectivePaymentMode = data.payment_mode === "materials_money" && hasMaterials ? "materials_money" : "money_only";
-      const unit = effectivePaymentMode === "money_only" && hasMaterials
-        ? Math.round(baseUnit + materialCostPerUnit + baseUnit * MONEY_ONLY_MARKUP)
-        : Math.round(baseUnit);
+      const unit = effectivePaymentMode === "materials_money" ? withMaterialsUnit : withoutMaterialsUnit;
+      if (unit <= 0) throw new Error(`Preço inválido para ${dbItem.name}. Corrige o item na Gestão de Materiais.`);
+
       const total = unit * line.quantity;
-      const dirtyMoney = effectivePaymentMode === "materials_money" ? total : 0;
-      const materialCost = effectivePaymentMode === "money_only" && hasMaterials ? Math.round(materialCostPerUnit * line.quantity) : null;
-      const moneyCost = effectivePaymentMode === "money_only" ? total : null;
       const ingredientsJsonStr = effectivePaymentMode === "materials_money" && ingredientsJson.length > 0 ? JSON.stringify(ingredientsJson) : null;
 
       const row = await pgOne<{ id: number }>(
         `insert into orders
            (member_id, item_id, quantity, status, unit_price, total_price, notes, markup_percent, created_at, updated_at, updated_by, responsavel_member_id, ingredients_json, batch_id, dirty_money, payment_mode, material_cost, money_cost)
-         values ($1, $2, $3, 'pending', $4, $5, $6, $7, now(), now(), $8, $9, $10, $11, $12, $13, $14, $15)
+         values ($1, $2, $3, 'pending', $4, $5, $6, 0, now(), now(), $7, $8, $9, $10, $11, $12, null, $13)
          returning id`,
         [
           me.id,
@@ -247,15 +213,13 @@ export const createOrder = createServerFn({ method: "POST" })
           unit,
           total,
           data.notes ?? null,
-          MONEY_ONLY_MARKUP,
           `web:${context.userId}`,
           data.responsavel_member_id ?? null,
           ingredientsJsonStr,
           batchId,
-          dirtyMoney,
+          total,
           effectivePaymentMode,
-          materialCost,
-          moneyCost,
+          total,
         ],
       );
       if (row) results.push({ id: row.id, item_name: dbItem.name, quantity: line.quantity });
@@ -284,27 +248,13 @@ export const transitionOrder = createServerFn({ method: "POST" })
     if (!current) throw new Error("Encomenda não encontrada");
     if (!me.is_superadmin && current.responsavel_member_id !== me.id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
 
-    const result = await pgOne<{
-      old_status: string;
-      member_id: number;
-      item_id: number | null;
-      quantity: number;
-      item_name: string | null;
-      responsavel_member_id: number | null;
-    }>(
+    const result = await pgOne<{ old_status: string; member_id: number; item_id: number | null; quantity: number; item_name: string | null; responsavel_member_id: number | null }>(
       `SELECT * FROM public.sp_transition_order($1, $2, $3, $4)`,
       [data.id, data.to, `web:${context.userId}`, data.notes ?? null],
     );
     if (!result) throw new Error("Encomenda não encontrada");
 
-    const actionMap: Record<string, string> = {
-      approved: "order_approved",
-      denied: "order_denied",
-      fulfilled: "order_fulfilled",
-      cancelled: "order_cancelled",
-      ready: "order_updated",
-      in_progress: "order_updated",
-    };
+    const actionMap: Record<string, string> = { approved: "order_approved", denied: "order_denied", fulfilled: "order_fulfilled", cancelled: "order_cancelled", ready: "order_updated", in_progress: "order_updated" };
     await logAdminAction(context.supabase, {
       action: actionMap[data.to] ?? "order_updated",
       actorId: context.userId,
@@ -318,13 +268,7 @@ export const transitionOrder = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-type OrderCommentRow = {
-  id: number;
-  order_id: number;
-  author_name: string | null;
-  content: string;
-  created_at: string;
-};
+type OrderCommentRow = { id: number; order_id: number; author_name: string | null; content: string; created_at: string };
 
 export const listOrderComments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -333,9 +277,7 @@ export const listOrderComments = createServerFn({ method: "GET" })
     if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
     return { order_id: id };
   })
-  .handler(async ({ data }) => {
-    return pgQuery<OrderCommentRow>(`select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`, [data.order_id]);
-  });
+  .handler(async ({ data }) => pgQuery<OrderCommentRow>(`select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`, [data.order_id]));
 
 export const addOrderComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -364,11 +306,7 @@ export const addOrderComment = createServerFn({ method: "POST" })
 export const cancelOwnOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { ids?: number[]; id?: number }) => {
-    const ids = Array.isArray(d.ids) && d.ids.length > 0
-      ? d.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
-      : d.id != null
-        ? [Number(d.id)]
-        : [];
+    const ids = Array.isArray(d.ids) && d.ids.length > 0 ? d.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : d.id != null ? [Number(d.id)] : [];
     if (ids.length === 0) throw new Error("ID inválido");
     return { ids };
   })
