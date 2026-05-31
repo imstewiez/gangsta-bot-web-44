@@ -3,14 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveCurrentMember } from "./pricing.server";
 import { logger } from "./logger.server";
 import { pgQuery } from "./pg.server";
-import {
-  getAllRecipes,
-  getItemById,
-  getItemByName,
-  getRecipeForItemName,
-  getNumericId,
-  getAllItems,
-} from "./config.loader";
+import { getAllItems } from "./config.loader";
 import { resolveItemPrices } from "./pricing.resolver";
 import { getSurchargesForItems } from "./tier-pricing.functions";
 
@@ -46,6 +39,7 @@ type DbPriceRow = {
   name: string;
   category: string | null;
   subcategory: string | null;
+  side: string | null;
   purchase_price: number | null;
   min_sale_price: number | null;
   estimated_value: number | null;
@@ -53,83 +47,105 @@ type DbPriceRow = {
 };
 
 type MergedRecipe = {
-  output: string;
-  inputs: Record<string, number>;
+  output_item_id: number;
+  output_name: string;
+  inputs: Array<{ item_id: number; name: string; quantity: number; category: string | null; subcategory: string | null }>;
 };
 
-async function getDbPriceMap(names: string[]): Promise<Map<string, DbPriceRow>> {
-  const uniqueNames = Array.from(new Set(names.filter(Boolean)));
-  if (uniqueNames.length === 0) return new Map();
+async function getDbItemsByIds(ids: number[]): Promise<Map<number, DbPriceRow>> {
+  const unique = Array.from(new Set(ids.filter((id) => Number.isFinite(id) && id > 0)));
+  if (unique.length === 0) return new Map();
   const rows = await pgQuery<DbPriceRow>(
-    `select id, name, category, subcategory,
+    `select id, name, category, subcategory, side,
             purchase_price::float as purchase_price,
             min_sale_price::float as min_sale_price,
             estimated_value::float as estimated_value,
             morador_purchase_price::float as morador_purchase_price
      from items
-     where name = any($1::text[])
+     where id = any($1::int[])
        and coalesce(active, true) = true
        and deleted_at is null`,
-    [uniqueNames],
+    [unique],
   );
-  return new Map(rows.map((r) => [r.name, r]));
+  return new Map(rows.map((r) => [r.id, r]));
 }
 
-function getConfigIdByNameMap(): Map<string, string> {
-  const configItems = getAllItems();
-  return new Map(Object.entries(configItems).map(([id, item]) => [item.name, id]));
-}
-
-/** Fetch DB recipes merged with config.json recipes. DB overrides config when it has valid inputs. */
-export async function getMergedRecipes(): Promise<Record<string, MergedRecipe>> {
-  const configRecipes = getAllRecipes();
-  const configItems = getAllItems();
-  const configIdByName = getConfigIdByNameMap();
-
-  const dbRows = await pgQuery<{
-    recipe_id: number;
-    item_name: string;
+async function getDbRecipesForItemIds(itemIds: number[]): Promise<Map<number, MergedRecipe>> {
+  const unique = Array.from(new Set(itemIds.filter((id) => Number.isFinite(id) && id > 0)));
+  if (unique.length === 0) return new Map();
+  const rows = await pgQuery<{
+    output_item_id: number;
+    output_name: string;
+    ingredient_item_id: number | null;
     ingredient_name: string | null;
     quantity: number | null;
+    ingredient_category: string | null;
+    ingredient_subcategory: string | null;
   }>(
-    `select cr.id as recipe_id, i.name as item_name, ii.name as ingredient_name, ri.quantity::float as quantity
+    `select cr.item_id as output_item_id,
+            out_i.name as output_name,
+            ri.ingredient_item_id,
+            ing_i.name as ingredient_name,
+            ri.quantity::float as quantity,
+            ing_i.category as ingredient_category,
+            ing_i.subcategory as ingredient_subcategory
      from craft_recipes cr
-     join items i on i.id = cr.item_id
+     join items out_i on out_i.id = cr.item_id
      left join recipe_ingredients ri on ri.recipe_id = cr.id
-     left join items ii on ii.id = ri.ingredient_item_id
-     where coalesce(i.active, true) = true and i.deleted_at is null`,
+     left join items ing_i on ing_i.id = ri.ingredient_item_id
+     where cr.item_id = any($1::int[])
+       and coalesce(out_i.active, true) = true
+       and out_i.deleted_at is null
+     order by out_i.name, ing_i.name`,
+    [unique],
   );
 
-  const dbInputsByOutputName = new Map<string, Record<string, number>>();
-  for (const row of dbRows) {
-    if (!dbInputsByOutputName.has(row.item_name)) dbInputsByOutputName.set(row.item_name, {});
-    if (!row.ingredient_name || row.quantity == null || row.quantity <= 0) continue;
-    const ingConfigId = configIdByName.get(row.ingredient_name);
-    if (!ingConfigId) continue;
-    dbInputsByOutputName.get(row.item_name)![ingConfigId] = Number(row.quantity);
+  const map = new Map<number, MergedRecipe>();
+  for (const row of rows) {
+    if (!map.has(row.output_item_id)) {
+      map.set(row.output_item_id, { output_item_id: row.output_item_id, output_name: row.output_name, inputs: [] });
+    }
+    if (!row.ingredient_item_id || !row.ingredient_name || !row.quantity || row.quantity <= 0) continue;
+    map.get(row.output_item_id)!.inputs.push({
+      item_id: row.ingredient_item_id,
+      name: row.ingredient_name,
+      quantity: Number(row.quantity),
+      category: row.ingredient_category,
+      subcategory: row.ingredient_subcategory,
+    });
   }
 
-  const merged: Record<string, MergedRecipe> = {};
-  for (const [recipeId, recipe] of Object.entries(configRecipes)) {
-    const outputItem = configItems[recipe.output];
-    if (!outputItem) continue;
-    const dbInputs = dbInputsByOutputName.get(outputItem.name);
-    merged[recipeId] = {
-      output: recipe.output,
-      inputs: dbInputs && Object.keys(dbInputs).length > 0 ? dbInputs : { ...recipe.inputs },
-    };
+  for (const [itemId, recipe] of Array.from(map.entries())) {
+    if (recipe.inputs.length === 0) map.delete(itemId);
   }
+  return map;
+}
 
-  return merged;
+export async function getMergedRecipes(): Promise<Record<string, MergedRecipe>> {
+  const rows = await pgQuery<{ item_id: number }>(
+    `select distinct cr.item_id
+     from craft_recipes cr
+     join recipe_ingredients ri on ri.recipe_id = cr.id
+     join items out_i on out_i.id = cr.item_id
+     join items ing_i on ing_i.id = ri.ingredient_item_id
+     where coalesce(out_i.active, true) = true
+       and out_i.deleted_at is null
+       and coalesce(ing_i.active, true) = true
+       and ing_i.deleted_at is null
+       and coalesce(ri.quantity, 0) > 0`,
+  );
+  const map = await getDbRecipesForItemIds(rows.map((r) => r.item_id));
+  return Object.fromEntries(Array.from(map.entries()).map(([itemId, recipe]) => [String(itemId), recipe]));
 }
 
 export async function getMergedRecipeForItemName(itemName: string): Promise<MergedRecipe | null> {
-  const recipes = await getMergedRecipes();
-  for (const recipe of Object.values(recipes)) {
-    const outItem = getItemById(recipe.output);
-    if (outItem?.name === itemName) return recipe;
-  }
-  return null;
+  const row = await pgQuery<{ id: number }>(
+    `select id from items where name = $1 and coalesce(active, true) = true and deleted_at is null limit 1`,
+    [itemName],
+  );
+  const id = row[0]?.id;
+  if (!id) return null;
+  return (await getDbRecipesForItemIds([id])).get(id) ?? null;
 }
 
 export const listRecipes = createServerFn({ method: "GET" })
@@ -137,65 +153,47 @@ export const listRecipes = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<RecipeRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const isManager = me?.is_manager ?? false;
-    const recipes = await getMergedRecipes();
+    const recipes = Object.values(await getMergedRecipes());
     const result: RecipeRow[] = [];
-
-    const allNames = new Set<string>();
-    for (const recipe of Object.values(recipes)) {
-      const out = getItemById(recipe.output);
-      if (out) allNames.add(out.name);
-      for (const ingId of Object.keys(recipe.inputs)) {
-        const ing = getItemById(ingId);
-        if (ing) allNames.add(ing.name);
-      }
-    }
-
-    const dbPriceMap = await getDbPriceMap(Array.from(allNames));
-    const outputIds = Array.from(new Set(
-      Object.values(recipes)
-        .map((r) => dbPriceMap.get(getItemById(r.output)?.name ?? "")?.id)
-        .filter(Boolean) as number[],
-    ));
+    const outputIds = recipes.map((r) => r.output_item_id);
+    const ingredientIds = recipes.flatMap((r) => r.inputs.map((i) => i.item_id));
+    const dbItems = await getDbItemsByIds([...outputIds, ...ingredientIds]);
     const surchargeMap = await getSurchargesForItems(outputIds);
-    const dbRecipeRows = await pgQuery<{ item_id: number; id: number }>(`select item_id, id from craft_recipes`);
-    const dbRecipeIdByItemId = new Map(dbRecipeRows.map((r) => [r.item_id, r.id]));
 
-    for (const [recipeId, recipe] of Object.entries(recipes)) {
-      const outputItem = getItemById(recipe.output);
-      if (!outputItem) continue;
-      const outDb = dbPriceMap.get(outputItem.name);
-      const outPrices = resolveItemPrices(outDb, outputItem, me?.tier ?? null, surchargeMap.get(outDb?.id ?? 0) ?? null);
+    for (const recipe of recipes) {
+      const output = dbItems.get(recipe.output_item_id);
+      if (!output) continue;
+      const outPrices = resolveItemPrices(output, null, me?.tier ?? null, surchargeMap.get(output.id) ?? null);
       const ingredients: RecipeRow["ingredients"] = [];
       let total_cost = 0;
 
-      for (const [ingId, qty] of Object.entries(recipe.inputs)) {
-        const ingItem = getItemById(ingId);
-        if (!ingItem) continue;
-        const ingDb = dbPriceMap.get(ingItem.name);
-        const ingPrices = resolveItemPrices(ingDb, ingItem);
-        const unit_cost = ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
-        const line_cost = qty * unit_cost;
+      for (const input of recipe.inputs) {
+        const ingDb = dbItems.get(input.item_id);
+        if (!ingDb) continue;
+        const ingPrices = resolveItemPrices(ingDb, null);
+        const unit_cost = ingPrices.morador_purchase_price ?? ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
+        const line_cost = input.quantity * unit_cost;
         ingredients.push({
-          item_id: ingDb?.id ?? getNumericId(ingId),
-          name: ingItem.name,
-          quantity: qty,
+          item_id: input.item_id,
+          name: input.name,
+          quantity: input.quantity,
           unit_cost,
           line_cost,
-          category: ingDb?.category ?? ingItem.category,
-          subcategory: ingDb?.subcategory ?? ingItem.subcategory,
+          category: input.category,
+          subcategory: input.subcategory,
         });
         total_cost += line_cost;
       }
 
-      const salePrice = outPrices.tier_price ?? outPrices.min_sale_price ?? outPrices.estimated_value ?? 0;
+      const salePrice = outPrices.tier_price ?? outPrices.min_sale_price ?? outPrices.purchase_price ?? 0;
       const margin = salePrice - total_cost;
       result.push({
-        recipe_id: outDb?.id ?? getNumericId(recipeId),
-        item_id: outDb?.id ?? getNumericId(recipe.output),
-        item_name: outputItem.name,
-        category: outDb?.category ?? outputItem.category,
-        subcategory: outDb?.subcategory ?? outputItem.subcategory,
-        tier: outputItem.tier,
+        recipe_id: recipe.output_item_id,
+        item_id: recipe.output_item_id,
+        item_name: recipe.output_name,
+        category: output.category,
+        subcategory: output.subcategory,
+        tier: null,
         unit: "unidade",
         ingredients,
         total_cost,
@@ -204,8 +202,8 @@ export const listRecipes = createServerFn({ method: "GET" })
         tier_price: outPrices.tier_price,
         margin: isManager ? margin : 0,
         margin_pct: isManager && total_cost > 0 ? (margin / total_cost) * 100 : null,
-        recipe_category: outputItem.type === "weapon" ? "craft_weapons" : outputItem.type === "magazine" ? "craft_carregadores" : "outros",
-        db_recipe_id: outDb ? (dbRecipeIdByItemId.get(outDb.id) ?? null) : null,
+        recipe_category: output.category,
+        db_recipe_id: recipe.output_item_id,
       });
     }
 
@@ -228,17 +226,6 @@ export type CraftFeasibility = {
   }>;
 };
 
-async function resolveRecipeForItemId(itemId: number): Promise<{ itemName: string; recipe: MergedRecipe | null }> {
-  const dbItem = await pgQuery<{ id: number; name: string }>(
-    `select id, name from items where id = $1 and coalesce(active, true) = true and deleted_at is null`,
-    [itemId],
-  );
-  const itemName = dbItem[0]?.name ?? "";
-  if (!itemName) return { itemName: "", recipe: null };
-  const recipe = await getMergedRecipeForItemName(itemName);
-  return { itemName, recipe };
-}
-
 export const computeCraftFeasibility = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { recipe_id: number; quantity: number }) => {
@@ -248,30 +235,25 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<CraftFeasibility> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    const { itemName, recipe } = await resolveRecipeForItemId(data.recipe_id);
-    if (!recipe) throw new Error("Receita não encontrada");
-    const head = getItemById(recipe.output);
-    if (!head) throw new Error("Item da receita não encontrado");
-
-    const ingNames = Object.keys(recipe.inputs).map((id) => getItemById(id)?.name).filter(Boolean) as string[];
-    ingNames.push(head.name);
-    const dbPriceMap = await getDbPriceMap(ingNames);
-    const headDb = dbPriceMap.get(head.name);
-    const surchargeMap = await getSurchargesForItems(headDb?.id ? [headDb.id] : []);
-    const headPrices = resolveItemPrices(headDb, head, me?.tier ?? null, surchargeMap.get(headDb?.id ?? 0) ?? null);
+    const recipe = (await getDbRecipesForItemIds([data.recipe_id])).get(data.recipe_id);
+    if (!recipe) throw new Error("Receita não encontrada na Gestão de Materiais");
+    const dbItems = await getDbItemsByIds([data.recipe_id, ...recipe.inputs.map((i) => i.item_id)]);
+    const output = dbItems.get(data.recipe_id);
+    if (!output) throw new Error("Item da receita não encontrado");
+    const surchargeMap = await getSurchargesForItems([output.id]);
+    const headPrices = resolveItemPrices(output, null, me?.tier ?? null, surchargeMap.get(output.id) ?? null);
     const ingredients: CraftFeasibility["ingredients"] = [];
 
-    for (const [ingId, qty] of Object.entries(recipe.inputs)) {
-      const ingItem = getItemById(ingId);
-      if (!ingItem) continue;
-      const ingDb = dbPriceMap.get(ingItem.name);
-      const ingPrices = resolveItemPrices(ingDb, ingItem);
-      const needed = qty * data.quantity;
-      const unitCost = ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
+    for (const input of recipe.inputs) {
+      const ingDb = dbItems.get(input.item_id);
+      if (!ingDb) continue;
+      const ingPrices = resolveItemPrices(ingDb, null);
+      const needed = input.quantity * data.quantity;
+      const unitCost = ingPrices.morador_purchase_price ?? ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
       ingredients.push({
-        name: ingItem.name,
+        name: input.name,
         needed,
-        qty_per_recipe: qty,
+        qty_per_recipe: input.quantity,
         unit_cost: unitCost,
         line_cost: needed * unitCost,
       });
@@ -279,7 +261,7 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
 
     return {
       recipe_id: data.recipe_id,
-      item_name: itemName || head.name,
+      item_name: recipe.output_name,
       requested_qty: data.quantity,
       dirty_money: (headPrices.estimated_value ?? 0) * data.quantity,
       min_sale_price: headPrices.min_sale_price,
@@ -306,73 +288,45 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
   .inputValidator((d: { lines: Array<{ item_id: number; quantity: number }> }) => {
     if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
     for (const l of d.lines) {
-      if (!Number.isFinite(l.item_id)) throw new Error("item_id inválido");
+      if (!Number.isFinite(l.item_id) || l.item_id <= 0) throw new Error("item_id inválido");
       if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("quantidade inválida");
     }
     return d;
   })
   .handler(async ({ data }): Promise<CraftFeasibilityBatch> => {
     try {
-      const itemIds = data.lines.map((l) => l.item_id);
-      const dbItems = await pgQuery<{ id: number; name: string }>(
-        `select id, name from items where id = any($1::int[]) and coalesce(active, true) = true and deleted_at is null`,
-        [itemIds],
-      );
-      const nameById = new Map(dbItems.map((i) => [i.id, i.name]));
-      const mergedRecipes = await getMergedRecipes();
-
-      const recipeByName = new Map<string, MergedRecipe>();
-      const allNames = new Set<string>();
-      for (const recipe of Object.values(mergedRecipes)) {
-        const output = getItemById(recipe.output);
-        if (!output) continue;
-        recipeByName.set(output.name, recipe);
-      }
-
-      for (const line of data.lines) {
-        const itemName = nameById.get(line.item_id);
-        if (!itemName) continue;
-        const recipe = recipeByName.get(itemName) ?? getRecipeForItemName(itemName) ?? null;
-        const item = getItemByName(itemName);
-        if (item) allNames.add(item.name);
-        if (!recipe) continue;
-        for (const ingId of Object.keys(recipe.inputs)) {
-          const ingItem = getItemById(ingId);
-          if (ingItem) allNames.add(ingItem.name);
-        }
-      }
-      const dbPriceMap = await getDbPriceMap(Array.from(allNames));
+      const dbItems = await getDbItemsByIds(data.lines.map((l) => l.item_id));
+      const recipeMap = await getDbRecipesForItemIds(data.lines.map((l) => l.item_id));
+      const ingredientIds = Array.from(new Set(Array.from(recipeMap.values()).flatMap((r) => r.inputs.map((i) => i.item_id))));
+      const ingredientItems = await getDbItemsByIds(ingredientIds);
       const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
       let dirty_money = 0;
       let full_material_cost = 0;
       const items: CraftFeasibilityBatch["items"] = [];
 
       for (const line of data.lines) {
-        const itemName = nameById.get(line.item_id);
-        if (!itemName) continue;
-        const item = getItemByName(itemName);
-        const recipe = recipeByName.get(itemName) ?? getRecipeForItemName(itemName) ?? null;
-        if (!item || !recipe) continue;
+        const item = dbItems.get(line.item_id);
+        if (!item) continue;
+        const recipe = recipeMap.get(line.item_id);
+        if (!recipe) continue;
         items.push({ item_name: item.name, requested_qty: line.quantity });
-        const itemPrices = resolveItemPrices(dbPriceMap.get(item.name), item);
+        const itemPrices = resolveItemPrices(item, null);
         dirty_money += (itemPrices.estimated_value ?? 0) * line.quantity;
-        const isOrange = item.tier === "orange" || item.category === "armas_orange";
 
-        for (const [ingId, qty] of Object.entries(recipe.inputs)) {
-          const ingItem = getItemById(ingId);
-          if (!ingItem) continue;
-          const ingPrices = resolveItemPrices(dbPriceMap.get(ingItem.name), ingItem);
-          const needed = qty * line.quantity;
-          const unitCost = ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
+        for (const input of recipe.inputs) {
+          const ingDb = ingredientItems.get(input.item_id);
+          if (!ingDb) continue;
+          const ingPrices = resolveItemPrices(ingDb, null);
+          const needed = input.quantity * line.quantity;
+          const unitCost = ingPrices.morador_purchase_price ?? ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
           const lineCost = needed * unitCost;
           full_material_cost += lineCost;
-          if (isOrange && !ingItem.name.toLowerCase().includes("peça")) continue;
-          const existing = allIngredients.get(ingItem.name);
+          const existing = allIngredients.get(input.name);
           if (existing) {
             existing.needed += needed;
             existing.line_cost += lineCost;
           } else {
-            allIngredients.set(ingItem.name, { name: ingItem.name, needed, qty_per_recipe: qty, unit_cost: unitCost, line_cost: lineCost });
+            allIngredients.set(input.name, { name: input.name, needed, qty_per_recipe: input.quantity, unit_cost: unitCost, line_cost: lineCost });
           }
         }
       }
