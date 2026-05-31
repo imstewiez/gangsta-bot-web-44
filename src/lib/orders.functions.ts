@@ -4,7 +4,6 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, OrderStatusSchema, IdSchema, NotesSchema } from "./security";
-import { logger } from "./logger.server";
 import { logAdminAction } from "./logging.functions";
 import { getAllItems, getTierPrice } from "./config.loader";
 import { resolveItemPrices, getConfigIdByName } from "./pricing.resolver";
@@ -283,7 +282,16 @@ export const transitionOrder = createServerFn({ method: "POST" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
 
-    // Atomic transition via stored procedure
+    const current = await pgOne<{ responsavel_member_id: number | null }>(
+      `select responsavel_member_id from orders where id = $1`,
+      [data.id],
+    );
+    if (!current) throw new Error("Encomenda não encontrada");
+    if (!me.is_superadmin && current.responsavel_member_id !== me.id) {
+      throw new Error("Sem permissão — só o responsável pode tratar este pedido");
+    }
+
+    // Atomic transition via stored procedure after permission has been verified.
     const result = await pgOne<{
       old_status: string;
       member_id: number;
@@ -315,14 +323,6 @@ export const transitionOrder = createServerFn({ method: "POST" })
       details: `Encomenda #${data.id} (${result.item_name ?? "?"} × ${result.quantity}) alterada de "${result.old_status}" para "${data.to}"`,
       afterState: { old_status: result.old_status, new_status: data.to },
     });
-
-    if (!me?.is_superadmin && me?.id !== result.responsavel_member_id) {
-      logger.warn("transitionOrder_permission_mismatch", {
-        orderId: data.id,
-        meId: me?.id,
-        responsavel: result.responsavel_member_id,
-      });
-    }
 
     return { ok: true as const };
   });
