@@ -2,8 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { getAllRecipes, getItemById, getAllItems } from "./config.loader";
-import { resolveItemPrices } from "./pricing.resolver";
+import { getAllRecipes, getItemById } from "./config.loader";
 
 export type OrderCycle = {
   cycle_start: string;
@@ -67,7 +66,7 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
         ).catch(() => []);
       })(),
       pgOne<{ total: number }>(
-        `select coalesce(sum(coalesce(b.balance, 0) * coalesce(i.min_sale_price, 0)), 0)::float as total
+        `select coalesce(sum(coalesce(b.balance, 0) * coalesce(i.estimated_value, i.min_sale_price, i.purchase_price, 0)), 0)::float as total
          from items i
          left join inventory_balance b on b.item_id = i.id
          where i.active = true`
@@ -128,23 +127,6 @@ export const getOrderCycles = createServerFn({ method: "GET" })
     const isChefia = me?.tier === "kingpin" || me?.tier === "manda_chuva" || me?.role_label === "kingpin" || me?.role_label === "manda_chuva";
     if (!isChefia) throw new Error("Acesso restrito. Apenas Kingpin e Manda-Chuva.");
 
-    // Build resolved unit costs from DB + config
-    const configItems = getAllItems();
-    const dbItems = await pgQuery<{
-      id: number;
-      name: string;
-      purchase_price: number | null;
-      estimated_value: number | null;
-    }>(
-      `select id, name, purchase_price::float as purchase_price, estimated_value::float as estimated_value from items where active = true`
-    );
-    const costs: { id: number; unit_cost: number }[] = [];
-    for (const db of dbItems) {
-      const configItem = configItems[Object.keys(configItems).find(k => configItems[k].name === db.name) ?? ""];
-      const prices = resolveItemPrices(db, configItem);
-      costs.push({ id: db.id, unit_cost: prices.purchase_price ?? prices.estimated_value ?? 0 });
-    }
-
     const cycles = await pgQuery<{
       cycle_start: string;
       cycle_end: string;
@@ -156,10 +138,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       fulfilled_count: number;
       pending_count: number;
     }>(
-      `WITH real_costs AS (
-        SELECT * FROM unnest($1::int[], $2::float[]) AS t(id, unit_cost)
-      ),
-      cycle_orders AS (
+      `WITH cycle_orders AS (
         SELECT
           date_trunc('week', o.created_at)::date as cycle_start,
           (date_trunc('week', o.created_at)::date + interval '6 days')::date as cycle_end,
@@ -167,10 +146,9 @@ export const getOrderCycles = createServerFn({ method: "GET" })
           o.status,
           o.quantity,
           COALESCE(o.total_price, 0) as total_price,
-          COALESCE(rc.unit_cost, 0) as unit_cost
+          COALESCE(i.estimated_value, 0) as unit_cost
         FROM orders o
         JOIN items i ON i.id = o.item_id
-        LEFT JOIN real_costs rc ON rc.id = i.id
         WHERE o.status NOT IN ('cancelled', 'denied')
       )
       SELECT
@@ -187,7 +165,6 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       GROUP BY cycle_start, cycle_end
       ORDER BY cycle_start DESC
       LIMIT 8`,
-      [costs.map(c => c.id), costs.map(c => c.unit_cost)]
     ).catch(() => []);
 
     const items = await pgQuery<{
@@ -198,23 +175,18 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       cost: number;
       profit: number;
     }>(
-      `WITH real_costs AS (
-        SELECT * FROM unnest($1::int[], $2::float[]) AS t(id, unit_cost)
-      )
-      SELECT
+      `SELECT
         date_trunc('week', o.created_at)::date as cycle_start,
         i.name as item_name,
         SUM(o.quantity)::int as quantity,
         SUM(COALESCE(o.total_price, 0))::float as revenue,
-        SUM(o.quantity * COALESCE(rc.unit_cost, 0))::float as cost,
-        SUM(COALESCE(o.total_price, 0) - o.quantity * COALESCE(rc.unit_cost, 0))::float as profit
+        SUM(o.quantity * COALESCE(i.estimated_value, 0))::float as cost,
+        SUM(COALESCE(o.total_price, 0) - o.quantity * COALESCE(i.estimated_value, 0))::float as profit
       FROM orders o
       JOIN items i ON i.id = o.item_id
-      LEFT JOIN real_costs rc ON rc.id = i.id
       WHERE o.status NOT IN ('cancelled', 'denied')
       GROUP BY date_trunc('week', o.created_at)::date, i.name
       ORDER BY cycle_start DESC, profit DESC`,
-      [costs.map(c => c.id), costs.map(c => c.unit_cost)]
     ).catch(() => []);
 
     return cycles.map((c) => ({
