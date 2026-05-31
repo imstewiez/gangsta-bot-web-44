@@ -74,14 +74,38 @@ const NEXT_STATES: Record<string, { to: OrderStatus; label: string; variant?: "d
 
 const ACTIVE_STATUSES = ["pending", "approved", "in_progress", "ready"];
 const ARCHIVED_STATUSES = ["fulfilled", "denied", "cancelled"];
-const MONEY_ONLY_MARKUP = 0.2;
 
 type PaymentMode = "materials_money" | "money_only";
 type OrderStatus = "pending" | "approved" | "in_progress" | "ready" | "fulfilled" | "denied" | "cancelled";
 type OrderLineInput = { item_id: string; qty: string };
 
-function itemUnitPrice(item: CatalogItem | undefined | null): number {
-  return Number(item?.tier_price ?? item?.min_sale_price ?? item?.morador_purchase_price ?? item?.purchase_price ?? 0);
+function positive(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function priceWithMaterials(item: CatalogItem | undefined | null): number {
+  return Number(
+    positive(item?.tier_price) ??
+    positive(item?.min_sale_price) ??
+    positive(item?.purchase_price) ??
+    positive(item?.morador_purchase_price) ??
+    0,
+  );
+}
+
+function priceWithoutMaterials(item: CatalogItem | undefined | null): number {
+  return Number(
+    positive(item?.purchase_price) ??
+    positive(item?.tier_price) ??
+    positive(item?.min_sale_price) ??
+    positive(item?.morador_purchase_price) ??
+    0,
+  );
+}
+
+function itemUnitPrice(item: CatalogItem | undefined | null, mode: PaymentMode): number {
+  return mode === "materials_money" ? priceWithMaterials(item) : priceWithoutMaterials(item);
 }
 
 function lineQuantity(line: OrderLineInput): number {
@@ -200,7 +224,6 @@ function OrdersList({ scope, canManage, meId, statusFilter }: { scope: "mine" | 
         const next = canManage ? NEXT_STATES[first.status] : null;
         const minId = Math.min(...lines.map((l) => l.id));
         const totalBatch = lines.reduce((sum, line) => sum + (line.total_price ?? 0), 0);
-        const cashToPay = lines.reduce((sum, line) => sum + (line.payment_mode === "materials_money" ? (line.total_price ?? 0) : (line.money_cost ?? line.total_price ?? 0)), 0);
         const isOwn = meId != null && first.member_id === meId;
         const canCancelOwn = !canManage && isOwn && statusFilter === "active" && first.status === "pending";
 
@@ -263,7 +286,7 @@ function OrdersList({ scope, canManage, meId, statusFilter }: { scope: "mine" | 
                       </ul>
                       <div className="flex items-center justify-between border-t border-border pt-1.5 font-semibold">
                         <span className="text-emerald-400">Dinheiro:</span>
-                        <span className="font-mono text-emerald-400">{fmtPrice(Math.round(cashToPay))}</span>
+                        <span className="font-mono text-emerald-400">{fmtPrice(Math.round(totalBatch))}</span>
                       </div>
                     </>
                   ) : (
@@ -359,10 +382,7 @@ function NewOrder() {
 
   const hasMaterialQuote = Boolean(sim.data && sim.data.ingredients.length > 0);
   const effectivePaymentMode: PaymentMode = hasMaterialQuote ? paymentMode : "money_only";
-  const baseTotal = validLines.reduce((sum, line) => sum + itemUnitPrice(itemsById.get(line.item_id)) * lineQuantity(line), 0);
-  const materialCost = hasMaterialQuote ? Math.round(sim.data?.full_material_cost ?? 0) : 0;
-  const moneyOnlyMarkup = hasMaterialQuote && effectivePaymentMode === "money_only" ? Math.round(baseTotal * MONEY_ONLY_MARKUP) : 0;
-  const finalTotal = effectivePaymentMode === "money_only" ? baseTotal + materialCost + moneyOnlyMarkup : baseTotal;
+  const finalTotal = validLines.reduce((sum, line) => sum + itemUnitPrice(itemsById.get(line.item_id), effectivePaymentMode) * lineQuantity(line), 0);
   const selectedManager = (managers.data ?? []).find((manager) => String(manager.id) === responsavel);
 
   useEffect(() => {
@@ -382,7 +402,7 @@ function NewOrder() {
       const list = groups.get(category);
       if (!list) continue;
       const cfg = ARMORY_CAT_CONFIG[category as keyof typeof ARMORY_CAT_CONFIG];
-      list.sort((a, b) => itemUnitPrice(a) - itemUnitPrice(b));
+      list.sort((a, b) => priceWithoutMaterials(a) - priceWithoutMaterials(b));
       result.push(...list.map((item) => ({ value: String(item.id), label: item.name, group: cfg?.label ?? fmtCategoryLabel(category), groupColor: cfg?.headerColor })));
     }
     return result;
@@ -398,7 +418,7 @@ function NewOrder() {
     setOpen(false); setStep("select"); setLines([{ item_id: "", qty: "1" }]); setNotes(""); setResponsavel(""); setPaymentMode("money_only");
   }
   function updateLine(index: number, patch: Partial<OrderLineInput>) { setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line))); }
-  const canReview = validLines.length > 0 && Boolean(responsavel) && !sim.isLoading;
+  const canReview = validLines.length > 0 && Boolean(responsavel) && !sim.isLoading && !sim.isError && finalTotal > 0;
 
   return (
     <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : handleClose())}>
@@ -411,6 +431,7 @@ function NewOrder() {
               {lines.map((line, index) => <div key={index} className="grid grid-cols-[1fr_100px_auto] gap-2"><SearchableSelect value={line.item_id} onChange={(value) => updateLine(index, { item_id: value })} options={options} placeholder="Material" searchPlaceholder="Procurar item..." emptyText="Nenhum material encontrado." /><Input type="number" min={1} value={line.qty} onChange={(event) => updateLine(index, { qty: event.target.value })} /><Button size="sm" variant="ghost" onClick={() => setLines((current) => current.filter((_, i) => i !== index))} disabled={lines.length === 1}><Trash2 className="h-4 w-4" /></Button></div>)}
               <Button size="sm" variant="outline" onClick={() => setLines((current) => [...current, { item_id: "", qty: "1" }])}><Plus className="mr-1 h-4 w-4" /> Mais uma linha</Button>
               {validLines.length > 0 && !sim.isLoading && <PaymentModePicker hasMaterialQuote={hasMaterialQuote} paymentMode={paymentMode} setPaymentMode={setPaymentMode} />}
+              {validLines.length > 0 && sim.isError && <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">Não foi possível calcular a encomenda. Confirma receitas/preços na Gestão de Materiais.</div>}
               <div><label className="mb-1 block text-xs text-muted-foreground">Responsável</label><Select value={responsavel} onValueChange={setResponsavel}><SelectTrigger><SelectValue placeholder="Seleciona quem gere isto" /></SelectTrigger><SelectContent>{(managers.data ?? []).map((manager) => <SelectItem key={manager.id} value={String(manager.id)}>{manager.display_name ?? manager.nick ?? `Membro #${manager.id}`}</SelectItem>)}</SelectContent></Select></div>
               <div><label className="text-xs text-muted-foreground">Notas (opcional)</label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} placeholder="Notas" /></div>
             </div>
@@ -419,9 +440,9 @@ function NewOrder() {
         ) : (
           <>
             <div className="grid max-h-[60vh] gap-3 overflow-y-auto pr-1">
-              <div className={cn("flex items-center gap-2 rounded-sm border p-2 text-xs", effectivePaymentMode === "money_only" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-blue-500/30 bg-blue-500/10 text-blue-400")}>{effectivePaymentMode === "money_only" ? <Banknote className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}<span className="font-medium">{effectivePaymentMode === "money_only" ? "Só dinheiro (sem materiais)" : "Materiais + dinheiro"}</span></div>
-              <div><div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Itens</div><ul className="space-y-0.5 text-sm">{validLines.map((line, index) => { const item = itemsById.get(line.item_id); const qty = lineQuantity(line); return <li key={index} className="interactive-row flex items-center justify-between"><span className="font-medium">{qty}× {item?.name ?? "—"}</span><span className="font-mono text-xs text-muted-foreground">{fmtPrice(itemUnitPrice(item) * qty)}</span></li>; })}</ul></div>
-              <div className="rounded-sm border border-border bg-muted/30 p-3"><div className="flex items-center justify-between text-sm font-semibold"><span>Total a pagar:</span><span className="font-mono">{fmtPrice(Math.round(finalTotal))}</span></div>{effectivePaymentMode === "money_only" && hasMaterialQuote && <div className="mt-1 space-y-0.5 text-[10px] text-muted-foreground"><div className="flex justify-between"><span>Base:</span><span className="font-mono">{fmtPrice(Math.round(baseTotal))}</span></div><div className="flex justify-between"><span>Material:</span><span className="font-mono">{fmtPrice(materialCost)}</span></div><div className="flex justify-between"><span>Taxa (20%):</span><span className="font-mono">{fmtPrice(moneyOnlyMarkup)}</span></div></div>}</div>
+              <div className={cn("flex items-center gap-2 rounded-sm border p-2 text-xs", effectivePaymentMode === "money_only" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-blue-500/30 bg-blue-500/10 text-blue-400")}>{effectivePaymentMode === "money_only" ? <Banknote className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}<span className="font-medium">{effectivePaymentMode === "money_only" ? "Só dinheiro" : "Materiais + dinheiro"}</span></div>
+              <div><div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Itens</div><ul className="space-y-0.5 text-sm">{validLines.map((line, index) => { const item = itemsById.get(line.item_id); const qty = lineQuantity(line); const unit = itemUnitPrice(item, effectivePaymentMode); return <li key={index} className="interactive-row flex items-center justify-between"><span className="font-medium">{qty}× {item?.name ?? "—"}</span><span className="font-mono text-xs text-muted-foreground">{fmtPrice(unit * qty)}</span></li>; })}</ul></div>
+              <div className="rounded-sm border border-border bg-muted/30 p-3"><div className="flex items-center justify-between text-sm font-semibold"><span>Total a pagar:</span><span className="font-mono">{fmtPrice(Math.round(finalTotal))}</span></div>{effectivePaymentMode === "money_only" && hasMaterialQuote && <div className="mt-1 text-[10px] text-muted-foreground">A ser usado o preço sem materiais definido na Gestão de Materiais.</div>}</div>
               {effectivePaymentMode === "materials_money" && hasMaterialQuote && <div><div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Materiais a entregar</div><ul className="space-y-0.5 text-xs">{(sim.data?.ingredients ?? []).map((ingredient) => <li key={ingredient.name} className="interactive-row flex items-center justify-between"><span>{ingredient.name}</span><span className="font-mono text-muted-foreground">{fmtNum(ingredient.needed)}</span></li>)}</ul></div>}
               {!hasMaterialQuote && <div className="rounded-sm border border-amber-500/20 bg-amber-500/5 p-2 text-xs text-muted-foreground">Esta encomenda não requer materiais. Vais pagar apenas o preço definido do artigo.</div>}
               <div className="space-y-1 text-xs text-muted-foreground"><div className="flex justify-between"><span>Responsável:</span><span className="font-medium text-foreground">{selectedManager?.display_name ?? selectedManager?.nick ?? "—"}</span></div>{notes && <div className="flex justify-between gap-3"><span>Notas:</span><span className="text-right italic">&quot;{notes}&quot;</span></div>}</div>
@@ -439,6 +460,6 @@ function PaymentModePicker({ hasMaterialQuote, paymentMode, setPaymentMode }: { 
     return <div><label className="mb-1 block text-xs text-muted-foreground">Modo de encomenda</label><div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400"><div className="flex items-center gap-2 font-semibold"><Banknote className="h-4 w-4" /> Só dinheiro</div><p className="mt-1 text-[10px] text-muted-foreground">Os artigos selecionados não têm receita/material associado, por isso não existe opção de entregar materiais.</p></div></div>;
   }
   return (
-    <div><label className="mb-1 block text-xs text-muted-foreground">Modo de encomenda</label><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setPaymentMode("materials_money")} className={cn("rounded-lg border p-3 text-left transition-colors", paymentMode === "materials_money" ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:bg-muted/50")}><Package className={cn("mb-1.5 h-5 w-5", paymentMode === "materials_money" ? "text-primary" : "text-muted-foreground")} /><div className={cn("text-xs font-semibold", paymentMode === "materials_money" ? "text-primary" : "text-foreground")}>Com materiais</div><div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">Entrego materiais necessários + dinheiro</div></button><button type="button" onClick={() => setPaymentMode("money_only")} className={cn("rounded-lg border p-3 text-left transition-colors", paymentMode === "money_only" ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:bg-muted/50")}><Banknote className={cn("mb-1.5 h-5 w-5", paymentMode === "money_only" ? "text-primary" : "text-muted-foreground")} /><div className={cn("text-xs font-semibold", paymentMode === "money_only" ? "text-primary" : "text-foreground")}>Sem materiais</div><div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">Pago material em dinheiro + taxa</div></button></div></div>
+    <div><label className="mb-1 block text-xs text-muted-foreground">Modo de encomenda</label><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setPaymentMode("materials_money")} className={cn("rounded-lg border p-3 text-left transition-colors", paymentMode === "materials_money" ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:bg-muted/50")}><Package className={cn("mb-1.5 h-5 w-5", paymentMode === "materials_money" ? "text-primary" : "text-muted-foreground")} /><div className={cn("text-xs font-semibold", paymentMode === "materials_money" ? "text-primary" : "text-foreground")}>Com materiais</div><div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">Entrego a receita definida + pago o preço com material</div></button><button type="button" onClick={() => setPaymentMode("money_only")} className={cn("rounded-lg border p-3 text-left transition-colors", paymentMode === "money_only" ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:bg-muted/50")}><Banknote className={cn("mb-1.5 h-5 w-5", paymentMode === "money_only" ? "text-primary" : "text-muted-foreground")} /><div className={cn("text-xs font-semibold", paymentMode === "money_only" ? "text-primary" : "text-foreground")}>Sem materiais</div><div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">Pago o preço sem materiais definido</div></button></div></div>
   );
 }
