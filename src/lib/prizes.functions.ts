@@ -42,6 +42,10 @@ export const listPrizes = createServerFn({ method: "GET" })
 const PRIZE_TYPES = ["Casa", "Arma", "Carro", "Dinheiro", "Outro"] as const;
 export type PrizeType = (typeof PRIZE_TYPES)[number];
 
+function assertCanManagePrizes(me: { can_manage_prizes?: boolean } | null) {
+  if (!me?.can_manage_prizes) throw new Error("Sem permissão — apenas Chefia/Sub-Chefia pode editar prémios.");
+}
+
 export const setPrize = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -63,10 +67,9 @@ export const setPrize = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.is_manager) throw new Error("Sem permissão");
+    assertCanManagePrizes(me);
     const isDelivered = data.status === "entregue";
 
-    // Fetch winner info before updating
     const prizeRow = await pgOne<{
       week_start: string;
       winner_member_id: number | null;
@@ -98,7 +101,6 @@ export const setPrize = createServerFn({ method: "POST" })
       ],
     );
 
-    // Notify bot to DM winner
     if (prizeRow?.winner_member_id) {
       const memberRow = await pgOne<{ discord_id: string | null }>(
         `select discord_id from members where id = $1 and deleted_at is null`,
@@ -119,12 +121,10 @@ export const setPrize = createServerFn({ method: "POST" })
     await logAdminAction(context.supabase, {
       action: isDelivered ? "prize_delivered" : "prize_set",
       actorId: context.userId,
-      actorName: me.display_name ?? "Direção",
+      actorName: me?.display_name ?? "Direção",
       targetType: "prize",
       targetId: data.id,
-      details: isDelivered
-        ? `Prémio #${data.id} marcado como entregue`
-        : `Prémio #${data.id} definido: ${data.prize_type ?? "?"}`,
+      details: isDelivered ? `Prémio #${data.id} marcado como entregue` : `Prémio #${data.id} definido: ${data.prize_type ?? "?"}`,
       afterState: { prize_type: data.prize_type, status: data.status },
     });
     return { ok: true };
@@ -134,8 +134,7 @@ export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.is_manager) throw new Error("Sem permissão");
-    // Take the most recent week_start in weekly_rankings; pick the top hybrid_score.
+    assertCanManagePrizes(me);
     const top = await pgOne<{
       member_id: number;
       week_start: string;
@@ -160,18 +159,12 @@ export const generatePrizeForCurrentWeek = createServerFn({ method: "POST" })
          (week_start, week_end, winner_member_id, hybrid_score, prize_status, defined_by, defined_at, created_at, updated_at)
        values ($1, $2, $3, $4, 'por_definir', $5, now(), now(), now())
        returning id`,
-      [
-        top.week_start,
-        top.week_end,
-        top.member_id,
-        top.score,
-        `web:${context.userId}`,
-      ],
+      [top.week_start, top.week_end, top.member_id, top.score, `web:${context.userId}`],
     );
     await logAdminAction(context.supabase, {
       action: "prize_set",
       actorId: context.userId,
-      actorName: me.display_name ?? "Direção",
+      actorName: me?.display_name ?? "Direção",
       targetType: "prize",
       targetId: row?.id ?? 0,
       details: `Prémio gerado para semana ${top.week_start} (vencedor: ${top.member_id})`,
