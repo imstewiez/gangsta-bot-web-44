@@ -3,7 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveCurrentMember } from "./pricing.server";
 import { logger } from "./logger.server";
 import { pgQuery } from "./pg.server";
-import { getAllItems } from "./config.loader";
 import { resolveItemPrices } from "./pricing.resolver";
 import { getSurchargesForItems } from "./tier-pricing.functions";
 
@@ -51,6 +50,11 @@ type MergedRecipe = {
   output_name: string;
   inputs: Array<{ item_id: number; name: string; quantity: number; category: string | null; subcategory: string | null }>;
 };
+
+function internalCost(value: number | null | undefined): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 
 async function getDbItemsByIds(ids: number[]): Promise<Map<number, DbPriceRow>> {
   const unique = Array.from(new Set(ids.filter((id) => Number.isFinite(id) && id > 0)));
@@ -164,29 +168,26 @@ export const listRecipes = createServerFn({ method: "GET" })
       const output = dbItems.get(recipe.output_item_id);
       if (!output) continue;
       const outPrices = resolveItemPrices(output, null, me?.tier ?? null, surchargeMap.get(output.id) ?? null);
+      const officialCost = internalCost(outPrices.estimated_value);
       const ingredients: RecipeRow["ingredients"] = [];
-      let total_cost = 0;
 
       for (const input of recipe.inputs) {
         const ingDb = dbItems.get(input.item_id);
         if (!ingDb) continue;
-        const ingPrices = resolveItemPrices(ingDb, null);
-        const unit_cost = ingPrices.morador_purchase_price ?? ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
-        const line_cost = input.quantity * unit_cost;
+        const ingredientCost = internalCost(ingDb.estimated_value);
         ingredients.push({
           item_id: input.item_id,
           name: input.name,
           quantity: input.quantity,
-          unit_cost,
-          line_cost,
+          unit_cost: ingredientCost,
+          line_cost: input.quantity * ingredientCost,
           category: input.category,
           subcategory: input.subcategory,
         });
-        total_cost += line_cost;
       }
 
       const salePrice = outPrices.tier_price ?? outPrices.min_sale_price ?? outPrices.purchase_price ?? 0;
-      const margin = salePrice - total_cost;
+      const margin = salePrice - officialCost;
       result.push({
         recipe_id: recipe.output_item_id,
         item_id: recipe.output_item_id,
@@ -196,12 +197,12 @@ export const listRecipes = createServerFn({ method: "GET" })
         tier: null,
         unit: "unidade",
         ingredients,
-        total_cost,
-        estimated_value: outPrices.estimated_value ?? 0,
+        total_cost: officialCost,
+        estimated_value: officialCost,
         min_sale_price: outPrices.min_sale_price,
         tier_price: outPrices.tier_price,
         margin: isManager ? margin : 0,
-        margin_pct: isManager && total_cost > 0 ? (margin / total_cost) * 100 : null,
+        margin_pct: isManager && officialCost > 0 ? (margin / officialCost) * 100 : null,
         recipe_category: output.category,
         db_recipe_id: recipe.output_item_id,
       });
@@ -247,9 +248,8 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     for (const input of recipe.inputs) {
       const ingDb = dbItems.get(input.item_id);
       if (!ingDb) continue;
-      const ingPrices = resolveItemPrices(ingDb, null);
+      const unitCost = internalCost(ingDb.estimated_value);
       const needed = input.quantity * data.quantity;
-      const unitCost = ingPrices.morador_purchase_price ?? ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
       ingredients.push({
         name: input.name,
         needed,
@@ -263,7 +263,7 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
       recipe_id: data.recipe_id,
       item_name: recipe.output_name,
       requested_qty: data.quantity,
-      dirty_money: (headPrices.estimated_value ?? 0) * data.quantity,
+      dirty_money: internalCost(headPrices.estimated_value) * data.quantity,
       min_sale_price: headPrices.min_sale_price,
       tier_price: headPrices.tier_price,
       ingredients,
@@ -311,16 +311,16 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         if (!recipe) continue;
         items.push({ item_name: item.name, requested_qty: line.quantity });
         const itemPrices = resolveItemPrices(item, null);
-        dirty_money += (itemPrices.estimated_value ?? 0) * line.quantity;
+        const configuredCost = internalCost(itemPrices.estimated_value) * line.quantity;
+        dirty_money += configuredCost;
+        full_material_cost += configuredCost;
 
         for (const input of recipe.inputs) {
           const ingDb = ingredientItems.get(input.item_id);
           if (!ingDb) continue;
-          const ingPrices = resolveItemPrices(ingDb, null);
+          const unitCost = internalCost(ingDb.estimated_value);
           const needed = input.quantity * line.quantity;
-          const unitCost = ingPrices.morador_purchase_price ?? ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0;
           const lineCost = needed * unitCost;
-          full_material_cost += lineCost;
           const existing = allIngredients.get(input.name);
           if (existing) {
             existing.needed += needed;
