@@ -1,22 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne, pgQuery } from "./pg.server";
-import { resolveCurrentMember } from "./pricing.server";
-import { getAllItems, getAllRecipes } from "./config.loader";
+import { resolveActualMember, resolveCurrentMember } from "./pricing.server";
 
 export type DataQualitySeverity = "critical" | "high" | "medium" | "low";
-export type DataQualityArea =
-  | "membros"
-  | "perfis"
-  | "encomendas"
-  | "entregas"
-  | "saidas"
-  | "inventario"
-  | "precos"
-  | "receitas"
-  | "premios"
-  | "notificacoes"
-  | "sistema";
+export type DataQualityArea = "membros" | "perfis" | "encomendas" | "entregas" | "saidas" | "inventario" | "precos" | "receitas" | "premios" | "notificacoes" | "sistema";
 
 export type DataQualityCheck = {
   id: string;
@@ -28,25 +16,46 @@ export type DataQualityCheck = {
   summary: string;
   examples: string[];
   recommendation: string;
+  repair_action?: "repair_delivery_lines";
 };
 
 export type DataQualityReport = {
   generated_at: string;
-  summary: {
-    total_checks: number;
-    total_issues: number;
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
+  summary: { total_checks: number; total_issues: number; critical: number; high: number; medium: number; low: number };
   checks: DataQualityCheck[];
 };
 
 type CountRow = { count: number };
 type ExampleRow = { label: string | null };
 
+type DeliveryLineRaw = Record<string, unknown>;
+type DeliveryLine = { item_id: number; item_name: string; qty: number; unit_value: number };
+
+type RepairResult = { ok: true; scanned: number; repaired: number; rejected: number; dropped_lines: number };
+
 const ACTIVE_MEMBER_EXPR = `coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`;
+const ACTIVE_ITEM_EXPR = `coalesce(active, true) = true and deleted_at is null`;
+const NORMALIZED_SQL = (field: string) => `translate(lower(coalesce(${field}, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')`;
+
+const DELIVERY_LINE_PARSE_SQL = `
+  with raw as (
+    select r.id, r.created_at, r.status, r.tipo, line
+    from inventory_delivery_requests r
+    cross join lateral jsonb_array_elements(case when jsonb_typeof(r.lines) = 'array' then r.lines else '[]'::jsonb end) line
+    where r.status = 'pending'
+  ), parsed as (
+    select *,
+      coalesce(line->>'item_id', line->>'itemId') as raw_item_id,
+      coalesce(line->>'qty', line->>'quantity', line->>'amount') as raw_qty,
+      coalesce(line->>'item_name', line->>'itemName') as raw_item_name
+    from raw
+  ), resolved as (
+    select p.*, coalesce(by_id.id, by_name.id) as resolved_item_id
+    from parsed p
+    left join items by_id on p.raw_item_id ~ '^\\d+$' and by_id.id = p.raw_item_id::int and ${ACTIVE_ITEM_EXPR.replaceAll("deleted_at", "by_id.deleted_at").replaceAll("active", "by_id.active")}
+    left join items by_name on by_id.id is null and ${NORMALIZED_SQL("by_name.name")} = ${NORMALIZED_SQL("p.raw_item_name")} and ${ACTIVE_ITEM_EXPR.replaceAll("deleted_at", "by_name.deleted_at").replaceAll("active", "by_name.active")}
+  )
+`;
 
 async function runCheck(args: {
   id: string;
@@ -57,6 +66,7 @@ async function runCheck(args: {
   examplesSql: string;
   summary: (count: number) => string;
   recommendation: string;
+  repair_action?: DataQualityCheck["repair_action"];
 }): Promise<DataQualityCheck> {
   try {
     const countRow = await pgOne<CountRow>(args.countSql);
@@ -72,6 +82,7 @@ async function runCheck(args: {
       summary: args.summary(count),
       examples: examples.map((r) => String(r.label ?? "—")).filter(Boolean),
       recommendation: args.recommendation,
+      repair_action: args.repair_action,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -100,71 +111,112 @@ function buildSummary(checks: DataQualityCheck[]): DataQualityReport["summary"] 
   };
 }
 
-async function configDriftChecks(): Promise<DataQualityCheck[]> {
-  const configItems = getAllItems();
-  const configRecipes = getAllRecipes();
-  const dbItems = await pgQuery<{ id: number; name: string; active: boolean; deleted_at: string | null }>(
-    `select id, name, coalesce(active, true) as active, deleted_at from items`,
-  );
-  const activeNames = new Set(dbItems.filter((i) => i.active !== false && !i.deleted_at).map((i) => i.name));
-  const configNames = new Set(Object.values(configItems).map((i) => i.name));
-
-  const missingInDb = Object.values(configItems).map((i) => i.name).filter((name) => !activeNames.has(name));
-  const dbNotInConfig = dbItems
-    .filter((i) => i.active !== false && !i.deleted_at && !configNames.has(i.name))
-    .map((i) => `#${i.id} · ${i.name}`);
-
-  const badRecipes: string[] = [];
-  for (const [recipeId, recipe] of Object.entries(configRecipes)) {
-    if (!configItems[recipe.output]) badRecipes.push(`${recipeId}: output inexistente (${recipe.output})`);
-    for (const [ingredientId, qty] of Object.entries(recipe.inputs)) {
-      if (!configItems[ingredientId]) badRecipes.push(`${recipeId}: ingrediente inexistente (${ingredientId})`);
-      if (!Number.isFinite(Number(qty)) || Number(qty) <= 0) badRecipes.push(`${recipeId}: quantidade inválida em ${ingredientId}`);
-    }
-  }
-
-  return [
-    {
-      id: "config_items_missing_in_db",
-      area: "precos",
-      severity: "high",
-      title: "Itens do config ausentes/inativos na base de dados",
-      count: missingInDb.length,
-      ok: missingInDb.length === 0,
-      summary: missingInDb.length === 0 ? "Todos os itens do config têm correspondência ativa na DB." : `${missingInDb.length} item(ns) do config não aparecem ativos na DB.`,
-      examples: missingInDb.slice(0, 10),
-      recommendation: "Sincronizar/reativar itens canónicos ou migrar de vez esses itens para gestão DB.",
-    },
-    {
-      id: "db_items_not_in_config",
-      area: "precos",
-      severity: "low",
-      title: "Itens ativos na DB fora do config",
-      count: dbNotInConfig.length,
-      ok: true,
-      summary: dbNotInConfig.length === 0 ? "Não há itens ativos fora do config." : `${dbNotInConfig.length} item(ns) ativo(s) existem só na DB — isto é aceitável se foram criados no admin.`,
-      examples: dbNotInConfig.slice(0, 10),
-      recommendation: "Manter se forem materiais criados pelo admin; desativar apenas itens obsoletos.",
-    },
-    {
-      id: "config_recipe_integrity",
-      area: "receitas",
-      severity: "critical",
-      title: "Receitas do config com referências inválidas",
-      count: badRecipes.length,
-      ok: badRecipes.length === 0,
-      summary: badRecipes.length === 0 ? "Receitas do config estão consistentes." : `${badRecipes.length} problema(s) encontrado(s) nas receitas do config.`,
-      examples: badRecipes.slice(0, 10),
-      recommendation: "Corrigir config.json antes de expor receitas/preços derivados.",
-    },
-  ];
+function normalizeText(value: unknown): string {
+  return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
+
+function positive(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function money(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function isObject(value: unknown): value is DeliveryLineRaw {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+async function assertReportAccess(context: any) {
+  const me = await resolveCurrentMember(context.supabase, context.userId);
+  if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+  return me;
+}
+
+async function assertRepairAccess(context: any) {
+  const me = await resolveActualMember(context.supabase, context.userId);
+  if (!me?.is_superadmin) throw new Error("Acesso restrito ao Superadmin.");
+  return me;
+}
+
+export const repairDeliveryLines = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<RepairResult> => {
+    await assertRepairAccess(context);
+
+    const requests = await pgQuery<{ id: string; tipo: string | null; lines: unknown }>(
+      `select id, tipo, lines
+       from inventory_delivery_requests
+       where status = 'pending'
+         and lines is not null`,
+    );
+    const items = await pgQuery<{ id: number; name: string; side: string | null; purchase_price: number | null; morador_purchase_price: number | null; min_sale_price: number | null }>(
+      `select id, name, side,
+              purchase_price::float as purchase_price,
+              morador_purchase_price::float as morador_purchase_price,
+              min_sale_price::float as min_sale_price
+       from items
+       where ${ACTIVE_ITEM_EXPR}`,
+    );
+
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const byName = new Map(items.map((item) => [normalizeText(item.name), item]));
+    let repaired = 0;
+    let rejected = 0;
+    let droppedLines = 0;
+
+    for (const request of requests) {
+      const rawLines = Array.isArray(request.lines) ? request.lines.filter(isObject) : [];
+      if (rawLines.length === 0) continue;
+      const tipo = request.tipo === "venda" ? "venda" : "entrega";
+      const normalized: DeliveryLine[] = [];
+
+      for (const raw of rawLines) {
+        const rawId = positive(raw.item_id ?? raw.itemId);
+        const rawName = raw.item_name ?? raw.itemName;
+        const item = (rawId ? byId.get(rawId) : undefined) ?? (rawName ? byName.get(normalizeText(rawName)) : undefined);
+        const qty = positive(raw.qty ?? raw.quantity ?? raw.amount);
+        if (!item || !qty) {
+          droppedLines += 1;
+          continue;
+        }
+        const explicitUnit = money(raw.unit_value ?? raw.unitValue ?? raw.unitPrice ?? raw.effectivePrice ?? raw.basePrice);
+        const lineValue = money(raw.lineValue);
+        const unit = tipo === "entrega" ? 0 : (explicitUnit ?? (lineValue != null ? lineValue / qty : null) ?? item.morador_purchase_price ?? item.purchase_price ?? item.min_sale_price ?? 0);
+        normalized.push({ item_id: item.id, item_name: item.name, qty, unit_value: unit });
+      }
+
+      if (normalized.length === 0) {
+        await pgQuery(
+          `update inventory_delivery_requests
+           set status = 'rejected', decision_reason = 'Reparação automática: pedido sem linhas válidas', decided_at = now(), updated_at = now(), lines = '[]'::jsonb, total_qty = 0, total_value = 0
+           where id = $1 and status = 'pending'`,
+          [request.id],
+        );
+        rejected += 1;
+        continue;
+      }
+
+      const totalQty = normalized.reduce((sum, line) => sum + line.qty, 0);
+      const totalValue = tipo === "entrega" ? 0 : normalized.reduce((sum, line) => sum + line.qty * line.unit_value, 0);
+      await pgQuery(
+        `update inventory_delivery_requests
+         set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now()
+         where id = $1 and status = 'pending'`,
+        [request.id, JSON.stringify(normalized), totalQty, totalValue],
+      );
+      repaired += 1;
+    }
+
+    return { ok: true, scanned: requests.length, repaired, rejected, dropped_lines: droppedLines };
+  });
 
 export const getDataQualityReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<DataQualityReport> => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+    await assertReportAccess(context);
     const checks: DataQualityCheck[] = [];
 
     checks.push(await runCheck({
@@ -282,46 +334,43 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       id: "deliveries_broken_lines",
       area: "entregas",
       severity: "critical",
-      title: "Entregas com linhas inválidas ou itens inexistentes",
-      countSql: `select count(*)::int as count
-        from inventory_delivery_requests r
-        cross join lateral jsonb_array_elements(coalesce(r.lines, '[]'::jsonb)) line
-        left join items i on (line->>'item_id') ~ '^\\d+$' and i.id = (line->>'item_id')::int
-        where not ((line->>'item_id') ~ '^\\d+$')
-           or not ((line->>'qty') ~ '^\\d+(\\.\\d+)?$')
-           or case when (line->>'qty') ~ '^\\d+(\\.\\d+)?$' then (line->>'qty')::numeric <= 0 else true end
-           or i.id is null`,
-      examplesSql: `select ('#' || r.id::text || ' · linha=' || line::text) as label
-        from inventory_delivery_requests r
-        cross join lateral jsonb_array_elements(coalesce(r.lines, '[]'::jsonb)) line
-        left join items i on (line->>'item_id') ~ '^\\d+$' and i.id = (line->>'item_id')::int
-        where not ((line->>'item_id') ~ '^\\d+$')
-           or not ((line->>'qty') ~ '^\\d+(\\.\\d+)?$')
-           or case when (line->>'qty') ~ '^\\d+(\\.\\d+)?$' then (line->>'qty')::numeric <= 0 else true end
-           or i.id is null
-        order by r.created_at desc limit 10`,
-      summary: (count) => count === 0 ? "Linhas das entregas estão válidas." : `${count} linha(s) de entrega inválida(s).`,
-      recommendation: "Corrigir linhas antes de aprovar para evitar movimentos de stock errados.",
+      title: "Entregas pendentes com linhas inválidas ou itens inexistentes",
+      countSql: `${DELIVERY_LINE_PARSE_SQL}
+        select count(*)::int as count
+        from resolved
+        where not (raw_qty ~ '^\\d+(\\.\\d+)?$')
+           or raw_qty::numeric <= 0
+           or resolved_item_id is null`,
+      examplesSql: `${DELIVERY_LINE_PARSE_SQL}
+        select ('#' || id::text || ' · linha=' || line::text) as label
+        from resolved
+        where not (raw_qty ~ '^\\d+(\\.\\d+)?$')
+           or raw_qty::numeric <= 0
+           or resolved_item_id is null
+        order by created_at desc limit 10`,
+      summary: (count) => count === 0 ? "Entregas pendentes têm linhas válidas." : `${count} linha(s) pendente(s) inválida(s).`,
+      recommendation: "Usar Reparar para normalizar linhas legacy por nome/ID e rejeitar pedidos sem linhas válidas.",
+      repair_action: "repair_delivery_lines",
     }));
 
     checks.push(await runCheck({
       id: "deliveries_orphan_requester",
       area: "entregas",
       severity: "high",
-      title: "Entregas com requerente/responsável inexistente",
+      title: "Entregas pendentes com requerente/responsável inexistente",
       countSql: `select count(*)::int as count
         from inventory_delivery_requests r
         left join members requester on requester.id = r.requester_member_id
         left join members resp on resp.id = r.responsavel_member_id
-        where requester.id is null or (r.responsavel_member_id is not null and resp.id is null)`,
+        where r.status = 'pending' and (requester.id is null or r.responsavel_member_id is null or resp.id is null)`,
       examplesSql: `select ('#' || r.id::text || ' · requester=' || coalesce(r.requester_member_id::text, '—') || ' · resp=' || coalesce(r.responsavel_member_id::text, '—')) as label
         from inventory_delivery_requests r
         left join members requester on requester.id = r.requester_member_id
         left join members resp on resp.id = r.responsavel_member_id
-        where requester.id is null or (r.responsavel_member_id is not null and resp.id is null)
+        where r.status = 'pending' and (requester.id is null or r.responsavel_member_id is null or resp.id is null)
         order by r.created_at desc limit 10`,
-      summary: (count) => count === 0 ? "Entregas têm membros associados válidos." : `${count} entrega(s) têm membro inexistente.`,
-      recommendation: "Corrigir requester/responsável para não perder histórico de pontos e autorização.",
+      summary: (count) => count === 0 ? "Entregas pendentes têm membros associados válidos." : `${count} entrega(s) pendente(s) com membro/responsável inválido.`,
+      recommendation: "Rejeitar/atribuir responsável antes de conferir a entrega.",
     }));
 
     checks.push(await runCheck({
@@ -374,17 +423,17 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       severity: "high",
       title: "Itens ativos com side/preços inválidos",
       countSql: `select count(*)::int as count from items
-        where coalesce(active, true) = true and deleted_at is null and (
+        where ${ACTIVE_ITEM_EXPR} and (
           coalesce(side, '') not in ('venda','compra','ambos')
-          or (side in ('venda','ambos') and coalesce(min_sale_price, estimated_value, purchase_price, 0) <= 0)
-          or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, estimated_value, 0) <= 0)
+          or (side in ('venda','ambos') and coalesce(min_sale_price, purchase_price, 0) <= 0)
+          or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, 0) <= 0)
         )`,
       examplesSql: `select ('#' || id::text || ' · ' || name || ' · side=' || coalesce(side, '—') || ' · compra=' || coalesce(purchase_price::text, '—') || ' · venda=' || coalesce(min_sale_price::text, '—')) as label
         from items
-        where coalesce(active, true) = true and deleted_at is null and (
+        where ${ACTIVE_ITEM_EXPR} and (
           coalesce(side, '') not in ('venda','compra','ambos')
-          or (side in ('venda','ambos') and coalesce(min_sale_price, estimated_value, purchase_price, 0) <= 0)
-          or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, estimated_value, 0) <= 0)
+          or (side in ('venda','ambos') and coalesce(min_sale_price, purchase_price, 0) <= 0)
+          or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, 0) <= 0)
         )
         order by category, name limit 10`,
       summary: (count) => count === 0 ? "Itens ativos têm side/preços mínimos coerentes." : `${count} item(ns) ativo(s) com side ou preço inválido.`,
@@ -454,33 +503,16 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       id: "required_stored_procedures",
       area: "sistema",
       severity: "critical",
-      title: "Stored procedures obrigatórias ausentes",
-      countSql: `select count(*)::int as count from unnest(array['sp_approve_delivery','sp_transition_order','sp_cancel_orders','sp_adjust_stock','sp_create_operation_with_participants','sp_liquidate_saida']) proc(name)
+      title: "Stored procedures operacionais ausentes",
+      countSql: `select count(*)::int as count from unnest(array['sp_approve_delivery','sp_adjust_stock','sp_create_operation_with_participants','sp_liquidate_saida']) proc(name)
         where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = proc.name)`,
-      examplesSql: `select proc.name as label from unnest(array['sp_approve_delivery','sp_transition_order','sp_cancel_orders','sp_adjust_stock','sp_create_operation_with_participants','sp_liquidate_saida']) proc(name)
+      examplesSql: `select proc.name as label from unnest(array['sp_approve_delivery','sp_adjust_stock','sp_create_operation_with_participants','sp_liquidate_saida']) proc(name)
         where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = proc.name)`,
-      summary: (count) => count === 0 ? "Stored procedures críticas existem na DB." : `${count} stored procedure(s) crítica(s) em falta na DB.`,
-      recommendation: "Aplicar migrations SQL no Supabase antes de usar entregas, encomendas, stock e saídas.",
+      summary: (count) => count === 0 ? "Stored procedures ainda usadas existem na DB." : `${count} stored procedure(s) operacional/operacionais em falta na DB.`,
+      recommendation: "Aplicar migrations SQL no Supabase ou remover de vez o fluxo dependente dessas procedures.",
     }));
 
-    try {
-      checks.push(...await configDriftChecks());
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      checks.push({
-        id: "config_drift_failed",
-        area: "precos",
-        severity: "critical",
-        title: "Falha ao comparar config vs DB",
-        count: 1,
-        ok: false,
-        summary: `Não foi possível comparar config.json com a DB: ${msg}`,
-        examples: [msg],
-        recommendation: "Corrigir acesso a items/config antes de confiar no preçário e receitas.",
-      });
-    }
-
     const order: Record<DataQualitySeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-    checks.sort((a, b) => order[a.severity] - order[b.severity] || Number(a.ok) - Number(b.ok) || b.count - a.count);
+    checks.sort((a, b) => Number(a.ok) - Number(b.ok) || order[a.severity] - order[b.severity] || b.count - a.count);
     return { generated_at: new Date().toISOString(), summary: buildSummary(checks), checks };
   });
