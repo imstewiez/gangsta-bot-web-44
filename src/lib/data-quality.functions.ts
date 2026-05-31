@@ -15,7 +15,8 @@ export type DataQualityArea =
   | "precos"
   | "receitas"
   | "premios"
-  | "notificacoes";
+  | "notificacoes"
+  | "sistema";
 
 export type DataQualityCheck = {
   id: string;
@@ -45,6 +46,8 @@ export type DataQualityReport = {
 type CountRow = { count: number };
 type ExampleRow = { label: string | null };
 
+const ACTIVE_MEMBER_EXPR = `coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`;
+
 async function runCheck(args: {
   id: string;
   area: DataQualityArea;
@@ -58,10 +61,7 @@ async function runCheck(args: {
   try {
     const countRow = await pgOne<CountRow>(args.countSql);
     const count = Number(countRow?.count ?? 0);
-    const examples = count > 0
-      ? await pgQuery<ExampleRow>(args.examplesSql)
-      : [];
-
+    const examples = count > 0 ? await pgQuery<ExampleRow>(args.examplesSql) : [];
     return {
       id: args.id,
       area: args.area,
@@ -103,24 +103,20 @@ function buildSummary(checks: DataQualityCheck[]): DataQualityReport["summary"] 
 async function configDriftChecks(): Promise<DataQualityCheck[]> {
   const configItems = getAllItems();
   const configRecipes = getAllRecipes();
-  const dbItems = await pgQuery<{ id: number; name: string; active: boolean }>(
-    `select id, name, active from items`,
+  const dbItems = await pgQuery<{ id: number; name: string; active: boolean; deleted_at: string | null }>(
+    `select id, name, coalesce(active, true) as active, deleted_at from items`,
   );
-  const activeNames = new Set(dbItems.filter((i) => i.active !== false).map((i) => i.name));
+  const activeNames = new Set(dbItems.filter((i) => i.active !== false && !i.deleted_at).map((i) => i.name));
   const configNames = new Set(Object.values(configItems).map((i) => i.name));
 
-  const missingInDb = Object.values(configItems)
-    .map((i) => i.name)
-    .filter((name) => !activeNames.has(name));
+  const missingInDb = Object.values(configItems).map((i) => i.name).filter((name) => !activeNames.has(name));
   const dbNotInConfig = dbItems
-    .filter((i) => i.active !== false && !configNames.has(i.name))
+    .filter((i) => i.active !== false && !i.deleted_at && !configNames.has(i.name))
     .map((i) => `#${i.id} · ${i.name}`);
 
   const badRecipes: string[] = [];
   for (const [recipeId, recipe] of Object.entries(configRecipes)) {
-    if (!configItems[recipe.output]) {
-      badRecipes.push(`${recipeId}: output inexistente (${recipe.output})`);
-    }
+    if (!configItems[recipe.output]) badRecipes.push(`${recipeId}: output inexistente (${recipe.output})`);
     for (const [ingredientId, qty] of Object.entries(recipe.inputs)) {
       if (!configItems[ingredientId]) badRecipes.push(`${recipeId}: ingrediente inexistente (${ingredientId})`);
       if (!Number.isFinite(Number(qty)) || Number(qty) <= 0) badRecipes.push(`${recipeId}: quantidade inválida em ${ingredientId}`);
@@ -135,24 +131,20 @@ async function configDriftChecks(): Promise<DataQualityCheck[]> {
       title: "Itens do config ausentes/inativos na base de dados",
       count: missingInDb.length,
       ok: missingInDb.length === 0,
-      summary: missingInDb.length === 0
-        ? "Todos os itens do config têm correspondência ativa na DB."
-        : `${missingInDb.length} item(ns) do config não aparecem ativos na DB.`,
+      summary: missingInDb.length === 0 ? "Todos os itens do config têm correspondência ativa na DB." : `${missingInDb.length} item(ns) do config não aparecem ativos na DB.`,
       examples: missingInDb.slice(0, 10),
-      recommendation: "Executar/sincronizar seed-items e garantir que items.active=true para todos os itens canónicos.",
+      recommendation: "Sincronizar/reativar itens canónicos ou migrar de vez esses itens para gestão DB.",
     },
     {
       id: "db_items_not_in_config",
       area: "precos",
-      severity: "medium",
+      severity: "low",
       title: "Itens ativos na DB fora do config",
       count: dbNotInConfig.length,
-      ok: dbNotInConfig.length === 0,
-      summary: dbNotInConfig.length === 0
-        ? "Não há itens ativos fora do config."
-        : `${dbNotInConfig.length} item(ns) ativo(s) existem na DB sem entrada no config.`,
+      ok: true,
+      summary: dbNotInConfig.length === 0 ? "Não há itens ativos fora do config." : `${dbNotInConfig.length} item(ns) ativo(s) existem só na DB — isto é aceitável se foram criados no admin.`,
       examples: dbNotInConfig.slice(0, 10),
-      recommendation: "Decidir se estes itens são válidos. Se forem, adicionar ao config; se não forem, desativar no admin.",
+      recommendation: "Manter se forem materiais criados pelo admin; desativar apenas itens obsoletos.",
     },
     {
       id: "config_recipe_integrity",
@@ -161,9 +153,7 @@ async function configDriftChecks(): Promise<DataQualityCheck[]> {
       title: "Receitas do config com referências inválidas",
       count: badRecipes.length,
       ok: badRecipes.length === 0,
-      summary: badRecipes.length === 0
-        ? "Receitas do config estão consistentes."
-        : `${badRecipes.length} problema(s) encontrado(s) nas receitas do config.`,
+      summary: badRecipes.length === 0 ? "Receitas do config estão consistentes." : `${badRecipes.length} problema(s) encontrado(s) nas receitas do config.`,
       examples: badRecipes.slice(0, 10),
       recommendation: "Corrigir config.json antes de expor receitas/preços derivados.",
     },
@@ -175,7 +165,6 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<DataQualityReport> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
-
     const checks: DataQualityCheck[] = [];
 
     checks.push(await runCheck({
@@ -185,12 +174,12 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       title: "Membros ativos com Discord duplicado",
       countSql: `select count(*)::int as count from (
         select discord_id from members
-        where deleted_at is null and discord_id is not null and trim(discord_id) <> ''
+        where deleted_at is null and discord_id is not null and trim(discord_id) <> '' and ${ACTIVE_MEMBER_EXPR}
         group by discord_id having count(*) > 1
       ) x`,
       examplesSql: `select ('Discord ' || discord_id || ' · ' || string_agg('#' || id::text || ' ' || coalesce(display_name, username, '?'), ', ' order by id)) as label
         from members
-        where deleted_at is null and discord_id is not null and trim(discord_id) <> ''
+        where deleted_at is null and discord_id is not null and trim(discord_id) <> '' and ${ACTIVE_MEMBER_EXPR}
         group by discord_id having count(*) > 1
         limit 10`,
       summary: (count) => count === 0 ? "Sem Discord IDs duplicados em membros ativos." : `${count} Discord ID(s) duplicados em membros ativos.`,
@@ -203,13 +192,11 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       severity: "high",
       title: "Membros ativos sem nome ou Discord",
       countSql: `select count(*)::int as count from members
-        where deleted_at is null
-          and coalesce(lifecycle_state::text, 'active') in ('active','promoted')
+        where deleted_at is null and ${ACTIVE_MEMBER_EXPR}
           and (nullif(trim(coalesce(display_name, '')), '') is null or nullif(trim(coalesce(discord_id, '')), '') is null)`,
       examplesSql: `select ('#' || id::text || ' · ' || coalesce(display_name, username, 'sem nome') || ' · discord=' || coalesce(discord_id, '—')) as label
         from members
-        where deleted_at is null
-          and coalesce(lifecycle_state::text, 'active') in ('active','promoted')
+        where deleted_at is null and ${ACTIVE_MEMBER_EXPR}
           and (nullif(trim(coalesce(display_name, '')), '') is null or nullif(trim(coalesce(discord_id, '')), '') is null)
         order by id desc limit 10`,
       summary: (count) => count === 0 ? "Todos os membros ativos têm identidade mínima." : `${count} membro(s) ativo(s) sem nome ou Discord.`,
@@ -224,11 +211,11 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       countSql: `select count(*)::int as count
         from profiles p
         where p.discord_id is not null
-          and not exists (select 1 from members m where m.discord_id = p.discord_id and m.deleted_at is null)`,
+          and not exists (select 1 from members m where m.discord_id = p.discord_id and m.deleted_at is null and ${ACTIVE_MEMBER_EXPR})`,
       examplesSql: `select (coalesce(p.display_name, p.user_id::text) || ' · discord=' || coalesce(p.discord_id, '—')) as label
         from profiles p
         where p.discord_id is not null
-          and not exists (select 1 from members m where m.discord_id = p.discord_id and m.deleted_at is null)
+          and not exists (select 1 from members m where m.discord_id = p.discord_id and m.deleted_at is null and ${ACTIVE_MEMBER_EXPR})
         order by p.created_at desc limit 10`,
       summary: (count) => count === 0 ? "Todos os perfis Discord têm membro ativo associado." : `${count} perfil/perfis OAuth sem membro ativo associado.`,
       recommendation: "Sincronizar membros do Discord ou criar membro manualmente; caso contrário o utilizador autentica mas não recebe permissões/dados.",
@@ -298,17 +285,19 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       title: "Entregas com linhas inválidas ou itens inexistentes",
       countSql: `select count(*)::int as count
         from inventory_delivery_requests r
-        cross join lateral jsonb_array_elements(r.lines) line
+        cross join lateral jsonb_array_elements(coalesce(r.lines, '[]'::jsonb)) line
         left join items i on (line->>'item_id') ~ '^\\d+$' and i.id = (line->>'item_id')::int
         where not ((line->>'item_id') ~ '^\\d+$')
-           or coalesce((line->>'qty')::numeric, 0) <= 0
+           or not ((line->>'qty') ~ '^\\d+(\\.\\d+)?$')
+           or case when (line->>'qty') ~ '^\\d+(\\.\\d+)?$' then (line->>'qty')::numeric <= 0 else true end
            or i.id is null`,
       examplesSql: `select ('#' || r.id::text || ' · linha=' || line::text) as label
         from inventory_delivery_requests r
-        cross join lateral jsonb_array_elements(r.lines) line
+        cross join lateral jsonb_array_elements(coalesce(r.lines, '[]'::jsonb)) line
         left join items i on (line->>'item_id') ~ '^\\d+$' and i.id = (line->>'item_id')::int
         where not ((line->>'item_id') ~ '^\\d+$')
-           or coalesce((line->>'qty')::numeric, 0) <= 0
+           or not ((line->>'qty') ~ '^\\d+(\\.\\d+)?$')
+           or case when (line->>'qty') ~ '^\\d+(\\.\\d+)?$' then (line->>'qty')::numeric <= 0 else true end
            or i.id is null
         order by r.created_at desc limit 10`,
       summary: (count) => count === 0 ? "Linhas das entregas estão válidas." : `${count} linha(s) de entrega inválida(s).`,
@@ -385,15 +374,15 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       severity: "high",
       title: "Itens ativos com side/preços inválidos",
       countSql: `select count(*)::int as count from items
-        where active = true and (
-          side not in ('venda','compra','ambos')
+        where coalesce(active, true) = true and deleted_at is null and (
+          coalesce(side, '') not in ('venda','compra','ambos')
           or (side in ('venda','ambos') and coalesce(min_sale_price, estimated_value, purchase_price, 0) <= 0)
           or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, estimated_value, 0) <= 0)
         )`,
       examplesSql: `select ('#' || id::text || ' · ' || name || ' · side=' || coalesce(side, '—') || ' · compra=' || coalesce(purchase_price::text, '—') || ' · venda=' || coalesce(min_sale_price::text, '—')) as label
         from items
-        where active = true and (
-          side not in ('venda','compra','ambos')
+        where coalesce(active, true) = true and deleted_at is null and (
+          coalesce(side, '') not in ('venda','compra','ambos')
           or (side in ('venda','ambos') and coalesce(min_sale_price, estimated_value, purchase_price, 0) <= 0)
           or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, estimated_value, 0) <= 0)
         )
@@ -452,17 +441,26 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
       severity: "medium",
       title: "Notificações pendentes antigas",
       countSql: `select count(*)::int as count from pending_notifications
-        where processed_at is null
-          and failed_at is null
-          and created_at < now() - interval '15 minutes'`,
+        where processed_at is null and failed_at is null and created_at < now() - interval '15 minutes'`,
       examplesSql: `select ('#' || id::text || ' · prioridade=' || coalesce(priority::text, '—') || ' · criado=' || created_at::text) as label
         from pending_notifications
-        where processed_at is null
-          and failed_at is null
-          and created_at < now() - interval '15 minutes'
+        where processed_at is null and failed_at is null and created_at < now() - interval '15 minutes'
         order by created_at asc limit 10`,
       summary: (count) => count === 0 ? "Fila de notificações não tem backlog antigo." : `${count} notificação/notificações antigas por processar.`,
       recommendation: "Verificar worker/bot de notificações; backlog antigo significa DMs/avisos perdidos ou atrasados.",
+    }));
+
+    checks.push(await runCheck({
+      id: "required_stored_procedures",
+      area: "sistema",
+      severity: "critical",
+      title: "Stored procedures obrigatórias ausentes",
+      countSql: `select count(*)::int as count from unnest(array['sp_approve_delivery','sp_transition_order','sp_cancel_orders','sp_adjust_stock','sp_create_operation_with_participants','sp_liquidate_saida']) proc(name)
+        where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = proc.name)`,
+      examplesSql: `select proc.name as label from unnest(array['sp_approve_delivery','sp_transition_order','sp_cancel_orders','sp_adjust_stock','sp_create_operation_with_participants','sp_liquidate_saida']) proc(name)
+        where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = proc.name)`,
+      summary: (count) => count === 0 ? "Stored procedures críticas existem na DB." : `${count} stored procedure(s) crítica(s) em falta na DB.`,
+      recommendation: "Aplicar migrations SQL no Supabase antes de usar entregas, encomendas, stock e saídas.",
     }));
 
     try {
@@ -484,10 +482,5 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
 
     const order: Record<DataQualitySeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
     checks.sort((a, b) => order[a.severity] - order[b.severity] || Number(a.ok) - Number(b.ok) || b.count - a.count);
-
-    return {
-      generated_at: new Date().toISOString(),
-      summary: buildSummary(checks),
-      checks,
-    };
+    return { generated_at: new Date().toISOString(), summary: buildSummary(checks), checks };
   });
