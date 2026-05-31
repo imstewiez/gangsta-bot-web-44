@@ -6,6 +6,7 @@ import {
   isAdmin,
   isManager,
   canSeeInventory,
+  canManagePrizes,
   type CurrentMember,
 } from "./pricing.shared";
 
@@ -27,6 +28,7 @@ function decorateMember(member: MemberRecord, viewAs?: { actual_member_id: numbe
     is_admin: isAdmin(member),
     is_manager: isManager(member),
     can_see_inventory: canSeeInventory(member),
+    can_manage_prizes: canManagePrizes(member),
     is_morador: member.role_label === "bairrista",
     is_viewing_as: Boolean(viewAs),
     actual_member_id: viewAs?.actual_member_id ?? null,
