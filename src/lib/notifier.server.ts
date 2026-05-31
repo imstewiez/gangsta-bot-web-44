@@ -2,7 +2,7 @@
 // Inserts a row into pending_notifications which the bot's notifier worker
 // reads. If you don't run the worker, these rows accumulate harmlessly.
 import { pgQuery } from "./pg.server";
-import { logger } from "./logger.server"; 
+import { logger } from "./logger.server";
 
 type EmbedField = { name: string; value: string; inline?: boolean };
 type EmbedPayload = {
@@ -19,6 +19,12 @@ export async function enqueueNotification(opts: {
   embed: EmbedPayload;
   priority?: number;
   content?: string | null;
+  /**
+   * Optional explicit dedupe key. Use for retries/idempotency of the same event.
+   * When omitted, no dedupe is applied so legitimate repeated notifications are
+   * not collapsed just because they share the same title in the same minute.
+   */
+  dedupKey?: string | null;
 }) {
   try {
     const payload = {
@@ -31,19 +37,32 @@ export async function enqueueNotification(opts: {
       source: "web",
     };
 
-    // Deduplication key based on embed title + current minute
-    const dedupKey = `${opts.embed.title ?? ""}_${Math.floor(Date.now() / 60000)}`;
+    if (opts.dedupKey) {
+      await pgQuery(
+        `INSERT INTO pending_notifications
+           (channel_id, payload, priority, attempts, max_attempts, next_retry_at, created_at, dedup_key)
+         SELECT $1, $2::jsonb, $3, 0, 5, now(), now(), $4
+         WHERE NOT EXISTS (
+           SELECT 1 FROM pending_notifications
+           WHERE dedup_key = $4
+             AND created_at > now() - interval '10 minutes'
+             AND processed_at IS NULL
+         )`,
+        [opts.channelId ?? null, JSON.stringify(payload), opts.priority ?? 5, opts.dedupKey],
+      );
+      return;
+    }
 
     await pgQuery(
       `INSERT INTO pending_notifications
          (channel_id, payload, priority, attempts, max_attempts, next_retry_at, created_at, dedup_key)
-       VALUES ($1, $2::jsonb, $3, 0, 5, now(), now(), $4)
-       ON CONFLICT (dedup_key) DO NOTHING`,
-      [opts.channelId ?? null, JSON.stringify(payload), opts.priority ?? 5, dedupKey],
+       VALUES ($1, $2::jsonb, $3, 0, 5, now(), now(), NULL)`,
+      [opts.channelId ?? null, JSON.stringify(payload), opts.priority ?? 5],
     );
   } catch (e) {
     // Fail-silently — don't fail the user-visible action if the queue insert hiccups.
     logger.error("enqueue_failed", {
+      title: opts.embed.title,
       error: e instanceof Error ? e.message : String(e),
     });
   }
