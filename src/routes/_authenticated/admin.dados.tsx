@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
-import { getDataQualityReport, repairDeliveryLines, type DataQualityCheck, type DataQualitySeverity } from "@/lib/data-quality.functions";
+import { getDataQualityReport, repairDeliveryLines, type DataQualityCheck, type DataQualitySeverity } from "@/lib/data-quality-v2.functions";
 import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
