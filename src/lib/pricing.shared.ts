@@ -2,12 +2,16 @@
 
 import { getXpPoints, isSuperAdminTier, isAdminTier, isManagerTier, isInventoryTier } from "./config.loader";
 
+function normalizeRole(value: string | null | undefined): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
 export function isSuperAdmin(
   member: { tier: string | null; role_label?: string | null } | null,
 ): boolean {
   if (!member) return false;
   if (isSuperAdminTier(member.tier)) return true;
-  if (member.role_label === "manda_chuva") return true;
+  if (normalizeRole(member.role_label) === "manda_chuva") return true;
   return false;
 }
 
@@ -17,8 +21,8 @@ export function isAdmin(
   if (!member) return false;
   if (isSuperAdmin(member)) return true;
   if (isAdminTier(member.tier)) return true;
-  if (member.role_label === "kingpin" || member.role_label === "admin" || member.role_label === "chefia")
-    return true;
+  const role = normalizeRole(member.role_label);
+  if (role === "kingpin" || role === "admin" || role === "chefia") return true;
   return false;
 }
 
@@ -28,8 +32,8 @@ export function isManager(
   if (!member) return false;
   if (isAdmin(member)) return true;
   if (isManagerTier(member.tier)) return true;
-  if (member.role_label === "chefia" || member.role_label === "manda_chuva" || member.role_label === "admin")
-    return true;
+  const role = normalizeRole(member.role_label);
+  if (role === "chefia" || role === "manda_chuva" || role === "admin") return true;
   return false;
 }
 
@@ -38,9 +42,25 @@ export function canSeeInventory(
 ): boolean {
   if (!member) return false;
   if (isInventoryTier(member.tier)) return true;
-  if (member.role_label === "chefia" || member.role_label === "manda_chuva")
-    return true;
+  const role = normalizeRole(member.role_label);
+  if (role === "chefia" || role === "manda_chuva") return true;
   return false;
+}
+
+const PRIZE_MANAGER_ROLES = new Set([
+  "patrao_di_zona",
+  "patrão_di_zona",
+  "og",
+  "kingpin",
+  "manda_chuva",
+]);
+
+export function canManagePrizes(
+  member: { tier: string | null; role_label?: string | null } | null,
+): boolean {
+  if (!member) return false;
+  if (isSuperAdmin(member)) return true;
+  return PRIZE_MANAGER_ROLES.has(normalizeRole(member.role_label)) || PRIZE_MANAGER_ROLES.has(normalizeRole(member.tier));
 }
 
 export type CurrentMember = {
@@ -53,6 +73,7 @@ export type CurrentMember = {
   is_admin: boolean;
   is_manager: boolean;
   can_see_inventory: boolean;
+  can_manage_prizes: boolean;
   is_morador: boolean;
   is_viewing_as?: boolean;
   actual_member_id?: number | null;
