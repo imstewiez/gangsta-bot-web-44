@@ -5,11 +5,10 @@ import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, OrderStatusSchema, IdSchema, NotesSchema } from "./security";
 import { logAdminAction } from "./logging.functions";
-import { getAllItems, getTierPrice } from "./config.loader";
-import { resolveItemPrices, getConfigIdByName } from "./pricing.resolver";
+import { getAllItems } from "./config.loader";
+import { resolveItemPrices } from "./pricing.resolver";
 import { getSurchargeForItem } from "./tier-pricing.functions";
 import { getMergedRecipeForItemName } from "./recipes.functions";
-
 
 type OrderRow = {
   id: number;
@@ -45,6 +44,25 @@ const ORDER_STATUSES = [
 ] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+const MONEY_ONLY_MARKUP = 0.20;
+
+function orderBasePrice(prices: {
+  tier_price?: number | null;
+  min_sale_price?: number | null;
+  morador_purchase_price?: number | null;
+  purchase_price?: number | null;
+  estimated_value?: number | null;
+}): number {
+  return Number(
+    prices.tier_price ??
+    prices.min_sale_price ??
+    prices.morador_purchase_price ??
+    prices.purchase_price ??
+    prices.estimated_value ??
+    0,
+  );
+}
+
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -66,7 +84,6 @@ export const listOrders = createServerFn({ method: "GET" })
       params.push(me.id);
       conds.push(`o.member_id = $${params.length}`);
     } else {
-      // manage scope: only the responsavel or superadmin
       if (!me?.is_manager) return [];
       if (!me.is_superadmin) {
         params.push(me.id);
@@ -109,124 +126,114 @@ export const listOrders = createServerFn({ method: "GET" })
 export const createOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: 'materials_money' | 'money_only' }) => {
-      if (!Array.isArray(d.lines) || d.lines.length === 0)
-        throw new Error("Carrinho vazio");
-      if (d.lines.length > 50)
-        throw new Error("Máximo 50 itens por encomenda");
+    (d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: "materials_money" | "money_only" }) => {
+      if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
+      if (d.lines.length > 50) throw new Error("Máximo 50 itens por encomenda");
       for (const l of d.lines) {
         if (!Number.isFinite(l.item_id)) throw new Error("Item inválido");
-        if (!Number.isFinite(l.quantity) || l.quantity <= 0)
-          throw new Error("Quantidade inválida");
+        if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("Quantidade inválida");
       }
       if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) {
         throw new Error("Tens de escolher um responsável");
       }
-      const paymentMode = d.payment_mode ?? 'materials_money';
-      if (paymentMode !== 'materials_money' && paymentMode !== 'money_only') {
-        throw new Error("Modo de pagamento inválido");
-      }
-      const notes = NotesSchema.parse(d.notes);
-      return { ...d, payment_mode: paymentMode, notes };
+      const paymentMode = d.payment_mode ?? "materials_money";
+      if (paymentMode !== "materials_money" && paymentMode !== "money_only") throw new Error("Modo de pagamento inválido");
+      return { ...d, payment_mode: paymentMode, notes: NotesSchema.parse(d.notes) };
     },
   )
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
-    const cfgItems = getAllItems();
 
-    // Fetch DB items for names + sides + prices
+    const cfgItems = getAllItems();
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
       id: number;
       name: string;
       side: string | null;
       min_sale_price: number | null;
+      purchase_price: number | null;
+      morador_purchase_price: number | null;
       estimated_value: number | null;
     }>(
-      `select id, name, side, min_sale_price::float as min_sale_price, estimated_value::float as estimated_value
-       from items where id = ANY($1) and active = true`,
+      `select id, name, side,
+              min_sale_price::float as min_sale_price,
+              purchase_price::float as purchase_price,
+              morador_purchase_price::float as morador_purchase_price,
+              estimated_value::float as estimated_value
+       from items
+       where id = ANY($1::int[])
+         and coalesce(active, true) = true
+         and deleted_at is null`,
       [itemIds],
     );
     const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    // Fetch DB prices for all potential ingredients
-    const allConfigItems = Object.values(cfgItems);
-    const allConfigNames = allConfigItems.map((i) => i.name);
+    const allConfigNames = Object.values(cfgItems).map((i) => i.name);
     const dbPrices = await pgQuery<{
       name: string;
       purchase_price: number | null;
       estimated_value: number | null;
     }>(
       `select name, purchase_price::float as purchase_price, estimated_value::float as estimated_value
-       from items where name = ANY($1::text[]) and active = true`,
+       from items
+       where name = ANY($1::text[])
+         and coalesce(active, true) = true
+         and deleted_at is null`,
       [allConfigNames],
     );
     const dbPriceMap = new Map(dbPrices.map((p) => [p.name, p]));
 
-    const paymentMode = (data.payment_mode as string) || 'materials_money';
     const batchId = crypto.randomUUID();
     const results: { id: number; item_name: string; quantity: number }[] = [];
+
     for (const line of data.lines) {
       const dbItem = itemMap.get(line.item_id);
       if (!dbItem) throw new Error(`Item não encontrado: ${line.item_id}`);
-      if (dbItem.side !== "venda" && dbItem.side !== "ambos")
+      if (dbItem.side !== "venda" && dbItem.side !== "ambos") {
         throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
+      }
 
-      const configItem = cfgItems[Object.keys(cfgItems).find(k => cfgItems[k].name === dbItem.name) ?? ""];
+      const configItem = Object.values(cfgItems).find((i) => i.name === dbItem.name) ?? null;
       const itemSurcharges = await getSurchargeForItem(dbItem.id);
-      const itemPrices = resolveItemPrices(dbItem, configItem, me?.tier ?? null, itemSurcharges);
+      const itemPrices = resolveItemPrices(dbItem, configItem, me.tier ?? null, itemSurcharges);
+      const baseUnit = orderBasePrice({ ...itemPrices, purchase_price: dbItem.purchase_price });
 
-      // Receitas e ingredientes (merged DB + config)
       const recipe = await getMergedRecipeForItemName(dbItem.name);
-      let ingredientsJson: Array<{ name: string; needed: number }> | null = null;
+      let ingredientsJson: Array<{ name: string; needed: number }> = [];
       let materialCostPerUnit = 0;
-      if (recipe) {
-        const isOrange = recipe.output.toLowerCase().includes("orange");
-        // Custo material = soma dos purchase_price dos ingredientes (DB > config)
-        materialCostPerUnit = Object.entries(recipe.inputs).reduce((sum, [ingId, qty]) => {
+      let hasMaterials = false;
+
+      if (recipe && Object.keys(recipe.inputs).length > 0) {
+        const outConfig = cfgItems[recipe.output];
+        const isOrange = outConfig?.tier === "orange" || outConfig?.category === "armas_orange";
+        const relevantInputs = Object.entries(recipe.inputs).filter(([ingId]) => {
           const ingItem = cfgItems[ingId];
-          if (!ingItem) return sum;
-          const ingDb = dbPriceMap.get(ingItem.name);
+          if (!ingItem) return false;
+          return !isOrange || ingItem.name.toLowerCase().includes("peça");
+        });
+        hasMaterials = relevantInputs.length > 0;
+        materialCostPerUnit = relevantInputs.reduce((sum, [ingId, qty]) => {
+          const ingItem = cfgItems[ingId];
+          const ingDb = ingItem ? dbPriceMap.get(ingItem.name) : null;
           const ingPrices = resolveItemPrices(ingDb, ingItem);
-          return sum + (Number(ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0) * Number(qty));
+          return sum + Number(ingPrices.purchase_price ?? ingPrices.estimated_value ?? 0) * Number(qty);
         }, 0);
-        if (paymentMode === 'materials_money') {
-          ingredientsJson = Object.entries(recipe.inputs)
-            .filter(([ingId]) => {
-              if (!isOrange) return true;
-              const ingItem = cfgItems[ingId];
-              return ingItem?.name?.toLowerCase().includes("peça");
-            })
-            .map(([ingId, qty]) => {
-              const ingItem = cfgItems[ingId];
-              return { name: ingItem?.name ?? ingId, needed: Number(qty) * line.quantity };
-            });
-        }
+        ingredientsJson = relevantInputs.map(([ingId, qty]) => {
+          const ingItem = cfgItems[ingId];
+          return { name: ingItem?.name ?? ingId, needed: Number(qty) * line.quantity };
+        });
       }
 
-      let unit: number | null = null;
-      let total: number | null = null;
-      let dirtyMoney = 0;
-      let materialCost: number | null = null;
-      let moneyCost: number | null = null;
-
-      if (paymentMode === 'money_only') {
-        const base = itemPrices.min_sale_price ?? itemPrices.estimated_value ?? 0;
-        const subtotal = base + materialCostPerUnit;
-        unit = Math.round(subtotal + subtotal * 0.30);
-        total = unit * line.quantity;
-        dirtyMoney = 0;
-        materialCost = Math.round(materialCostPerUnit * line.quantity);
-        moneyCost = total;
-        ingredientsJson = [];
-      } else {
-        unit = itemPrices.tier_price ?? itemPrices.min_sale_price ?? itemPrices.estimated_value ?? 0;
-        total = unit * line.quantity;
-        dirtyMoney = (itemPrices.estimated_value ?? 0) * line.quantity;
-      }
-
-      const ingredientsJsonStr = ingredientsJson ? JSON.stringify(ingredientsJson) : null;
+      const effectivePaymentMode = data.payment_mode === "materials_money" && hasMaterials ? "materials_money" : "money_only";
+      const unit = effectivePaymentMode === "money_only" && hasMaterials
+        ? Math.round(baseUnit + materialCostPerUnit + baseUnit * MONEY_ONLY_MARKUP)
+        : Math.round(baseUnit);
+      const total = unit * line.quantity;
+      const dirtyMoney = effectivePaymentMode === "materials_money" ? baseUnit * line.quantity : 0;
+      const materialCost = effectivePaymentMode === "money_only" && hasMaterials ? Math.round(materialCostPerUnit * line.quantity) : null;
+      const moneyCost = effectivePaymentMode === "money_only" ? total : null;
+      const ingredientsJsonStr = effectivePaymentMode === "materials_money" && ingredientsJson.length > 0 ? JSON.stringify(ingredientsJson) : null;
 
       const row = await pgOne<{ id: number }>(
         `insert into orders
@@ -240,21 +247,20 @@ export const createOrder = createServerFn({ method: "POST" })
           unit,
           total,
           data.notes ?? null,
-          0,
+          MONEY_ONLY_MARKUP,
           `web:${context.userId}`,
           data.responsavel_member_id ?? null,
           ingredientsJsonStr,
           batchId,
           dirtyMoney,
-          paymentMode,
+          effectivePaymentMode,
           materialCost,
           moneyCost,
         ],
       );
-      if (row) {
-        results.push({ id: row.id, item_name: dbItem.name, quantity: line.quantity });
-      }
+      if (row) results.push({ id: row.id, item_name: dbItem.name, quantity: line.quantity });
     }
+
     await logAdminAction(context.supabase, {
       action: "order_created",
       actorId: context.userId,
@@ -269,29 +275,15 @@ export const createOrder = createServerFn({ method: "POST" })
 
 export const transitionOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { id: number; to: OrderStatus; notes?: string | null }) => {
-      return z.object({
-        id: IdSchema,
-        to: OrderStatusSchema,
-        notes: NotesSchema,
-      }).parse(d);
-    },
-  )
+  .inputValidator((d: { id: number; to: OrderStatus; notes?: string | null }) => z.object({ id: IdSchema, to: OrderStatusSchema, notes: NotesSchema }).parse(d))
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
 
-    const current = await pgOne<{ responsavel_member_id: number | null }>(
-      `select responsavel_member_id from orders where id = $1`,
-      [data.id],
-    );
+    const current = await pgOne<{ responsavel_member_id: number | null }>(`select responsavel_member_id from orders where id = $1`, [data.id]);
     if (!current) throw new Error("Encomenda não encontrada");
-    if (!me.is_superadmin && current.responsavel_member_id !== me.id) {
-      throw new Error("Sem permissão — só o responsável pode tratar este pedido");
-    }
+    if (!me.is_superadmin && current.responsavel_member_id !== me.id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
 
-    // Atomic transition via stored procedure after permission has been verified.
     const result = await pgOne<{
       old_status: string;
       member_id: number;
@@ -303,7 +295,6 @@ export const transitionOrder = createServerFn({ method: "POST" })
       `SELECT * FROM public.sp_transition_order($1, $2, $3, $4)`,
       [data.id, data.to, `web:${context.userId}`, data.notes ?? null],
     );
-
     if (!result) throw new Error("Encomenda não encontrada");
 
     const actionMap: Record<string, string> = {
@@ -343,10 +334,7 @@ export const listOrderComments = createServerFn({ method: "GET" })
     return { order_id: id };
   })
   .handler(async ({ data }) => {
-    return pgQuery<OrderCommentRow>(
-      `select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`,
-      [data.order_id],
-    );
+    return pgQuery<OrderCommentRow>(`select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`, [data.order_id]);
   });
 
 export const addOrderComment = createServerFn({ method: "POST" })
@@ -362,63 +350,34 @@ export const addOrderComment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
-
-    // Verify the order exists and the user is either the requester or a manager
-    const order = await pgOne<{ member_id: number; status: string }>(
-      `select member_id, status from orders where id = $1`,
-      [data.order_id],
-    );
+    const order = await pgOne<{ member_id: number; status: string }>(`select member_id, status from orders where id = $1`, [data.order_id]);
     if (!order) throw new Error("Encomenda não encontrada");
-    const isRequester = order.member_id === me.id;
-    const isManager = me.is_manager;
-    if (!isRequester && !isManager) throw new Error("Sem permissão para comentar nesta encomenda.");
-
-    const row = await pgOne<OrderCommentRow>(
+    if (order.member_id !== me.id && !me.is_manager) throw new Error("Sem permissão para comentar nesta encomenda.");
+    return pgOne<OrderCommentRow>(
       `insert into order_comments (order_id, author_id, author_name, content, created_at)
        values ($1, $2, $3, $4, now())
        returning id, order_id, author_name, content, created_at`,
       [data.order_id, me.id, me.display_name ?? "Membro", data.content],
     );
-    return row;
   });
-
 
 export const cancelOwnOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { ids?: number[]; id?: number }) => {
-      const ids = Array.isArray(d.ids) && d.ids.length > 0
-        ? d.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
-        : d.id != null
-          ? [Number(d.id)]
-          : [];
-      if (ids.length === 0) throw new Error("ID inválido");
-      return { ids };
-    },
-  )
+  .inputValidator((d: { ids?: number[]; id?: number }) => {
+    const ids = Array.isArray(d.ids) && d.ids.length > 0
+      ? d.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+      : d.id != null
+        ? [Number(d.id)]
+        : [];
+    if (ids.length === 0) throw new Error("ID inválido");
+    return { ids };
+  })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
-
-    // Verify ownership first (read-only, no race concern for ownership check)
-    const beforeRows = await pgQuery<{
-      id: number;
-      status: string;
-      member_id: number;
-    }>(
-      `select o.id, o.status, o.member_id from orders o where o.id = ANY($1)`,
-      [data.ids],
-    );
+    const beforeRows = await pgQuery<{ id: number; status: string; member_id: number }>(`select o.id, o.status, o.member_id from orders o where o.id = ANY($1::int[])`, [data.ids]);
     if (beforeRows.length === 0) throw new Error("Encomenda(s) não encontrada(s)");
-
-    const notOwn = beforeRows.find((r) => r.member_id !== me.id);
-    if (notOwn) throw new Error("Não podes cancelar encomendas de outrem.");
-
-    // Atomic cancellation via stored procedure
-    const cancelled = await pgOne<{ sp_cancel_orders: number }>(
-      `SELECT public.sp_cancel_orders($1, $2, $3) as sp_cancel_orders`,
-      [data.ids, `web:${context.userId}`, "Cancelado pelo utilizador"],
-    );
-
+    if (beforeRows.some((r) => r.member_id !== me.id)) throw new Error("Não podes cancelar encomendas de outrem.");
+    const cancelled = await pgOne<{ sp_cancel_orders: number }>(`SELECT public.sp_cancel_orders($1, $2, $3) as sp_cancel_orders`, [data.ids, `web:${context.userId}`, "Cancelado pelo utilizador"]);
     return { ok: true as const, cancelled: cancelled?.sp_cancel_orders ?? 0 };
   });
