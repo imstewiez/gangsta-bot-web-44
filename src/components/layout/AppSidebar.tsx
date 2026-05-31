@@ -78,6 +78,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/admin/dashboard",   label: "Painel",    icon: Activity,   admin: true },
       { to: "/admin/itens",       label: "Materiais",        icon: Package,    admin: true },
+      { to: "/admin/dados",       label: "Dados",       icon: Database,   admin: true },
       { to: "/admin",             label: "Definições",   icon: Shield,     admin: true },
       { to: "/auditoria",         label: "Auditoria",    icon: ScrollText, admin: true },
 
