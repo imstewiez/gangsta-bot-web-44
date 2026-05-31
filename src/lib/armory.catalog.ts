@@ -6,7 +6,6 @@
 import {
   Crosshair,
   Swords,
-  Sword,
   Package,
   Cylinder,
   Telescope,
@@ -239,7 +238,6 @@ export const ARMORY_CAT_CONFIG: Record<
   },
 };
 
-// Print tiers — uniform labels across the app
 export const PRINT_LABELS: Record<string, string> = {
   azul: "Print Azul",
   amarela: "Print Amarela",
@@ -258,59 +256,50 @@ export const PRINT_BADGE_CLASS: Record<string, string> = {
   red: "bg-red-500/15 text-red-400 border-red-500/40",
 };
 
-// ── Armas banidas (não aparecem em nenhuma página) ─────────────────────────
+function normalize(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 function isBannedWeapon(name: string | null): boolean {
   if (!name) return false;
-  const n = name.toLowerCase().trim();
+  const n = normalize(name);
   const bannedPatterns = getBannedWeaponPatterns();
-  return bannedPatterns.some((w) => n.includes(w.toLowerCase().trim()));
+  return bannedPatterns.some((w) => n.includes(normalize(w)));
 }
 
 export function isOrangeWeapon(name: string | null): boolean {
   if (!name) return false;
   const item = getItemByName(name);
   if (item) return item.tier === "orange";
-  // fallback para nomes que não estão no config
-  const n = name.toLowerCase().trim();
-  if (/\bcorpo\b|\bprint\b|\besquema\b|\bblueprint\b|\bchassi\b/.test(n)) return false;
   return false;
 }
 
-// ── Filtro UNIFICADO para TODAS as páginas ─────────────────────────────────
-// Retorna a categoria se o item deve aparecer, ou null se deve ser escondido.
-// Usar esta função em vez de replicar filtros ad-hoc em cada página.
 export function filterItemForDisplay(
   itemName: string,
   category: string | null,
   subcategory: string | null,
 ): ArmoryCategory | null {
-  const name = itemName.toLowerCase();
-
-  // Banidas
+  const name = normalize(itemName);
   if (isBannedWeapon(itemName)) return null;
 
   const cat = itemDisplayCategory(itemName, category, subcategory);
 
-  // Categorias escondidas — nenhuma por omissão (antes "outros" era escondido)
-  // if (cat === "outros") return null;
-
-  // Apenas colete padrão
+  // Apenas o colete padrão é público nas páginas de encomenda/preçário.
+  // A gestão de materiais continua a mostrar todos.
   if (cat === "coletes") {
-    const coletePattern = getColetePattern();
-    if (coletePattern && !name.includes(coletePattern.toLowerCase())) return null;
+    const coletePattern = normalize(getColetePattern());
+    if (coletePattern && !name.includes(coletePattern)) return null;
   }
 
-  // Apenas acessórios permitidos explicitamente
   if (cat === "acessorios") {
-    const allowedPatterns = getAllowedAccessoryPatterns();
-    const allowed = new RegExp(allowedPatterns.join("|"), "i");
-    if (!allowed.test(itemName)) return null;
+    const allowedPatterns = getAllowedAccessoryPatterns().map(normalize).filter(Boolean);
+    if (allowedPatterns.length > 0 && !allowedPatterns.some((p) => name.includes(p))) return null;
   }
 
-  // Armas red/orange — já filtradas pela categoria acima, não precisam de whitelist
-
-  // Carregadores: apenas as 3 opções genéricas (Orange / Red / Especial).
-  // Esconde carregadores específicos por arma (TEC-9 Carregador, PDW Carregador, etc.).
   if (cat === "carregadores") {
     const magPattern = getAllowedMagazinePattern();
     if (magPattern && !new RegExp(magPattern, "i").test(itemName.trim())) return null;
@@ -319,67 +308,57 @@ export function filterItemForDisplay(
   return cat;
 }
 
-// ── Classificação UNIFICADA para TODAS as páginas ──────────────────────────
-// Usar esta função em vez de lógicas ad-hoc. Garante consistência entre
-// armazém, preçário, encomendas, receitas, etc.
 export function itemDisplayCategory(
   itemName: string,
   category: string | null,
   subcategory: string | null,
 ): ArmoryCategory {
-  const name = itemName.toLowerCase();
-  const sub = subcategory;
-  const cat = category;
+  const name = normalize(itemName);
+  const sub = normalize(subcategory);
+  const cat = normalize(category);
 
-  // 0. Revolver é excluído explicitamente
   if (name === "revolver") return "outros";
 
-  // 1. Carregadores — tudo na mesma categoria
+  // Coletes têm prioridade sobre acessórios/equipamento. Isto corrige itens
+  // criados como categoria "equipamento" mas cujo nome é "Colete Padrão".
+  if (name.includes("colete") || sub === "coletes" || cat === "coletes") return "coletes";
+
   if (
     sub === "carregadores" ||
     sub === "municoes" ||
     cat === "municoes" ||
     sub === "craft_carregadores" ||
     name.includes("carregador")
-  ) {
-    return "carregadores";
-  }
+  ) return "carregadores";
 
-  // 2. Armas — usar categorias do config.json como fonte de verdade
   if (cat === "armas_orange" || sub === "armas_orange") return "armas_orange";
   if (cat === "armas_red" || sub === "armas_red") return "armas_red";
-  if (sub === "craft_weapons" || cat === "craft_weapons") {
-    // Neste caso, usamos o tier se disponível
-    if (sub === "armas_orange" || cat === "armas_orange") return "armas_orange";
-    return "armas_red";
-  }
+  if (sub === "craft_weapons" || cat === "craft_weapons") return "armas_red";
 
-  // 3. Corpos
-  if (cat === "corpos" || sub === "corpos" || /corpo|chassi/.test(name))
-    return "corpos";
-
-  // 4. Prints (só se NÃO for arma — já verificado acima)
-  if (cat === "prints" || sub === "prints" || /print|esquema|blueprint/.test(name))
-    return "prints";
-
-  // 4.5. Reciclagem
+  if (cat === "corpos" || sub === "corpos" || /corpo|chassi/.test(name)) return "corpos";
+  if (cat === "prints" || sub === "prints" || /print|esquema|blueprint/.test(name)) return "prints";
   if (cat === "reciclagem" || sub === "reciclagem") return "reciclagem";
 
-  // 5. Acessórios / coletes
+  if (cat === "metais" || sub === "metais") return "metais";
+  if (cat === "madeiras" || sub === "madeiras") return "madeiras";
+  if (cat === "texteis" || sub === "texteis") return "texteis";
+  if (cat === "componentes" || sub === "componentes") return "componentes";
+  if (cat === "droga" || sub === "droga" || name.includes("haxixe") || name.includes("opio") || name.includes("meth")) return "droga";
+  if (cat === "dinheiro" || sub === "dinheiro" || name.includes("dinheiro sujo")) return "dinheiro";
+
   if (
     sub === "acessorios" ||
     sub === "acessorios_armas" ||
     cat === "acessorios" ||
     cat === "acessorios_armas"
-  )
-    return "acessorios";
-  if (sub === "coletes" || cat === "coletes") return "coletes";
+  ) return "acessorios";
 
-  // 9. Outros
+  if (cat === "materiais" || sub === "materiais") return "materiais";
+  if (cat === "equipamento" || sub === "equipamento") return "equipamento";
+
   return "outros";
 }
 
-// Subcategory label override — replace ugly raw names
 export function itemSubLabel(
   category: string | null,
   recipeCategory: string | null,
