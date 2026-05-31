@@ -56,6 +56,10 @@ function internalCost(value: number | null | undefined): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+function managerOnly(value: number, canSeeCosts: boolean): number {
+  return canSeeCosts ? value : 0;
+}
+
 async function getDbItemsByIds(ids: number[]): Promise<Map<number, DbPriceRow>> {
   const unique = Array.from(new Set(ids.filter((id) => Number.isFinite(id) && id > 0)));
   if (unique.length === 0) return new Map();
@@ -156,7 +160,7 @@ export const listRecipes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<RecipeRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    const isManager = me?.is_manager ?? false;
+    const canSeeCosts = me?.is_manager ?? false;
     const recipes = Object.values(await getMergedRecipes());
     const result: RecipeRow[] = [];
     const outputIds = recipes.map((r) => r.output_item_id);
@@ -179,8 +183,8 @@ export const listRecipes = createServerFn({ method: "GET" })
           item_id: input.item_id,
           name: input.name,
           quantity: input.quantity,
-          unit_cost: ingredientCost,
-          line_cost: input.quantity * ingredientCost,
+          unit_cost: managerOnly(ingredientCost, canSeeCosts),
+          line_cost: managerOnly(input.quantity * ingredientCost, canSeeCosts),
           category: input.category,
           subcategory: input.subcategory,
         });
@@ -197,18 +201,18 @@ export const listRecipes = createServerFn({ method: "GET" })
         tier: null,
         unit: "unidade",
         ingredients,
-        total_cost: officialCost,
-        estimated_value: officialCost,
+        total_cost: managerOnly(officialCost, canSeeCosts),
+        estimated_value: managerOnly(officialCost, canSeeCosts),
         min_sale_price: outPrices.min_sale_price,
         tier_price: outPrices.tier_price,
-        margin: isManager ? margin : 0,
-        margin_pct: isManager && officialCost > 0 ? (margin / officialCost) * 100 : null,
+        margin: managerOnly(margin, canSeeCosts),
+        margin_pct: canSeeCosts && officialCost > 0 ? (margin / officialCost) * 100 : null,
         recipe_category: output.category,
         db_recipe_id: recipe.output_item_id,
       });
     }
 
-    return result.sort((a, b) => (b.tier_price ?? b.min_sale_price ?? b.estimated_value ?? 0) - (a.tier_price ?? a.min_sale_price ?? a.estimated_value ?? 0));
+    return result.sort((a, b) => (b.tier_price ?? b.min_sale_price ?? 0) - (a.tier_price ?? a.min_sale_price ?? 0));
   });
 
 export type CraftFeasibility = {
@@ -236,6 +240,7 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<CraftFeasibility> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
+    const canSeeCosts = me?.is_manager ?? false;
     const recipe = (await getDbRecipesForItemIds([data.recipe_id])).get(data.recipe_id);
     if (!recipe) throw new Error("Receita não encontrada na Gestão de Materiais");
     const dbItems = await getDbItemsByIds([data.recipe_id, ...recipe.inputs.map((i) => i.item_id)]);
@@ -254,8 +259,8 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
         name: input.name,
         needed,
         qty_per_recipe: input.quantity,
-        unit_cost: unitCost,
-        line_cost: needed * unitCost,
+        unit_cost: managerOnly(unitCost, canSeeCosts),
+        line_cost: managerOnly(needed * unitCost, canSeeCosts),
       });
     }
 
@@ -263,7 +268,7 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
       recipe_id: data.recipe_id,
       item_name: recipe.output_name,
       requested_qty: data.quantity,
-      dirty_money: internalCost(headPrices.estimated_value) * data.quantity,
+      dirty_money: managerOnly(internalCost(headPrices.estimated_value) * data.quantity, canSeeCosts),
       min_sale_price: headPrices.min_sale_price,
       tier_price: headPrices.tier_price,
       ingredients,
@@ -293,15 +298,16 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
     }
     return d;
   })
-  .handler(async ({ data }): Promise<CraftFeasibilityBatch> => {
+  .handler(async ({ data, context }): Promise<CraftFeasibilityBatch> => {
     try {
+      const me = await resolveCurrentMember(context.supabase, context.userId);
+      const canSeeCosts = me?.is_manager ?? false;
       const dbItems = await getDbItemsByIds(data.lines.map((l) => l.item_id));
       const recipeMap = await getDbRecipesForItemIds(data.lines.map((l) => l.item_id));
       const ingredientIds = Array.from(new Set(Array.from(recipeMap.values()).flatMap((r) => r.inputs.map((i) => i.item_id))));
       const ingredientItems = await getDbItemsByIds(ingredientIds);
       const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
-      let dirty_money = 0;
-      let full_material_cost = 0;
+      let hiddenCost = 0;
       const items: CraftFeasibilityBatch["items"] = [];
 
       for (const line of data.lines) {
@@ -311,9 +317,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         if (!recipe) continue;
         items.push({ item_name: item.name, requested_qty: line.quantity });
         const itemPrices = resolveItemPrices(item, null);
-        const configuredCost = internalCost(itemPrices.estimated_value) * line.quantity;
-        dirty_money += configuredCost;
-        full_material_cost += configuredCost;
+        hiddenCost += internalCost(itemPrices.estimated_value) * line.quantity;
 
         for (const input of recipe.inputs) {
           const ingDb = ingredientItems.get(input.item_id);
@@ -324,14 +328,25 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
           const existing = allIngredients.get(input.name);
           if (existing) {
             existing.needed += needed;
-            existing.line_cost += lineCost;
+            existing.line_cost = managerOnly(existing.line_cost + lineCost, canSeeCosts);
           } else {
-            allIngredients.set(input.name, { name: input.name, needed, qty_per_recipe: input.quantity, unit_cost: unitCost, line_cost: lineCost });
+            allIngredients.set(input.name, {
+              name: input.name,
+              needed,
+              qty_per_recipe: input.quantity,
+              unit_cost: managerOnly(unitCost, canSeeCosts),
+              line_cost: managerOnly(lineCost, canSeeCosts),
+            });
           }
         }
       }
 
-      return { dirty_money, full_material_cost, ingredients: Array.from(allIngredients.values()), items };
+      return {
+        dirty_money: managerOnly(hiddenCost, canSeeCosts),
+        full_material_cost: managerOnly(hiddenCost, canSeeCosts),
+        ingredients: Array.from(allIngredients.values()),
+        items,
+      };
     } catch (e) {
       logger.error("computeCraftFeasibilityBatch_error", { error: e instanceof Error ? e.message : String(e) });
       throw new Error("Erro ao calcular materiais: " + (e instanceof Error ? e.message : "Erro desconhecido"));
