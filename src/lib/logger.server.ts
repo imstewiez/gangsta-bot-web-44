@@ -6,6 +6,8 @@
 //   logger.error("db_query_failed", { error: err.message, query: "..." });
 //   logger.warn("rate_limit_approaching", { ip, path });
 
+import { getEnv } from "./env.server";
+
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
@@ -17,9 +19,8 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 function getMinLevel(): LogLevel {
-  const env = (globalThis as any).__cloudflareEnv as Record<string, string> | undefined;
-  const level = env?.LOG_LEVEL ?? process.env.LOG_LEVEL ?? "info";
-  return level as LogLevel;
+  const level = getEnv("LOG_LEVEL", "info") as LogLevel;
+  return LEVEL_PRIORITY[level] === undefined ? "info" : level;
 }
 
 function shouldLog(level: LogLevel): boolean {
