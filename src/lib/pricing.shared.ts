@@ -54,6 +54,9 @@ export type CurrentMember = {
   is_manager: boolean;
   can_see_inventory: boolean;
   is_morador: boolean;
+  is_viewing_as?: boolean;
+  actual_member_id?: number | null;
+  actual_display_name?: string | null;
 };
 
 export type CatalogItem = {
