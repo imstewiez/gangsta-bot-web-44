@@ -3,7 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveCurrentMember } from "./pricing.server";
 import { pgQuery } from "./pg.server";
 import type { CurrentMember, CatalogItem } from "./pricing.shared";
-import { getAllItems } from "./config.loader";
 import { resolveItemPrices } from "./pricing.resolver";
 import { getSurchargesForItems } from "./tier-pricing.functions";
 
@@ -12,11 +11,6 @@ export const getCurrentMember = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<CurrentMember | null> => {
     return resolveCurrentMember(context.supabase, context.userId);
   });
-
-function getConfigByName() {
-  const configItems = getAllItems();
-  return new Map(Object.values(configItems).map((item) => [item.name, item]));
-}
 
 type DbCatalogRow = {
   id: number;
@@ -46,17 +40,17 @@ async function getDbCatalogRows(): Promise<DbCatalogRow[]> {
   );
 }
 
-function toCatalogItem(db: DbCatalogRow, side: "venda" | "compra" | "ambos", config: ReturnType<typeof getConfigByName> extends Map<string, infer T> ? T | null : never, prices: ReturnType<typeof resolveItemPrices>): CatalogItem {
+function toCatalogItem(db: DbCatalogRow, side: "venda" | "compra" | "ambos", prices: ReturnType<typeof resolveItemPrices>): CatalogItem {
   return {
     id: db.id,
     name: db.name,
-    category: db.category ?? config?.category ?? "outros",
-    subcategory: db.subcategory ?? config?.subcategory ?? null,
+    category: db.category ?? "outros",
+    subcategory: db.subcategory ?? null,
     side,
     purchase_price: prices.purchase_price,
     morador_purchase_price: prices.morador_purchase_price,
     min_sale_price: prices.min_sale_price,
-    xp_points: db.xp_points ?? config?.xpPoints ?? 0,
+    xp_points: db.xp_points ?? 0,
     tier_price: prices.tier_price,
   };
 }
@@ -65,7 +59,6 @@ export const getCatalog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CatalogItem[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    const configByName = getConfigByName();
     const dbItems = await getDbCatalogRows();
     const surchargeMap = await getSurchargesForItems(dbItems.map((d) => d.id));
 
@@ -73,9 +66,8 @@ export const getCatalog = createServerFn({ method: "GET" })
       .map((db) => {
         const side = (db.side ?? "venda") as "venda" | "compra" | "ambos";
         if (side !== "venda" && side !== "ambos") return null;
-        const config = configByName.get(db.name) ?? null;
-        const prices = resolveItemPrices(db, config, me?.tier ?? null, surchargeMap.get(db.id) ?? null);
-        return toCatalogItem(db, side, config, prices);
+        const prices = resolveItemPrices(db, null, me?.tier ?? null, surchargeMap.get(db.id) ?? null);
+        return toCatalogItem(db, side, prices);
       })
       .filter((item): item is CatalogItem => Boolean(item))
       .sort((a, b) => (b.tier_price ?? b.min_sale_price ?? b.purchase_price ?? 0) - (a.tier_price ?? a.min_sale_price ?? a.purchase_price ?? 0));
@@ -84,16 +76,14 @@ export const getCatalog = createServerFn({ method: "GET" })
 export const getBuyCatalog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<CatalogItem[]> => {
-    const configByName = getConfigByName();
     const dbItems = await getDbCatalogRows();
 
     return dbItems
       .map((db) => {
         const side = (db.side ?? "compra") as "venda" | "compra" | "ambos";
         if (side !== "compra" && side !== "ambos") return null;
-        const config = configByName.get(db.name) ?? null;
-        const prices = resolveItemPrices(db, config);
-        return toCatalogItem(db, side, config, prices);
+        const prices = resolveItemPrices(db, null);
+        return toCatalogItem(db, side, prices);
       })
       .filter((item): item is CatalogItem => Boolean(item))
       .sort((a, b) => (b.morador_purchase_price ?? b.purchase_price ?? 0) - (a.morador_purchase_price ?? a.purchase_price ?? 0));
