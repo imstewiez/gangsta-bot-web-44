@@ -1,12 +1,7 @@
 // Hierarquia do bairro — labels bonitos com emoji para UI.
 // Nunca mostrar os IDs internos (young_blood, patrao_di_zona, etc) na UI.
 
-import {
-  getTierLabels,
-  getTierGradients,
-  getTierAccents,
-  getTierOrder,
-} from "./config.loader";
+import { getTierOrder } from "./config.loader";
 
 export type Tier =
   | "young_blood"
@@ -20,46 +15,63 @@ export type Tier =
 
 export type MemberRole = Tier | "bairrista";
 
-// Cargo real do Discord. Usado em Posição/Cargo, perfil, badges principais e hierarquia.
-export const DISCORD_ROLE_LABELS: Record<string, string> = {
-  young_blood: "Young Blood",
-  o_gunao: "O Gunão",
-  gangster_fodido: "Gangster Fodido",
-  patrao_di_zona: "Patrão di Zona",
-  real_gangster: "Real Gangster",
-  og: "OG",
-  kingpin: "Kingpin",
-  manda_chuva: "Manda-Chuva",
-  bairrista: "Bairrista",
-};
-
-// Tier/progressão interna. Usado apenas para XP, preços, progressão e coluna Tier.
-export const TIER_LABELS: Record<string, string> = {
-  ...getTierLabels(),
+// Cargo/posição principal — deve bater com o que o Discord mostra à comunidade.
+// Usado em Cargo/Posição, perfil, hierarquia e badges coloridas.
+export const ROLE_LABELS: Record<string, string> = {
   young_blood: "Bairrista-1",
   o_gunao: "Bairrista-2",
   gangster_fodido: "Bairrista-3",
+  patrao_di_zona: "Chefe de Moradores",
+  real_gangster: "Oficiais-1",
+  og: "Oficiais-2",
+  kingpin: "Sub-Chefe",
+  manda_chuva: "Chefe",
+  bairrista: "Bairrista",
 };
 
-// (TIER_EMOJI removido — usar <TierIcon /> em todo o lado.)
+// Tier/descrição — informação secundária, sem substituir o cargo.
+export const TIER_LABELS: Record<string, string> = {
+  young_blood: "Entrada / Tier 1",
+  o_gunao: "Progressão / Tier 2",
+  gangster_fodido: "Progressão / Tier 3",
+  patrao_di_zona: "Gestão de moradores",
+  real_gangster: "Oficial de rua",
+  og: "Oficial sénior",
+  kingpin: "Subchefia",
+  manda_chuva: "Chefia máxima",
+  bairrista: "Bairro",
+};
 
-// Gradiente por tier — replicado do servidor de Discord.
-// Linear-gradient ~135deg, dois stops.
-// Gradients sincronizados com as cores dos roles do Discord.
-export const TIER_GRADIENT: Record<string, string> = getTierGradients();
+// Gradientes reais CSS para ícones/badges. Não usar classes Tailwind aqui.
+export const TIER_GRADIENT: Record<string, string> = {
+  manda_chuva: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
+  kingpin: "linear-gradient(135deg, #fb7185 0%, #9f1239 100%)",
+  og: "linear-gradient(135deg, #facc15 0%, #92400e 100%)",
+  real_gangster: "linear-gradient(135deg, #c084fc 0%, #6d28d9 100%)",
+  patrao_di_zona: "linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%)",
+  gangster_fodido: "linear-gradient(135deg, #22d3ee 0%, #0f766e 100%)",
+  o_gunao: "linear-gradient(135deg, #34d399 0%, #166534 100%)",
+  young_blood: "linear-gradient(135deg, #94a3b8 0%, #334155 100%)",
+  bairrista: "linear-gradient(135deg, #7c3aed 0%, #3b0764 100%)",
+};
 
-// Cor "principal" do tier — para textos e bordas.
-// Cores de texto/borda sincronizadas com as cores dos roles do Discord.
-export const TIER_ACCENT: Record<string, string> = getTierAccents();
+export const TIER_ACCENT: Record<string, string> = {
+  manda_chuva: "#ef4444",
+  kingpin: "#fb7185",
+  og: "#facc15",
+  real_gangster: "#c084fc",
+  patrao_di_zona: "#8b5cf6",
+  gangster_fodido: "#22d3ee",
+  o_gunao: "#34d399",
+  young_blood: "#94a3b8",
+  bairrista: "#a855f7",
+};
 
-// Tag "Chefia de Ballas" — roxo púrpura da firma.
-export const BALLAS_GRADIENT =
-  "linear-gradient(135deg, #9b59b6 0%, #6c3483 100%)";
+export const BALLAS_GRADIENT = "linear-gradient(135deg, #a855f7 0%, #581c87 100%)";
 
 // Ordem hierárquica (mais baixo → mais alto).
 export const TIER_ORDER: string[] = getTierOrder();
 
-// Tag "Chefia de Ballas" — patrões di zona e acima representam a firma.
 export const CHEFIA_TIERS = new Set<string>([
   "patrao_di_zona",
   "real_gangster",
@@ -79,40 +91,30 @@ export function tierLabel(tier: string | null | undefined): string {
 
 export function roleLabel(tier: string | null | undefined): string {
   if (!tier) return "—";
-  return DISCORD_ROLE_LABELS[tier] ?? tier;
+  return ROLE_LABELS[tier] ?? tier;
 }
 
-export const ROLE_LABELS = DISCORD_ROLE_LABELS;
-
-// Posições hierárquicas — o que aparece na coluna "Posição" e no perfil.
-export const POSITION_LABELS: Record<string, string> = DISCORD_ROLE_LABELS;
+// Posição/cargo principal — mantém nome antigo para compatibilidade.
+export const POSITION_LABELS: Record<string, string> = ROLE_LABELS;
 
 export function tierColor(tier: string | null | undefined): string {
   switch (tier) {
     case "manda_chuva":
-      // dourado Manda-Chuva
-      return "bg-[#eec16d/0.22] text-[#eec16d] border-[#eec16d/0.55]";
+      return "bg-red-500/15 text-red-300 border-red-400/50";
     case "kingpin":
-      // prateado Kingpin
-      return "bg-[#b3b5b8/0.22] text-[#b3b5b8] border-[#b3b5b8/0.55]";
+      return "bg-rose-500/15 text-rose-300 border-rose-400/50";
     case "og":
-      // vinho escuro OG
-      return "bg-[#470000/0.35] text-[#c94a4a] border-[#470000/0.55]";
+      return "bg-yellow-400/15 text-yellow-300 border-yellow-400/50";
     case "real_gangster":
-      // roxo Real Gangster
-      return "bg-[#9e6bff/0.22] text-[#9e6bff] border-[#9e6bff/0.55]";
+      return "bg-purple-400/15 text-purple-300 border-purple-400/50";
     case "patrao_di_zona":
-      // azul escuro Patrão
-      return "bg-[#021e85/0.22] text-[#3b82f6] border-[#021e85/0.55]";
+      return "bg-violet-500/15 text-violet-300 border-violet-400/50";
     case "gangster_fodido":
-      // verde-azulado Gangster Fodido
-      return "bg-[#3a8f97/0.22] text-[#3a8f97] border-[#3a8f97/0.55]";
+      return "bg-cyan-400/15 text-cyan-300 border-cyan-400/50";
     case "o_gunao":
-      // verde musgo O Gunão
-      return "bg-[#70966e/0.22] text-[#70966e] border-[#70966e/0.55]";
+      return "bg-emerald-400/15 text-emerald-300 border-emerald-400/50";
     case "young_blood":
-      // azul claro Young Blood
-      return "bg-[#4cadd0/0.22] text-[#4cadd0] border-[#4cadd0/0.55]";
+      return "bg-slate-400/15 text-slate-300 border-slate-400/50";
     case "bairrista":
     default:
       return "bg-muted text-muted-foreground border-border";
