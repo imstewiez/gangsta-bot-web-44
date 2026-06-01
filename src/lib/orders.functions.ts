@@ -25,7 +25,6 @@ type OrderRow = {
   responsavel_name: string | null;
   ingredients_json: Array<{ name: string; needed: number }> | null;
   batch_id: string | null;
-  dirty_money: number | null;
   payment_mode: string | null;
   material_cost: number | null;
   money_cost: number | null;
@@ -110,7 +109,7 @@ async function insertOrderHistory(orderId: number, oldStatus: string, newStatus:
       [orderId, oldStatus, newStatus, changedBy, notes ?? null],
     );
   } catch {
-    // History is useful, but missing legacy tables must not block operational flow.
+    // History is useful, but missing old tables must not block operational flow.
   }
 }
 
@@ -159,7 +158,6 @@ export const listOrders = createServerFn({ method: "GET" })
               mr.display_name as responsavel_name,
               o.ingredients_json,
               o.batch_id,
-              o.total_price::float as dirty_money,
               o.payment_mode,
               o.material_cost::float as material_cost,
               o.money_cost::float as money_cost
@@ -247,8 +245,8 @@ export const createOrder = createServerFn({ method: "POST" })
       const ingredientsJsonStr = effectivePaymentMode === "materials_money" ? JSON.stringify(ingredients) : null;
       const row = await pgOne<{ id: number }>(
         `insert into orders
-           (member_id, item_id, quantity, status, unit_price, total_price, notes, markup_percent, created_at, updated_at, updated_by, responsavel_member_id, ingredients_json, batch_id, dirty_money, payment_mode, material_cost, money_cost)
-         values ($1, $2, $3, 'pending', $4, $5, $6, 0, now(), now(), $7, $8, $9, $10, $11, $12, null, $13)
+           (member_id, item_id, quantity, status, unit_price, total_price, notes, markup_percent, created_at, updated_at, updated_by, responsavel_member_id, ingredients_json, batch_id, payment_mode, material_cost, money_cost)
+         values ($1, $2, $3, 'pending', $4, $5, $6, 0, now(), now(), $7, $8, $9, $10, $11, null, $12)
          returning id`,
         [
           me.id,
@@ -261,7 +259,6 @@ export const createOrder = createServerFn({ method: "POST" })
           data.responsavel_member_id,
           ingredientsJsonStr,
           batchId,
-          total,
           effectivePaymentMode,
           total,
         ],
@@ -296,6 +293,7 @@ export const transitionOrder = createServerFn({ method: "POST" })
       [data.id],
     );
     if (!current) throw new Error("Encomenda não encontrada");
+    if (!current.responsavel_member_id) throw new Error("Encomenda sem responsável — corrige nos Dados antes de alterar estados.");
     if (!me.is_superadmin && current.responsavel_member_id !== me.id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
     if (TERMINAL_STATUSES.has(current.status)) throw new Error("Esta encomenda já está fechada.");
     if (!(ALLOWED_TRANSITIONS[current.status] ?? []).includes(data.to)) throw new Error("Transição inválida para esta encomenda.");
@@ -345,7 +343,18 @@ export const listOrderComments = createServerFn({ method: "GET" })
     if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
     return { order_id: id };
   })
-  .handler(async ({ data }) => pgQuery<OrderCommentRow>(`select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`, [data.order_id]));
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Não tens conta de membro associada.");
+    const order = await pgOne<{ member_id: number; responsavel_member_id: number | null }>(
+      `select member_id, responsavel_member_id from orders where id = $1`,
+      [data.order_id],
+    );
+    if (!order) throw new Error("Encomenda não encontrada");
+    const canRead = order.member_id === me.id || order.responsavel_member_id === me.id || me.is_manager;
+    if (!canRead) throw new Error("Sem permissão para ver comentários desta encomenda.");
+    return pgQuery<OrderCommentRow>(`select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`, [data.order_id]);
+  });
 
 export const addOrderComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -360,9 +369,9 @@ export const addOrderComment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Não tens conta de membro associada.");
-    const order = await pgOne<{ member_id: number; status: string }>(`select member_id, status from orders where id = $1`, [data.order_id]);
+    const order = await pgOne<{ member_id: number; responsavel_member_id: number | null; status: string }>(`select member_id, responsavel_member_id, status from orders where id = $1`, [data.order_id]);
     if (!order) throw new Error("Encomenda não encontrada");
-    if (order.member_id !== me.id && !me.is_manager) throw new Error("Sem permissão para comentar nesta encomenda.");
+    if (order.member_id !== me.id && order.responsavel_member_id !== me.id && !me.is_manager) throw new Error("Sem permissão para comentar nesta encomenda.");
     return pgOne<OrderCommentRow>(
       `insert into order_comments (order_id, author_id, author_name, content, created_at)
        values ($1, $2, $3, $4, now())
