@@ -12,6 +12,31 @@ const TIERS = getTierOrder();
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+type AdminActor = Awaited<ReturnType<typeof resolveCurrentMember>>;
+
+type TargetMember = {
+  id: number;
+  discord_id: string | null;
+  display_name: string | null;
+  tier: string | null;
+  role: string | null;
+};
+
+const TIER_RANK: Record<string, number> = {
+  young_blood: 1,
+  o_gunao: 2,
+  gangster_fodido: 3,
+  patrao_di_zona: 4,
+  real_gangster: 5,
+  og: 6,
+  kingpin: 7,
+  manda_chuva: 8,
+};
+
+function tierRank(tier: string | null | undefined): number {
+  return TIER_RANK[String(tier ?? "").trim().toLowerCase()] ?? 0;
+}
+
 async function assertManager(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -30,12 +55,31 @@ async function assertSuperAdminMember(
   return me;
 }
 
-async function getMemberTier(id: number): Promise<string | null> {
-  const m = await pgOne<{ tier: string | null }>(
-    "select tier from members where id = $1",
+async function getTargetMember(id: number): Promise<TargetMember | null> {
+  return pgOne<TargetMember>(
+    `select id, discord_id, display_name, tier, role
+       from members
+      where id = $1
+        and deleted_at is null
+      limit 1`,
     [id],
   );
-  return m?.tier ?? null;
+}
+
+function assertCanManageTarget(me: NonNullable<AdminActor>, target: TargetMember, action = "alterar este membro") {
+  if (me.is_superadmin) return;
+  if (me.id === target.id) throw new Error("Não podes alterar a tua própria conta por aqui.");
+  if (tierRank(me.tier) <= tierRank(target.tier)) {
+    throw new Error(`Não podes ${action} do mesmo cargo ou superior ao teu.`);
+  }
+}
+
+function assertCanSetTier(me: NonNullable<AdminActor>, target: TargetMember, newTier: string) {
+  assertCanManageTarget(me, target, "alterar alguém");
+  if (me.is_superadmin) return;
+  if (tierRank(me.tier) <= tierRank(newTier)) {
+    throw new Error("Não podes promover/despromover alguém para o teu cargo ou superior.");
+  }
 }
 
 async function getDiscordId(memberId: number): Promise<string | null> {
@@ -58,9 +102,10 @@ export const adminRenameMember = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const me = await assertManager(context.supabase, context.userId);
-    const before = await pgOne<{ display_name: string | null; nickname: string | null }>(
-      "select display_name, nickname from members where id = $1", [data.id],
-    );
+    const before = await getTargetMember(data.id);
+    if (!before) throw new Error("Membro não encontrado ou já inativo.");
+    assertCanManageTarget(me, before, "renomear alguém");
+
     await pgQuery(
       "update members set display_name = $2, nickname = $3, updated_at = now() where id = $1",
       [data.id, data.display_name, data.nickname ?? null],
@@ -71,7 +116,7 @@ export const adminRenameMember = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Direção",
       targetType: "member",
       targetId: data.id,
-      details: `Renomeado de "${before?.display_name ?? ""}" para "${data.display_name}"`,
+      details: `Renomeado de "${before.display_name ?? ""}" para "${data.display_name}"`,
       afterState: { nickname: data.nickname, previous: before },
     });
     const did = await getDiscordId(data.id);
@@ -93,25 +138,21 @@ async function syncUserRolesForMember(memberId: number, newTier: string, oldTier
   if (!profile) return;
   const userId = profile.user_id;
 
-  // Add superadmin for manda_chuva
   if (isSuperAdminTier(newTier)) {
     await pgQuery(
       `insert into user_roles (user_id, role) values ($1, 'superadmin') on conflict (user_id, role) do nothing`,
       [userId],
     );
   }
-  // Add admin for kingpin/manda_chuva
   if (isAdminTier(newTier)) {
     await pgQuery(
       `insert into user_roles (user_id, role) values ($1, 'admin') on conflict (user_id, role) do nothing`,
       [userId],
     );
   }
-  // Remove superadmin if demoted from manda_chuva
   if (isSuperAdminTier(oldTier) && !isSuperAdminTier(newTier)) {
     await pgQuery(`delete from user_roles where user_id = $1 and role = 'superadmin'`, [userId]);
   }
-  // Remove admin if demoted from kingpin/manda_chuva to non-admin
   if (isAdminTier(oldTier) && !isAdminTier(newTier)) {
     await pgQuery(`delete from user_roles where user_id = $1 and role = 'admin'`, [userId]);
   }
@@ -126,28 +167,23 @@ export const adminSetTier = createServerFn({ method: "POST" })
     }).parse,
   )
   .handler(async ({ data, context }) => {
-    const targetTier = await getMemberTier(data.id);
-    const isPromotingToHighCommand = isAdminTier(data.tier);
-    const isDemotingFromHighCommand = targetTier ? isAdminTier(targetTier) : false;
+    const before = await getTargetMember(data.id);
+    if (!before) throw new Error("Membro não encontrado ou já inativo.");
 
-    let me;
-    if (isPromotingToHighCommand || isDemotingFromHighCommand) {
-      me = await assertSuperAdminMember(context.supabase, context.userId);
-    } else {
-      me = await assertManager(context.supabase, context.userId);
-    }
-    const before = await pgOne<{
-      tier: string | null;
-      discord_id: string | null;
-      display_name: string | null;
-    }>("select tier, discord_id, display_name from members where id = $1", [data.id]);
+    const isPromotingToHighCommand = isAdminTier(data.tier);
+    const isDemotingFromHighCommand = before.tier ? isAdminTier(before.tier) : false;
+    const me = isPromotingToHighCommand || isDemotingFromHighCommand
+      ? await assertSuperAdminMember(context.supabase, context.userId)
+      : await assertManager(context.supabase, context.userId);
+    assertCanSetTier(me, before, data.tier);
+
     await pgQuery(
-      "update members set tier = $2, role = $2, updated_at = now() where id = $1",
+      "update members set tier = $2, role = $2, status = 'ativo', lifecycle_state = 'active', deleted_at = null, updated_at = now() where id = $1",
       [data.id, data.tier],
     );
-    await syncUserRolesForMember(data.id, data.tier, before?.tier ?? null);
+    await syncUserRolesForMember(data.id, data.tier, before.tier ?? null);
     const tierList = getTierOrder();
-    const fromIdx = tierList.indexOf(before?.tier ?? "young_blood");
+    const fromIdx = tierList.indexOf(before.tier ?? "young_blood");
     const toIdx = tierList.indexOf(data.tier);
     const isPromotion = toIdx >= fromIdx;
     await logAdminAction(context.supabase, {
@@ -156,10 +192,10 @@ export const adminSetTier = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Direção",
       targetType: "member",
       targetId: data.id,
-      details: `${before?.display_name ?? "Membro"} ${isPromotion ? "promovido" : "despromovido"} de "${before?.tier ?? "?"}" para "${data.tier}"`,
-      afterState: { previous_tier: before?.tier, new_tier: data.tier },
+      details: `${before.display_name ?? "Membro"} ${isPromotion ? "promovido" : "despromovido"} de "${before.tier ?? "?"}" para "${data.tier}"`,
+      afterState: { previous_tier: before.tier, new_tier: data.tier },
     });
-    if (before?.discord_id) {
+    if (before.discord_id) {
       await notifyBot({
         action: isPromotion ? "promote" : "demote",
         discord_id: before.discord_id,
@@ -180,19 +216,24 @@ export const adminKickMember = createServerFn({ method: "POST" })
     }).parse,
   )
   .handler(async ({ data, context }) => {
-    const targetTier = await getMemberTier(data.id);
-    let me;
-    if (targetTier && isAdminTier(targetTier)) {
-      me = await assertSuperAdminMember(context.supabase, context.userId);
-    } else {
-      me = await assertManager(context.supabase, context.userId);
-    }
-    const target = await pgOne<{ discord_id: string | null; display_name: string | null }>(
-      "select discord_id, display_name from members where id = $1", [data.id],
-    );
+    const me = await assertManager(context.supabase, context.userId);
+    const target = await getTargetMember(data.id);
+    if (!target) throw new Error("Membro não encontrado ou já inativo.");
+    assertCanManageTarget(me, target, "expulsar alguém");
+
+    const reason = data.reason || "Expulso pela chefia";
     await pgQuery(
-      "update members set deleted_at = now(), updated_at = now() where id = $1",
-      [data.id],
+      `update members set
+         role = 'inativo',
+         status = 'inativo',
+         lifecycle_state = 'removed',
+         lifecycle_changed_at = now(),
+         lifecycle_changed_by = $2,
+         lifecycle_notes = $3,
+         deleted_at = now(),
+         updated_at = now()
+       where id = $1`,
+      [data.id, context.userId, reason],
     );
     await logAdminAction(context.supabase, {
       action: "member_kicked",
@@ -200,11 +241,11 @@ export const adminKickMember = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Direção",
       targetType: "member",
       targetId: data.id,
-      details: `${target?.display_name ?? "Membro #" + data.id} kickado${data.reason ? " (" + data.reason + ")" : ""}`,
-      afterState: { reason: data.reason },
+      details: `${target.display_name ?? "Membro #" + data.id} kickado${reason ? " (" + reason + ")" : ""}`,
+      afterState: { reason, previous_tier: target.tier, previous_role: target.role },
     });
-    if (target?.discord_id)
-      await notifyBot({ action: "kick", discord_id: target.discord_id, reason: data.reason });
+    if (target.discord_id)
+      await notifyBot({ action: "kick", discord_id: target.discord_id, reason });
     return { ok: true };
   });
 
@@ -218,7 +259,6 @@ function toNumber(v: unknown): number | undefined {
 export const adminAdjustStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => {
-    const obj = raw as Record<string, unknown>;
     const parsed = z.object({
       id: z.number().int().positive(),
       kills_delta: z.union([z.number().int(), z.string()]).optional(),
@@ -243,15 +283,16 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const me = await assertManager(context.supabase, context.userId);
-    // Ensure all_time_stats row exists for this member
+    const target = await getTargetMember(data.id);
+    if (!target) throw new Error("Membro não encontrado ou já inativo.");
+    assertCanManageTarget(me, target, "ajustar estatísticas de alguém");
+
     await pgQuery(`INSERT INTO all_time_stats (member_id, orders) VALUES ($1, 0) ON CONFLICT (member_id) DO NOTHING`, [data.id]);
     const reason = data.reason || "ajuste manual direção";
 
-    // Kills
     if (data.kills_delta && data.kills_delta !== 0) {
       const n = Math.abs(data.kills_delta);
       if (data.kills_delta > 0) {
-        // Batch insert N kill rows in a single query
         await pgQuery(
           `INSERT INTO kill_logs (killer_id, victim_name, spot, notes, created_at, created_by)
            SELECT $1, 'manual', 'ajuste', $2, now(), $3
@@ -264,7 +305,6 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
           [data.id, n],
         );
       }
-      // Sync all_time_stats
       await pgQuery(
         `insert into all_time_stats (member_id, kills_total, updated_at)
          values ($1, $2, now())
@@ -273,10 +313,7 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       );
     }
 
-    // Deaths
     if (data.deaths_delta && data.deaths_delta !== 0) {
-      const n = Math.abs(data.deaths_delta);
-      // Best-effort: update all_time_stats deaths directly since we don't track individual death logs
       await pgQuery(
         `insert into all_time_stats (member_id, deaths_total, updated_at)
          values ($1, $2, now())
@@ -285,7 +322,6 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       );
     }
 
-    // Deliveries
     if (data.deliveries_delta && data.deliveries_delta !== 0) {
       await pgQuery(
         `insert into all_time_stats (member_id, deliveries, updated_at)
@@ -295,7 +331,6 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       );
     }
 
-    // Sales
     if (data.sales_delta && data.sales_delta !== 0) {
       await pgQuery(
         `insert into all_time_stats (member_id, sales, updated_at)
@@ -305,7 +340,6 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       );
     }
 
-    // Orders
     if (data.orders_delta && data.orders_delta !== 0) {
       await pgQuery(
         `insert into all_time_stats (member_id, orders, updated_at)
@@ -315,7 +349,6 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       );
     }
 
-    // Saídas (operations count)
     if (data.saidas_delta && data.saidas_delta !== 0) {
       await pgQuery(
         `insert into all_time_stats (member_id, saidas_total, updated_at)
@@ -331,7 +364,7 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Direção",
       targetType: "member",
       targetId: data.id,
-      details: data.reason || "ajuste manual direção",
+      details: reason,
       afterState: {
         kills_delta: data.kills_delta,
         deaths_delta: data.deaths_delta,
