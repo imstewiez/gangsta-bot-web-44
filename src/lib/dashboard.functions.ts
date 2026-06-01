@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
-import { resolveCurrentMember } from "./pricing.server";
 
 type RankRow = {
   display_name: string | null;
@@ -29,13 +28,11 @@ type PrizeHighlight = {
 };
 
 type HomeKpis = {
-  // public-safe stats — visible to every member
   newMembersWeek: number;
-  totalSaidasWeek: number; // operações fechadas/finalizadas na semana
+  totalSaidasWeek: number;
   totalKillsWeek: number;
-  totalOpsWeek: number; // saídas iniciadas na semana (qualquer estado)
-  // Saídas stats
-  winRate: number; // % de vitórias nas saídas fechadas/finalizadas
+  totalOpsWeek: number;
+  winRate: number;
   avgKillsPerSaida: number;
   topOpsParticipants: { display_name: string | null; tier: string | null; ops: number }[];
   lastSaida: {
@@ -50,7 +47,6 @@ type HomeKpis = {
     mvp_name: string | null;
     mvp_kills: number;
   } | null;
-  // Existing
   byTier: { tier: string; count: number }[];
   topByTier: { tier: string; name: string | null; score: number }[];
   topWeek: RankRow[];
@@ -62,34 +58,167 @@ type HomeKpis = {
   prize: PrizeHighlight | null;
 };
 
-async function topForWeek(weekStart: string | null): Promise<RankRow[]> {
-  if (!weekStart) return [];
+const ACTIVE_MEMBER_CONDITION = `
+  m.deleted_at is null
+  and coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
+`;
+
+function scoreCtes(startSql: string, endSql: string) {
+  return `
+    with bounds as (select ${startSql} as dstart, ${endSql} as dend),
+    active_members as (
+      select m.id, m.display_name, m.nickname, m.tier
+      from members m
+      where ${ACTIVE_MEMBER_CONDITION}
+    ),
+    delivery_movements as (
+      select im.*,
+             regexp_replace(coalesce(im.notes,''), '^delivery:', '') as source_id
+      from inventory_movements im
+      cross join bounds
+      where im.movement_type in ('entrega_bairrista','entrega_oficial')
+        and im.member_id is not null
+        and im.quantity > 0
+        and im.created_at >= bounds.dstart
+        and im.created_at < bounds.dend + interval '1 day'
+    ),
+    deliveries_agg as (
+      select dm.member_id,
+             count(distinct coalesce(nullif(dm.source_id,''), dm.id::text))::int as deliveries,
+             coalesce(sum(dm.quantity * case
+               when lower(coalesce(i.category,'')) in ('quimicos_droga','dinheiro') then 0
+               else coalesce(i.xp_points, 0)
+             end), 0)::int as material_points
+      from delivery_movements dm
+      left join items i on i.id = dm.item_id
+      group by dm.member_id
+    ),
+    sales_movements as (
+      select im.*,
+             coalesce(
+               nullif(regexp_replace(coalesce(im.notes,''), '^delivery:', ''), ''),
+               nullif(regexp_replace(coalesce(im.notes,''), '^order:', ''), '')
+             ) as source_id
+      from inventory_movements im
+      cross join bounds
+      where im.movement_type = 'venda_bairrista'
+        and im.member_id is not null
+        and im.quantity < 0
+        and im.created_at >= bounds.dstart
+        and im.created_at < bounds.dend + interval '1 day'
+    ),
+    sales_agg as (
+      select sm.member_id,
+             count(distinct coalesce(nullif(sm.source_id,''), sm.id::text))::int as sales,
+             count(distinct coalesce(nullif(sm.source_id,''), sm.id::text))::int as sales_points
+      from sales_movements sm
+      group by sm.member_id
+    ),
+    ops_agg as (
+      select p.member_id,
+             count(*)::int as ops,
+             count(*) filter (where o.was_profitable = true)::int as wins,
+             count(*) filter (where p.died = true)::int as deaths
+      from operation_participants p
+      join operations o on o.id = p.operation_id and o.deleted_at is null
+      cross join bounds
+      where o.status = 'concluida'
+        and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
+        and coalesce(o.end_time, o.start_time, o.date::timestamp) < bounds.dend + interval '1 day'
+      group by p.member_id
+    ),
+    kills_logs_agg as (
+      select killer_id as member_id, count(*)::int as kills
+      from kill_logs
+      cross join bounds
+      where killer_id is not null
+        and date >= bounds.dstart
+        and date <= bounds.dend
+      group by killer_id
+    ),
+    kills_ops_agg as (
+      select p.member_id, sum(p.kills)::int as kills
+      from operation_participants p
+      join operations o on o.id = p.operation_id and o.deleted_at is null
+      cross join bounds
+      where o.status = 'concluida'
+        and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
+        and coalesce(o.end_time, o.start_time, o.date::timestamp) < bounds.dend + interval '1 day'
+        and p.kills > 0
+      group by p.member_id
+    ),
+    kills_agg as (
+      select coalesce(l.member_id, o.member_id) as member_id,
+             coalesce(l.kills, 0) + coalesce(o.kills, 0) as kills
+      from kills_logs_agg l
+      full outer join kills_ops_agg o on l.member_id = o.member_id
+    ),
+    scores as (
+      select am.id as member_id,
+             am.display_name,
+             am.nickname as nick,
+             am.tier,
+             coalesce(d.deliveries, 0)::int as deliveries,
+             coalesce(s.sales, 0)::int as sales,
+             coalesce(o.ops, 0)::int as ops,
+             coalesce(d.material_points, 0)::int as material_points,
+             coalesce(s.sales_points, 0)::int as sales_points,
+             (coalesce(o.ops, 0) * 5 + coalesce(o.wins, 0) * 10)::int as ops_points,
+             coalesce(k.kills, 0)::int as kills_count,
+             coalesce(o.wins, 0)::int as wins_count,
+             coalesce(o.deaths, 0)::int as deaths_count,
+             (coalesce(d.material_points, 0)
+              + coalesce(s.sales_points, 0) * 5
+              + coalesce(o.ops, 0) * 5
+              + coalesce(o.wins, 0) * 10
+              + coalesce(k.kills, 0) * 3
+              - coalesce(o.deaths, 0) * 5)::float8 as score
+      from active_members am
+      left join deliveries_agg d on d.member_id = am.id
+      left join sales_agg s on s.member_id = am.id
+      left join ops_agg o on o.member_id = am.id
+      left join kills_agg k on k.member_id = am.id
+    )
+  `;
+}
+
+async function topForRange(startSql: string, endSql: string, limit = 5): Promise<RankRow[]> {
   return pgQuery<RankRow>(
-    `select m.display_name, m.nickname as nick,
-            coalesce(wr.total_score, 0)::float as score,
-            coalesce(wr.deliveries,0) as deliveries,
-            coalesce(wr.sales,0) as sales,
-            coalesce(wr.operations_count,0) as ops,
-            coalesce(wr.material_points,0) as material_points,
-            coalesce(wr.sales_points,0) as sales_points,
-            coalesce(wr.ops_points,0) as ops_points,
-            coalesce(wr.kills_count,0) as kills_count,
-            coalesce(wr.wins_count,0) as wins_count
-     from weekly_rankings wr
-     join members m on m.id = wr.member_id
-     where wr.week_start = $1
-       and m.deleted_at is null
-       and (m.status = 'ativo' or m.status is null)
-       and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
-     order by coalesce(wr.hybrid_score, 0) desc nulls last
-     limit 5`,
-    [weekStart],
+    `${scoreCtes(startSql, endSql)}
+     select display_name, nick, score, deliveries, sales, ops,
+            material_points, sales_points, ops_points, kills_count, wins_count
+     from scores
+     where score > 0
+     order by score desc nulls last
+     limit ${limit}`,
+  ).catch(() => []);
+}
+
+async function topByTierAllTime(): Promise<{ tier: string; name: string | null; score: number }[]> {
+  return pgQuery<{ tier: string; name: string | null; score: number }>(
+    `${scoreCtes(`'1900-01-01'::date`, `current_date`)}
+     select tier, display_name as name, score
+     from (
+       select tier, display_name, score,
+              row_number() over (partition by tier order by score desc nulls last) as rn
+       from scores
+       where score > 0
+     ) ranked
+     where rn <= 3
+     order by tier, score desc nulls last`,
   ).catch(() => []);
 }
 
 export const getHomeKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<HomeKpis> => {
+    const currentWeekStart = `date_trunc('week', current_date)::date`;
+    const currentWeekEnd = `(date_trunc('week', current_date)::date + interval '6 days')::date`;
+    const prevWeekStart = `(date_trunc('week', current_date)::date - interval '7 days')::date`;
+    const prevWeekEnd = `(date_trunc('week', current_date)::date - interval '1 day')::date`;
+    const monthStart = `date_trunc('month', current_date)::date`;
+    const monthEnd = `(date_trunc('month', current_date)::date + interval '1 month' - interval '1 day')::date`;
+
     const [
       byTier,
       topByTier,
@@ -101,34 +230,22 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       avgKillsRow,
       topOpsRow,
       lastSaidaRow,
-      weeks,
+      weekLabels,
+      topWeek,
+      topPrevWeek,
       monthRows,
       prize,
-      currentLeader,
     ] = await Promise.all([
       pgQuery<{ tier: string; count: string }>(
         `select coalesce(m.tier, 'unknown') as tier, count(*)::text as count
          from members m
-         where m.deleted_at is null
-           and (m.status = 'ativo' or m.status is null)
-           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
+         where ${ACTIVE_MEMBER_CONDITION}
          group by 1 order by 2 desc`,
       ).catch(() => []),
-      pgQuery<{ tier: string; name: string | null; score: number }>(
-        `select m.tier, m.display_name as name,
-                coalesce(s.kills_total * 3 + s.deliveries * 2 + s.sales * 2 + s.saidas_total * 2 + s.wins * 4 - s.deaths_total, 0)::float as score
-         from members m
-         left join all_time_stats s on s.member_id = m.id
-         where m.deleted_at is null
-           and (m.status = 'ativo' or m.status is null)
-           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
-         order by m.tier, coalesce(s.kills_total * 3 + s.deliveries * 2 + s.sales * 2 + s.saidas_total * 2 + s.wins * 4 - s.deaths_total, 0) desc`,
-      ).catch(() => []),
+      topByTierAllTime(),
       pgOne<{ count: string }>(
         `select count(*)::text as count from members m
-         where m.deleted_at is null
-           and (m.status = 'ativo' or m.status is null)
-           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
+         where ${ACTIVE_MEMBER_CONDITION}
            and m.joined_at >= now() - interval '7 days'`
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
@@ -170,16 +287,15 @@ export const getHomeKpis = createServerFn({ method: "GET" })
            and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`,
       ).catch(() => ({ avg: "0" })),
       pgQuery<{ display_name: string | null; tier: string | null; ops: number }>(
-        `select m.display_name, m.tier,
-                sum(coalesce(wr.operations_count,0))::int as ops
-         from weekly_rankings wr
-         join members m on m.id = wr.member_id
-         where wr.week_start = (select max(week_start) from weekly_rankings)
-           and m.deleted_at is null
-           and (m.status = 'ativo' or m.status is null)
-           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
+        `select m.display_name, m.tier, count(*)::int as ops
+         from operation_participants p
+         join operations o on o.id = p.operation_id and o.deleted_at is null
+         join members m on m.id = p.member_id
+         where o.status = 'concluida'
+           and ${ACTIVE_MEMBER_CONDITION}
+           and coalesce(o.end_time, o.start_time, o.date::timestamp) >= date_trunc('week', current_date)::date
+           and coalesce(o.end_time, o.start_time, o.date::timestamp) < date_trunc('week', current_date)::date + interval '7 days'
          group by m.display_name, m.tier
-         having sum(coalesce(wr.operations_count,0)) > 0
          order by ops desc
          limit 3`,
       ).catch(() => []),
@@ -234,37 +350,16 @@ export const getHomeKpis = createServerFn({ method: "GET" })
         order by coalesce(o.end_time, o.start_time, o.date::timestamp) desc
         limit 1`,
       ).catch(() => null),
-      pgQuery<{ week_start: string }>(
-        `select to_char(week_start,'YYYY-MM-DD') as week_start
-         from weekly_rankings
-         where (hybrid_score > 0 or normalized_score > 0 or performance_score > 0
-                or deliveries > 0 or sales > 0 or operations_count > 0)
-         group by week_start
-         order by week_start desc
-         limit 2`,
-      ).catch(() => []),
-      pgQuery<RankRow>(
-        `select m.display_name, m.nickname as nick,
-                sum(coalesce(wr.hybrid_score, 0))::float as score,
-                sum(coalesce(wr.deliveries,0))::int as deliveries,
-                sum(coalesce(wr.sales,0))::int as sales,
-                sum(coalesce(wr.operations_count,0))::int as ops,
-                sum(coalesce(wr.material_points,0))::int as material_points,
-                sum(coalesce(wr.sales_points,0))::int as sales_points,
-                sum(coalesce(wr.ops_points,0))::int as ops_points,
-                sum(coalesce(wr.kills_count,0))::int as kills_count,
-                sum(coalesce(wr.wins_count,0))::int as wins_count
-         from weekly_rankings wr
-         join members m on m.id = wr.member_id
-         where wr.week_start >= date_trunc('month', current_date)::date
-           and m.deleted_at is null
-           and (m.status = 'ativo' or m.status is null)
-           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
-         group by m.display_name, m.nickname
-         having sum(coalesce(wr.hybrid_score, 0)) > 0
-         order by score desc nulls last
-         limit 5`,
-      ).catch(() => []),
+      pgOne<{ current_start: string; prev_start: string; month_label: string; current_week_label: string }>(
+        `select
+           to_char(date_trunc('week', current_date)::date, 'YYYY-MM-DD') as current_start,
+           to_char((date_trunc('week', current_date)::date - interval '7 days')::date, 'YYYY-MM-DD') as prev_start,
+           to_char(current_date, 'TMMonth YYYY') as month_label,
+           to_char(date_trunc('week', current_date)::date,'DD/MM') || ' – ' || to_char((date_trunc('week', current_date)::date + interval '6 days')::date,'DD/MM') as current_week_label`,
+      ).catch(() => null),
+      topForRange(currentWeekStart, currentWeekEnd),
+      topForRange(prevWeekStart, prevWeekEnd),
+      topForRange(monthStart, monthEnd),
       pgOne<PrizeHighlight>(
         `select m.display_name as winner_name, m.tier as winner_tier,
                 wp.hybrid_score::float as score,
@@ -277,39 +372,20 @@ export const getHomeKpis = createServerFn({ method: "GET" })
          where wp.week_start = date_trunc('week', current_date)::date
          limit 1`,
       ).catch(() => null),
-      pgOne<PrizeHighlight>(
-        `select m.display_name as winner_name, m.tier as winner_tier,
-                coalesce(wr.total_score, 0)::float as score,
-                null::text as prize_description,
-                'em_curso'::text as prize_status,
-                to_char(date_trunc('week', current_date)::date,'YYYY-MM-DD') as week_start,
-                to_char(date_trunc('week', current_date)::date,'DD/MM') || ' – ' || to_char((date_trunc('week', current_date)::date + interval '6 days')::date,'DD/MM') as week_label,
-                'in_progress'::text as status
-         from weekly_rankings wr
-         join members m on m.id = wr.member_id
-         where wr.week_start = date_trunc('week', current_date)::date
-           and m.deleted_at is null
-           and coalesce(m.lifecycle_state::text, 'active') in ('active', 'promoted')
-         order by coalesce(wr.hybrid_score, 0) desc nulls last
-         limit 1`,
-      ).catch(() => null),
     ]);
 
-    const resolvedPrize = prize ?? currentLeader;
-
-    const [latestWeek, prevWeek] = [
-      weeks[0]?.week_start ?? null,
-      weeks[1]?.week_start ?? null,
-    ];
-    const [topWeek, topPrevWeek] = await Promise.all([
-      topForWeek(latestWeek),
-      topForWeek(prevWeek),
-    ]);
-
-    const monthLabel = new Intl.DateTimeFormat("pt-PT", {
-      month: "long",
-      year: "numeric",
-    }).format(new Date());
+    const resolvedPrize = prize ?? (topWeek[0]
+      ? {
+          winner_name: topWeek[0].display_name ?? topWeek[0].nick,
+          winner_tier: null,
+          score: topWeek[0].score,
+          prize_description: null,
+          prize_status: "em_curso",
+          week_start: weekLabels?.current_start ?? null,
+          week_label: weekLabels?.current_week_label ?? null,
+          status: "in_progress" as const,
+        }
+      : null);
 
     const wr = winRateRows[0] ?? { wins: 0, total: 0 };
 
@@ -325,13 +401,11 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       byTier: byTier.map((r) => ({ tier: r.tier, count: Number(r.count) })),
       topByTier: topByTier.map((r) => ({ tier: r.tier, name: r.name, score: Number(r.score) })),
       topWeek,
-      topWeekLabel: latestWeek,
+      topWeekLabel: weekLabels?.current_start ?? null,
       topPrevWeek,
-      topPrevWeekLabel: prevWeek,
+      topPrevWeekLabel: weekLabels?.prev_start ?? null,
       topMonth: monthRows,
-      topMonthLabel: monthLabel,
+      topMonthLabel: weekLabels?.month_label ?? null,
       prize: resolvedPrize,
     };
   });
-
-
