@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { getAllRecipes, getItemById } from "./config.loader";
 
 export type OrderCycle = {
   cycle_start: string;
@@ -43,39 +42,45 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
       pgOne<{ count: number }>(`select count(*)::int as count from members where deleted_at is null and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')`).catch(() => ({ count: 0 })),
       pgOne<{ count: number }>(`select count(*)::int as count from orders where status in ('pending', 'approved', 'in_progress', 'ready')`).catch(() => ({ count: 0 })),
       pgOne<{ count: number }>(`select count(*)::int as count from inventory_delivery_requests where status = 'pending'`).catch(() => ({ count: 0 })),
-      (async () => {
-        const recipes = getAllRecipes();
-        const recipeIngredientNames = new Set<string>();
-        for (const recipe of Object.values(recipes)) {
-          for (const ingId of Object.keys(recipe.inputs)) {
-            const item = getItemById(ingId);
-            if (item) recipeIngredientNames.add(item.name);
-          }
-        }
-        const ingredientNames = Array.from(recipeIngredientNames);
-        return pgQuery<{ name: string; balance: number }>(
-          `select i.name, coalesce(b.balance, 0)::int as balance
+      pgQuery<{ name: string; balance: number }>(
+        `with visible_items as (
+           select i.id, i.name
            from items i
-           left join inventory_balance b on b.item_id = i.id
-           where i.active = true
-             and (i.side in ('venda', 'ambos') or i.name = any($1::text[]))
-             and coalesce(b.balance, 0) < 5
-           order by coalesce(b.balance, 0) asc
-           limit 10`,
-          [ingredientNames],
-        ).catch(() => []);
-      })(),
+           where coalesce(i.active, true) = true
+             and i.deleted_at is null
+             and (
+               coalesce(i.side, 'venda') in ('venda', 'ambos')
+               or exists (
+                 select 1
+                 from recipe_ingredients ri
+                 join craft_recipes cr on cr.id = ri.recipe_id
+                 join items out_i on out_i.id = cr.item_id
+                 where ri.ingredient_item_id = i.id
+                   and coalesce(ri.quantity, 0) > 0
+                   and coalesce(out_i.active, true) = true
+                   and out_i.deleted_at is null
+               )
+             )
+         )
+         select vi.name, coalesce(b.balance, 0)::int as balance
+         from visible_items vi
+         left join inventory_balance b on b.item_id = vi.id
+         where coalesce(b.balance, 0) < 5
+         order by coalesce(b.balance, 0) asc
+         limit 10`,
+      ).catch(() => []),
       pgOne<{ total: number }>(
-        `select coalesce(sum(coalesce(b.balance, 0) * coalesce(i.estimated_value, i.min_sale_price, i.purchase_price, 0)), 0)::float as total
+        `select coalesce(sum(coalesce(b.balance, 0) * coalesce(i.estimated_value, 0)), 0)::float as total
          from items i
          left join inventory_balance b on b.item_id = i.id
-         where i.active = true`
+         where coalesce(i.active, true) = true
+           and i.deleted_at is null`,
       ).catch(() => ({ total: 0 })),
       pgOne<{ total: number }>(
         `select coalesce(sum(total_price), 0)::float as total
          from orders
          where status = 'fulfilled'
-           and created_at >= now() - interval '7 days'`
+           and created_at >= now() - interval '7 days'`,
       ).catch(() => ({ total: 0 })),
       pgQuery<{ display_name: string | null; days: number }>(
         `WITH member_activity AS (
@@ -104,7 +109,7 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
          FROM member_activity
          WHERE last_active < now() - interval '14 days'
          ORDER BY last_active ASC
-         LIMIT 10`
+         LIMIT 10`,
       ).catch(() => []),
     ]);
 
