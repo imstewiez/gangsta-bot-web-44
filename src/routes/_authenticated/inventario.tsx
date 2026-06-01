@@ -89,7 +89,7 @@ function Page() {
           </TabsList>
 
           <TabsContent value="stock" className="mt-4">
-            <StockTable />
+            <StockTable canSeeValues={me.data?.is_manager ?? false} />
           </TabsContent>
           <TabsContent value="ledger" className="mt-4">
             <LedgerTable />
@@ -100,7 +100,7 @@ function Page() {
   );
 }
 
-function StockTable() {
+function StockTable({ canSeeValues }: { canSeeValues: boolean }) {
   const fn = useAuthedServerFn(getStock);
   const q = useQuery({ queryKey: ["stock"], queryFn: () => fn() });
   const rows = q.data ?? [];
@@ -144,14 +144,14 @@ function StockTable() {
         const cfg = ARMORY_CAT_CONFIG[cat as keyof typeof ARMORY_CAT_CONFIG];
         const meta = cfg ?? { label: cat, tone: "muted", order: 99, icon: Package, color: "", bg: "", border: "", headerColor: "" };
         const totalQty = items.reduce((s, r) => s + (r.qty ?? 0), 0);
-        const value = items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0);
+        const value = canSeeValues ? items.reduce((s, r) => s + (r.qty ?? 0) * (r.unit_price ?? 0), 0) : null;
         return (
           <section key={cat} className="overflow-hidden rounded-sm border border-border bg-card">
             <div className="border-b">
               <CategoryHeader
                 category={cat}
                 className="rounded-none border-x-0 border-t-0"
-                right={`${items.length} refs · ${fmtNum(totalQty)} em casa · ${fmtPrice(Math.round(value))}`}
+                right={canSeeValues ? `${items.length} refs · ${fmtNum(totalQty)} em casa · ${fmtPrice(Math.round(value ?? 0))}` : `${items.length} refs · ${fmtNum(totalQty)} em casa`}
               />
             </div>
             <div className="overflow-x-auto">
@@ -160,7 +160,7 @@ function StockTable() {
                   <tr>
                     <th className="px-3 py-2 text-left">Material</th>
                     <th className="px-3 py-2 text-right">Em casa</th>
-                    <th className="px-3 py-2 text-right">Preço unid.</th>
+                    {canSeeValues && <th className="px-3 py-2 text-right">Valor interno unid.</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -168,7 +168,7 @@ function StockTable() {
                     .slice()
                     .sort((a, b) => (a.unit_price ?? 0) - (b.unit_price ?? 0))
                     .map((r) => (
-                      <StockRow key={r.item_id} r={r} cat={cat} />
+                      <StockRow key={r.item_id} r={r} cat={cat} canSeeValues={canSeeValues} />
                     ))}
                 </tbody>
               </table>
@@ -180,7 +180,7 @@ function StockTable() {
   );
 }
 
-function StockRow({ r, cat }: { r: StockRowType; cat: string }) {
+function StockRow({ r, cat, canSeeValues }: { r: StockRowType; cat: string; canSeeValues: boolean }) {
   const low = r.qty <= 0;
   const warn = r.qty > 0 && r.qty < 5;
 
@@ -195,9 +195,11 @@ function StockRow({ r, cat }: { r: StockRowType; cat: string }) {
       <td className={"px-3 py-2 text-right font-mono " + (low ? "text-destructive" : warn ? "text-warning" : "")}>
         {fmtNum(r.qty)}
       </td>
-      <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-        {r.unit_price != null ? fmtPrice(r.unit_price) : "—"}
-      </td>
+      {canSeeValues && (
+        <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+          {r.unit_price != null ? fmtPrice(r.unit_price) : "—"}
+        </td>
+      )}
     </tr>
   );
 }
