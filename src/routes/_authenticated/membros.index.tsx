@@ -6,8 +6,8 @@ import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { POSITION_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
-import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
+import { fmtDate, TIER_ORDER } from "@/lib/domain";
+import { RoleBadge, TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
 import { Users, RotateCcw, Loader2 } from "lucide-react";
 import { Reveal } from "@/components/layout/Reveal";
@@ -36,7 +36,6 @@ function Page() {
     !q || (m.display_name ?? "").toLowerCase().includes(q.toLowerCase()) ||
     (m.nick ?? "").toLowerCase().includes(q.toLowerCase())
   );
-  // ordena por hierarquia (mais alto primeiro), depois alfabético
   const sorted = [...filtered].sort((a, b) => {
     const ai = TIER_ORDER.indexOf(a.tier ?? "");
     const bi = TIER_ORDER.indexOf(b.tier ?? "");
@@ -72,7 +71,7 @@ function Page() {
             <tr className="interactive-row">
               <th className="px-3 py-2 text-left">Nome</th>
               <th className="px-3 py-2 text-left">Alcunha</th>
-              <th className="px-3 py-2 text-left">Posição</th>
+              <th className="px-3 py-2 text-left">Cargo</th>
               <th className="px-3 py-2 text-left">Tier</th>
               <th className="px-3 py-2 text-left">Afiliação</th>
               <th className="px-3 py-2 text-left">Entrou</th>
@@ -98,7 +97,7 @@ function Page() {
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{m.nick ?? "—"}</td>
-                <td className="px-3 py-2 text-muted-foreground">{POSITION_LABELS[m.tier ?? "bairrista"] ?? m.tier}</td>
+                <td className="px-3 py-2"><RoleBadge tier={m.tier} /></td>
                 <td className="px-3 py-2"><TierBadge tier={m.tier} /></td>
                 <td className="px-3 py-2"><AffiliationBadge tier={m.tier} /></td>
                 <td className="px-3 py-2 text-xs text-muted-foreground">{fmtDate(m.joined_at)}</td>
