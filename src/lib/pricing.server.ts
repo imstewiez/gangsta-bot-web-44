@@ -21,6 +21,11 @@ type MemberRecord = {
   role_label: string | null;
 };
 
+const ACTIVE_MEMBER_SQL = `
+  deleted_at is null
+  and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')
+`;
+
 function decorateMember(member: MemberRecord, viewAs?: { actual_member_id: number; actual_display_name: string | null }): CurrentMember {
   return {
     ...member,
@@ -40,7 +45,8 @@ async function getMemberByDiscord(discordId: string): Promise<MemberRecord | nul
   return pgOne<MemberRecord>(
     `select id, discord_id, display_name, tier, coalesce(role,'bairrista') as role_label
      from members
-     where discord_id = $1 and deleted_at is null
+     where discord_id = $1
+       and ${ACTIVE_MEMBER_SQL}
      limit 1`,
     [discordId],
   );
@@ -50,7 +56,8 @@ async function getMemberById(memberId: number): Promise<MemberRecord | null> {
   return pgOne<MemberRecord>(
     `select id, discord_id, display_name, tier, coalesce(role,'bairrista') as role_label
      from members
-     where id = $1 and deleted_at is null
+     where id = $1
+       and ${ACTIVE_MEMBER_SQL}
      limit 1`,
     [memberId],
   );
