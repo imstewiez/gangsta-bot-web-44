@@ -4,7 +4,6 @@ import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { IdSchema } from "./security";
-import { getAllItems, getAllRecipes, getItemById } from "./config.loader";
 import { resolveItemPrices } from "./pricing.resolver";
 
 async function gateInventory(supabase: unknown, userId: string) {
@@ -13,23 +12,10 @@ async function gateInventory(supabase: unknown, userId: string) {
   return me;
 }
 
-function getConfigRecipeIngredientNames(): Set<string> {
-  const recipes = getAllRecipes();
-  const names = new Set<string>();
-  for (const recipe of Object.values(recipes)) {
-    for (const ingId of Object.keys(recipe.inputs)) {
-      const item = getItemById(ingId);
-      if (item) names.add(item.name);
-    }
-  }
-  return names;
-}
-
-function isInventoryVisible(side: string | null | undefined, itemName: string, recipeIngredientNames: Set<string>, recipeIngredientIds: Set<number>, itemId?: number): boolean {
+function isInventoryVisible(side: string | null | undefined, recipeIngredientIds: Set<number>, itemId: number): boolean {
   const effectiveSide = side ?? "venda";
   if (effectiveSide === "venda" || effectiveSide === "ambos") return true;
-  if (effectiveSide === "compra" && recipeIngredientNames.has(itemName)) return true;
-  if (effectiveSide === "compra" && itemId && recipeIngredientIds.has(itemId)) return true;
+  if (effectiveSide === "compra" && recipeIngredientIds.has(itemId)) return true;
   return false;
 }
 
@@ -53,11 +39,18 @@ async function getInventoryVisibleItems(): Promise<Array<{
   estimated_value: number | null;
   morador_purchase_price: number | null;
 }>> {
-  const configItems = getAllItems();
-  const configByName = new Map(Object.values(configItems).map((i) => [i.name, i]));
-  const recipeIngredientNames = getConfigRecipeIngredientNames();
   const recipeIngredientIdRows = await pgQuery<{ ingredient_item_id: number }>(
-    `select distinct ingredient_item_id from recipe_ingredients where ingredient_item_id is not null`,
+    `select distinct ri.ingredient_item_id
+     from recipe_ingredients ri
+     join items ing on ing.id = ri.ingredient_item_id
+     join craft_recipes cr on cr.id = ri.recipe_id
+     join items out_i on out_i.id = cr.item_id
+     where ri.ingredient_item_id is not null
+       and coalesce(ri.quantity, 0) > 0
+       and coalesce(ing.active, true) = true
+       and ing.deleted_at is null
+       and coalesce(out_i.active, true) = true
+       and out_i.deleted_at is null`,
   );
   const recipeIngredientIds = new Set(recipeIngredientIdRows.map((r) => r.ingredient_item_id));
 
@@ -82,18 +75,13 @@ async function getInventoryVisibleItems(): Promise<Array<{
      order by category, name`,
   );
 
-  return dbItems.filter((i) => {
-    const config = configByName.get(i.name);
-    return isInventoryVisible(i.side ?? config?.side, i.name, recipeIngredientNames, recipeIngredientIds, i.id);
-  });
+  return dbItems.filter((i) => isInventoryVisible(i.side, recipeIngredientIds, i.id));
 }
 
 export const getStock = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<StockRow[]> => {
-    await gateInventory(context.supabase, context.userId);
-    const configItems = getAllItems();
-    const configByName = new Map(Object.values(configItems).map((i) => [i.name, i]));
+    const me = await gateInventory(context.supabase, context.userId);
     const visibleItems = await getInventoryVisibleItems();
     const dbIds = visibleItems.map((i) => i.id);
     if (dbIds.length === 0) return [];
@@ -109,15 +97,14 @@ export const getStock = createServerFn({ method: "GET" })
     const balanceMap = new Map(balances.map((b) => [b.item_id, b.balance]));
 
     return visibleItems.map((db) => {
-      const config = configByName.get(db.name) ?? null;
-      const prices = resolveItemPrices(db, config);
+      const prices = resolveItemPrices(db, null);
       return {
         item_id: db.id,
         item_name: db.name,
-        category: db.category ?? config?.category ?? null,
-        subcategory: db.subcategory ?? config?.subcategory ?? null,
+        category: db.category ?? null,
+        subcategory: db.subcategory ?? null,
         qty: balanceMap.get(db.id) ?? 0,
-        unit_price: prices.purchase_price ?? prices.estimated_value ?? null,
+        unit_price: me.is_manager ? (prices.estimated_value ?? prices.purchase_price ?? prices.min_sale_price ?? null) : null,
       };
     });
   });
@@ -140,7 +127,8 @@ export const adjustStock = createServerFn({ method: "POST" })
     return z.object({ item_id: IdSchema, new_qty: z.number().finite() }).parse(d);
   })
   .handler(async ({ data, context }) => {
-    await gateInventory(context.supabase, context.userId);
+    const me = await gateInventory(context.supabase, context.userId);
+    if (!me.is_manager) throw new Error("Sem permissão para ajustar stock.");
     const item = await pgOne<{ id: number }>(
       `select id from items where id = $1 and coalesce(active, true) = true and deleted_at is null`,
       [data.item_id],
