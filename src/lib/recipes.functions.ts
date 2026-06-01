@@ -45,10 +45,12 @@ type DbPriceRow = {
   morador_purchase_price: number | null;
 };
 
+type RecipeInput = { item_id: number; name: string; quantity: number; category: string | null; subcategory: string | null };
+
 type MergedRecipe = {
   output_item_id: number;
   output_name: string;
-  inputs: Array<{ item_id: number; name: string; quantity: number; category: string | null; subcategory: string | null }>;
+  inputs: RecipeInput[];
 };
 
 function internalCost(value: number | null | undefined): number {
@@ -58,6 +60,26 @@ function internalCost(value: number | null | undefined): number {
 
 function managerOnly(value: number, canSeeCosts: boolean): number {
   return canSeeCosts ? value : 0;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function isOrangeCategory(output: { category: string | null; subcategory: string | null }): boolean {
+  return normalizeText(output.category) === "armas_orange" || normalizeText(output.subcategory) === "armas_orange";
+}
+
+function isPiecesIngredient(input: RecipeInput): boolean {
+  const name = normalizeText(input.name);
+  const category = normalizeText(input.category);
+  const subcategory = normalizeText(input.subcategory);
+  return name === "peca" || name === "pecas" || category === "peca" || category === "pecas" || subcategory === "peca" || subcategory === "pecas";
+}
+
+function paymentInputsForOrder(output: { category: string | null; subcategory: string | null }, inputs: RecipeInput[]): RecipeInput[] {
+  if (!isOrangeCategory(output)) return inputs;
+  return inputs.filter(isPiecesIngredient);
 }
 
 async function getDbItemsByIds(ids: number[]): Promise<Map<number, DbPriceRow>> {
@@ -250,7 +272,7 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
     const headPrices = resolveItemPrices(output, null, me?.tier ?? null, surchargeMap.get(output.id) ?? null);
     const ingredients: CraftFeasibility["ingredients"] = [];
 
-    for (const input of recipe.inputs) {
+    for (const input of paymentInputsForOrder(output, recipe.inputs)) {
       const ingDb = dbItems.get(input.item_id);
       if (!ingDb) continue;
       const unitCost = internalCost(ingDb.estimated_value);
@@ -319,7 +341,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         const itemPrices = resolveItemPrices(item, null);
         hiddenCost += internalCost(itemPrices.estimated_value) * line.quantity;
 
-        for (const input of recipe.inputs) {
+        for (const input of paymentInputsForOrder(item, recipe.inputs)) {
           const ingDb = ingredientItems.get(input.item_id);
           if (!ingDb) continue;
           const unitCost = internalCost(ingDb.estimated_value);
