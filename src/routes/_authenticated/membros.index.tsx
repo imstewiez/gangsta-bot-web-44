@@ -1,21 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useState } from "react";
 import { listMembers } from "@/lib/members.functions";
-import { getCurrentMember } from "@/lib/pricing.functions";
-import { syncDiscordMembers } from "@/lib/member-sync.functions";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { ROLE_LABELS, POSITION_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
+import { POSITION_LABELS, fmtDate, TIER_ORDER } from "@/lib/domain";
 import { TierBadge, AffiliationBadge } from "@/components/domain/RoleBadge";
 import { TierIcon } from "@/components/domain/TierIcon";
-import { Users, RotateCcw, Loader2, RefreshCw } from "lucide-react";
-import { Reveal, Stagger } from "@/components/layout/Reveal";
+import { Users, RotateCcw, Loader2 } from "lucide-react";
+import { Reveal } from "@/components/layout/Reveal";
 import { PLACEHOLDER, LOADING, beautifyError } from "@/lib/messages";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/membros/")({
   head: () => ({
@@ -26,10 +22,7 @@ export const Route = createFileRoute("/_authenticated/membros/")({
 
 function Page() {
   useRealtimeSync(["members"]);
-  const qc = useQueryClient();
   const fn = useAuthedServerFn(listMembers);
-  const meFn = useAuthedServerFn(getCurrentMember);
-  const syncFn = useAuthedServerFn(syncDiscordMembers);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["members"],
     queryFn: () => fn(),
@@ -37,21 +30,7 @@ function Page() {
     gcTime: 0,
     refetchOnMount: "always",
   });
-  const me = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
-  const isManager = me.data?.is_manager ?? false;
   const [q, setQ] = useState("");
-
-  const syncM = useMutation({
-    mutationFn: () => syncFn(),
-    onSuccess: (result) => {
-      toast.success(`Sincronização concluída: ${result.created} criados, ${result.updated} atualizados, ${result.deactivated ?? 0} desativados.`);
-      qc.invalidateQueries({ queryKey: ["members"] });
-      qc.invalidateQueries({ queryKey: ["view-as-targets"] });
-      refetch();
-    },
-    onError: (e: Error) => toast.error(beautifyError(e)),
-  });
-
   const list = Array.isArray(data) ? data : [];
   const filtered = list.filter((m) =>
     !q || (m.display_name ?? "").toLowerCase().includes(q.toLowerCase()) ||
@@ -70,17 +49,7 @@ function Page() {
     <>
       <PageHeader eyebrow="Bairro" title="Membros" description={`${list.length} membro${list.length !== 1 ? "s" : ""}`}
         icon={Users}
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {isManager && (
-              <Button size="sm" variant="outline" onClick={() => syncM.mutate()} disabled={syncM.isPending}>
-                {syncM.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
-                Sincronizar Discord
-              </Button>
-            )}
-            <Input placeholder={PLACEHOLDER.searchMembers} value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />
-          </div>
-        }
+        action={<Input placeholder={PLACEHOLDER.searchMembers} value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />}
       />
       {error && (
         <Reveal direction="up">
