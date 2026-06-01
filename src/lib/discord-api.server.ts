@@ -99,7 +99,9 @@ export async function fetchGuildMember(discordId: string): Promise<DiscordGuildM
   }
 }
 
-// Role configuration — MUST match the Discord bot config
+// Role configuration — MUST match the Discord bot config.
+// Importante: a tag base/friends nunca deve, sozinha, criar ou manter membro ativo.
+// Só cargos operacionais reais/tier contam para membership da Ballas.
 const CHEFIA_TIERS = [
   { key: "manda_chuva", env: "MANDA_CHUVA_ROLE_ID" },
   { key: "kingpin", env: "KINGPIN_ROLE_ID" },
@@ -132,7 +134,7 @@ function resolveTier(roleIds: string[], tiers: { key: string; env: string }[]): 
 
 /**
  * Detect the RP role/tier for a Discord member based on their role IDs.
- * Returns null if the member has no relevant RP roles.
+ * Returns null if the member has no relevant operational Ballas role.
  */
 export function detectMemberRole(
   roleIds: string[]
@@ -140,32 +142,22 @@ export function detectMemberRole(
   const chefiaIds = [getRoleIdFromEnv("MANDA_CHUVA_ROLE_ID"), getRoleIdFromEnv("KINGPIN_ROLE_ID")].filter(Boolean) as string[];
   const oficialIds = [getRoleIdFromEnv("OG_ROLE_ID"), getRoleIdFromEnv("REAL_GANGSTER_ROLE_ID")].filter(Boolean) as string[];
   const patraoIds = [getRoleIdFromEnv("PATRAO_DI_ZONA_ROLE_ID")].filter(Boolean) as string[];
-  const bairristaBaseId = getRoleIdFromEnv("BAIRRISTAS_BASE_ROLE_ID");
 
-  // Chefia
   if (rolesIncludeAny(roleIds, chefiaIds)) {
     return { role: "chefia", tier: resolveTier(roleIds, CHEFIA_TIERS) };
   }
 
-  // Oficial
   if (rolesIncludeAny(roleIds, oficialIds)) {
     return { role: "oficial", tier: resolveTier(roleIds, OFICIAL_TIERS) };
   }
 
-  // Patrão di Zona
   if (rolesIncludeAny(roleIds, patraoIds)) {
     return { role: "patrao_di_zona", tier: "patrao_di_zona" };
   }
 
-  // Bairrista com tier
   const bairristaTier = resolveTier(roleIds, BAIRRISTA_TIERS);
   if (bairristaTier) {
     return { role: "bairrista", tier: bairristaTier };
-  }
-
-  // Bairrista sem tier mas com role base
-  if (bairristaBaseId && roleIds.includes(bairristaBaseId)) {
-    return { role: "bairrista", tier: getRoleIdFromEnv("BAIRRISTA_DEFAULT_TIER") || "young_blood" };
   }
 
   return null;
