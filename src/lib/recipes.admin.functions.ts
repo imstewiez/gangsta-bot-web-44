@@ -3,7 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery, pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { logAdminAction } from "./logging.functions";
-import { getAllRecipes, getItemById, getNumericId, getAllItems } from "./config.loader";
 
 export type AdminRecipeRow = {
   recipe_id: number;
@@ -135,9 +134,9 @@ function normalizeItemPricing(input: ItemPricingInput, existing?: Partial<Normal
   const xp_points = input.xp_points !== undefined ? cleanXp(input.xp_points) : (existing?.xp_points ?? 0);
   const active = input.active !== undefined && input.active !== null ? Boolean(input.active) : (existing?.active ?? true);
 
-  // Canonical semantics:
+  // Semântica canónica da Gestão de Materiais:
   // compra: purchase_price = preço civil, morador_purchase_price = preço organização.
-  // venda: min_sale_price = com material, purchase_price = sem material, estimated_value = custo.
+  // venda: min_sale_price = preço com material, purchase_price = preço sem material, estimated_value = custo interno.
   if (side === "compra") {
     min_sale_price = null;
     estimated_value = null;
@@ -147,7 +146,7 @@ function normalizeItemPricing(input: ItemPricingInput, existing?: Partial<Normal
   }
 
   if (active) {
-    const hasBuyPrice = moneyValue(purchase_price) > 0 || moneyValue(morador_purchase_price) > 0;
+    const hasBuyPrice = moneyValue(purchase_price) > 0 || moneyValue(morador_purchase_price) > 0 || moneyValue(min_sale_price) > 0;
     const hasSellPrice = moneyValue(min_sale_price) > 0 || moneyValue(purchase_price) > 0;
     if ((side === "compra" || side === "ambos") && !hasBuyPrice) {
       throw new Error("Define pelo menos um preço de compra para este material.");
@@ -178,30 +177,61 @@ export const listRecipesAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminRecipeRow[]> => {
     await assertManager(context);
-    const recipes = getAllRecipes();
-    const result: AdminRecipeRow[] = [];
 
-    for (const [recipeId, recipe] of Object.entries(recipes)) {
-      const outputItem = getItemById(recipe.output);
-      if (!outputItem) continue;
-      const ingredients: AdminRecipeRow["ingredients"] = [];
-      for (const [ingId, qty] of Object.entries(recipe.inputs)) {
-        const ingItem = getItemById(ingId);
-        if (!ingItem) continue;
-        ingredients.push({ item_id: getNumericId(ingId), name: ingItem.name, quantity: Number(qty), unit_cost: ingItem.buyPrice ?? ingItem.estimatedValue ?? 0 });
+    const rows = await pgQuery<{
+      recipe_id: number;
+      item_id: number;
+      item_name: string;
+      category: string | null;
+      subcategory: string | null;
+      ingredient_item_id: number | null;
+      ingredient_name: string | null;
+      quantity: number | null;
+      unit_cost: number | null;
+    }>(
+      `select cr.id as recipe_id,
+              out_i.id as item_id,
+              out_i.name as item_name,
+              out_i.category,
+              out_i.subcategory,
+              ri.ingredient_item_id,
+              ing_i.name as ingredient_name,
+              ri.quantity::float as quantity,
+              ing_i.estimated_value::float as unit_cost
+       from craft_recipes cr
+       join items out_i on out_i.id = cr.item_id
+       left join recipe_ingredients ri on ri.recipe_id = cr.id
+       left join items ing_i on ing_i.id = ri.ingredient_item_id and ing_i.deleted_at is null and coalesce(ing_i.active, true) = true
+       where out_i.deleted_at is null
+         and coalesce(out_i.active, true) = true
+       order by out_i.category, out_i.name, ing_i.name`,
+    );
+
+    const map = new Map<number, AdminRecipeRow>();
+    for (const row of rows) {
+      if (!map.has(row.recipe_id)) {
+        map.set(row.recipe_id, {
+          recipe_id: row.recipe_id,
+          item_id: row.item_id,
+          item_name: row.item_name,
+          category: row.category,
+          subcategory: row.subcategory,
+          recipe_category: row.category,
+          tier: null,
+          ingredients: [],
+        });
       }
-      result.push({
-        recipe_id: getNumericId(recipeId),
-        item_id: getNumericId(recipe.output),
-        item_name: outputItem.name,
-        category: outputItem.category,
-        subcategory: outputItem.subcategory,
-        recipe_category: outputItem.type === "weapon" ? "craft_weapons" : outputItem.type === "magazine" ? "craft_carregadores" : "outros",
-        tier: outputItem.tier,
-        ingredients,
-      });
+      if (row.ingredient_item_id && row.ingredient_name && row.quantity && row.quantity > 0) {
+        map.get(row.recipe_id)!.ingredients.push({
+          item_id: row.ingredient_item_id,
+          name: row.ingredient_name,
+          quantity: Number(row.quantity),
+          unit_cost: moneyValue(row.unit_cost),
+        });
+      }
     }
-    return result.sort((a, b) => (a.recipe_category ?? "").localeCompare(b.recipe_category ?? "") || a.item_name.localeCompare(b.item_name));
+
+    return Array.from(map.values()).sort((a, b) => (a.recipe_category ?? "").localeCompare(b.recipe_category ?? "") || a.item_name.localeCompare(b.item_name));
   });
 
 export const listItemsAdmin = createServerFn({ method: "GET" })
@@ -224,9 +254,6 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<AdminDbItemRow[]> => {
     await assertManager(context);
 
-    const configItems = getAllItems();
-    const configNames = new Set(Object.values(configItems).map((i) => i.name));
-    const configRecipes = getAllRecipes();
     const rows = await pgQuery<{
       id: number;
       name: string;
@@ -252,39 +279,22 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
        order by coalesce(active, true) desc, category, name`,
     );
 
-    const dbIdByName = new Map(rows.map((r) => [r.name, r.id]));
     const recipeRows = await pgQuery<{ recipe_id: number; item_id: number }>(`select id as recipe_id, item_id from craft_recipes`);
     const recipeItemByRecipeId = new Map(recipeRows.map((r) => [r.recipe_id, r.item_id]));
+    const recipeMap = new Map<number, { recipe_id: number; ingredients: Array<{ recipe_id: number; ingredient_item_id: number; quantity: number; ingredient_name: string }> }>();
+    for (const recipe of recipeRows) recipeMap.set(recipe.item_id, { recipe_id: recipe.recipe_id, ingredients: [] });
+
     const ingredientRows = await pgQuery<{ recipe_id: number; ingredient_item_id: number; quantity: number; ingredient_name: string }>(
       `select ri.recipe_id, ri.ingredient_item_id, ri.quantity::float as quantity, i.name as ingredient_name
        from recipe_ingredients ri
        join items i on i.id = ri.ingredient_item_id
        where coalesce(i.active, true) = true and i.deleted_at is null`,
     );
-
-    const recipeMap = new Map<number, { recipe_id: number; ingredients: typeof ingredientRows }>();
-    for (const r of recipeRows) recipeMap.set(r.item_id, { recipe_id: r.recipe_id, ingredients: [] });
     for (const ing of ingredientRows) {
       const itemId = recipeItemByRecipeId.get(ing.recipe_id);
       if (!itemId) continue;
-      const rec = recipeMap.get(itemId);
-      if (rec) rec.ingredients.push(ing);
-    }
-
-    for (const recipe of Object.values(configRecipes)) {
-      const outputItem = configItems[recipe.output];
-      if (!outputItem) continue;
-      const outputDbId = dbIdByName.get(outputItem.name);
-      if (!outputDbId || recipeMap.has(outputDbId)) continue;
-      const syntheticIngredients = [];
-      for (const [ingConfigId, qty] of Object.entries(recipe.inputs)) {
-        const ingItem = configItems[ingConfigId];
-        if (!ingItem) continue;
-        const ingDbId = dbIdByName.get(ingItem.name);
-        if (!ingDbId) continue;
-        syntheticIngredients.push({ recipe_id: -1, ingredient_item_id: ingDbId, quantity: Number(qty), ingredient_name: ingItem.name });
-      }
-      recipeMap.set(outputDbId, { recipe_id: -1, ingredients: syntheticIngredients });
+      const recipe = recipeMap.get(itemId);
+      if (recipe) recipe.ingredients.push(ing);
     }
 
     return rows.map((r) => {
@@ -296,8 +306,8 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
         category,
         subcategory,
         side: VALID_SIDES.has(r.side ?? "") ? r.side : "venda",
-        in_config: configNames.has(r.name),
-        recipe_id: recipe && recipe.recipe_id > 0 ? recipe.recipe_id : null,
+        in_config: false,
+        recipe_id: recipe?.recipe_id ?? null,
         ingredients: recipe?.ingredients ?? [],
       };
     });
@@ -319,7 +329,7 @@ export const updateItemPrice = createServerFn({ method: "POST" })
     if (data.xp_points !== undefined) { sets.push(`xp_points = $${sets.length + 1}`); vals.push(cleanXp(data.xp_points)); }
     if (sets.length === 0) return;
     vals.push(data.item_id);
-    await pgQuery(`update items set ${sets.join(", ")}, updated_at = now() where id = $${vals.length}`, vals);
+    await pgQuery(`update items set ${sets.join(", ")}, updated_at = now() where id = $${vals.length} and deleted_at is null`, vals);
   });
 
 export const updateItemAdmin = createServerFn({ method: "POST" })
@@ -348,7 +358,7 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
       `update items set name = $2, category = $3, subcategory = $4, side = $5,
          purchase_price = $6, morador_purchase_price = $7, min_sale_price = $8,
          estimated_value = $9, xp_points = $10, active = $11, updated_at = now()
-       where id = $1`,
+       where id = $1 and deleted_at is null`,
       [data.item_id, item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points, item.active],
     );
     await logAdminAction(context.supabase, {
@@ -482,6 +492,12 @@ export const updateRecipeIngredientQty = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<void> => {
     await assertManager(context);
     if (data.ingredient_item_id === data.item_id) throw new Error("Um item não pode ser ingrediente de si próprio.");
+    const output = await pgOne<{ id: number; side: string | null }>(`select id, side from items where id = $1 and coalesce(active, true) = true and deleted_at is null`, [data.item_id]);
+    if (!output || output.side === "compra") throw new Error("Item de saída inválido para receita.");
+    if (data.quantity > 0) {
+      const input = await pgOne<{ id: number }>(`select id from items where id = $1 and coalesce(active, true) = true and deleted_at is null and coalesce(side, 'compra') in ('compra','ambos')`, [data.ingredient_item_id]);
+      if (!input) throw new Error("Ingrediente inválido para receita.");
+    }
     const recipeId = await getOrCreateRecipeId(data.item_id);
     await pgQuery(`delete from recipe_ingredients where recipe_id = $1 and ingredient_item_id = $2`, [recipeId, data.ingredient_item_id]);
     if (data.quantity > 0) {
