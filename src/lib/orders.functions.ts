@@ -5,10 +5,8 @@ import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, OrderStatusSchema, IdSchema, NotesSchema } from "./security";
 import { logAdminAction } from "./logging.functions";
-import { getAllItems } from "./config.loader";
 import { resolveItemPrices } from "./pricing.resolver";
 import { getSurchargeForItem } from "./tier-pricing.functions";
-import { getMergedRecipeForItemName } from "./recipes.functions";
 
 type OrderRow = {
   id: number;
@@ -47,9 +45,7 @@ const ALLOWED_TRANSITIONS: Record<string, OrderStatus[]> = {
 type PriceLike = {
   tier_price?: number | null;
   min_sale_price?: number | null;
-  morador_purchase_price?: number | null;
   purchase_price?: number | null;
-  estimated_value?: number | null;
 };
 
 type OrderIngredient = { name: string; needed: number };
@@ -60,14 +56,14 @@ function positive(value: unknown): number | null {
 }
 
 function priceWithMaterials(prices: PriceLike): number {
-  return Number(positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? positive(prices.purchase_price) ?? positive(prices.morador_purchase_price) ?? positive(prices.estimated_value) ?? 0);
+  return Number(positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? 0);
 }
 
 function priceWithoutMaterials(prices: PriceLike): number {
-  return Number(positive(prices.purchase_price) ?? positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? positive(prices.morador_purchase_price) ?? positive(prices.estimated_value) ?? 0);
+  return Number(positive(prices.purchase_price) ?? 0);
 }
 
-async function getOrderIngredients(itemId: number, itemName: string, quantity: number): Promise<OrderIngredient[]> {
+async function getOrderIngredients(itemId: number, quantity: number): Promise<OrderIngredient[]> {
   const dbRows = await pgQuery<{ name: string; qty: number }>(
     `select i.name, ri.quantity::float as qty
      from craft_recipes cr
@@ -80,20 +76,7 @@ async function getOrderIngredients(itemId: number, itemName: string, quantity: n
      order by i.name`,
     [itemId],
   );
-  if (dbRows.length > 0) {
-    return dbRows.map((row) => ({ name: row.name, needed: Number(row.qty) * quantity }));
-  }
-
-  // Legacy fallback for config recipes that have not been migrated into DB yet.
-  const configItems = getAllItems();
-  const legacy = await getMergedRecipeForItemName(itemName);
-  if (!legacy) return [];
-  return Object.entries(legacy.inputs)
-    .map(([ingId, qty]) => {
-      const ing = configItems[ingId];
-      return ing ? { name: ing.name, needed: Number(qty) * quantity } : null;
-    })
-    .filter((x): x is OrderIngredient => Boolean(x));
+  return dbRows.map((row) => ({ name: row.name, needed: Number(row.qty) * quantity }));
 }
 
 async function insertOrderHistory(orderId: number, oldStatus: string, newStatus: string, changedBy: string, notes?: string | null) {
@@ -194,7 +177,6 @@ export const createOrder = createServerFn({ method: "POST" })
     );
     if (!responsible) throw new Error("Responsável inválido");
 
-    const cfgItems = getAllItems();
     const itemIds = data.lines.map((l) => l.item_id);
     const items = await pgQuery<{
       id: number;
@@ -225,16 +207,16 @@ export const createOrder = createServerFn({ method: "POST" })
       if (!dbItem) throw new Error(`Item não encontrado: ${line.item_id}`);
       if (dbItem.side !== "venda" && dbItem.side !== "ambos") throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
 
-      const configItem = Object.values(cfgItems).find((i) => i.name === dbItem.name) ?? null;
       const itemSurcharges = await getSurchargeForItem(dbItem.id);
-      const itemPrices = resolveItemPrices(dbItem, configItem, me.tier ?? null, itemSurcharges);
+      const itemPrices = resolveItemPrices(dbItem, null, me.tier ?? null, itemSurcharges);
       const withMaterialsUnit = Math.round(priceWithMaterials(itemPrices));
       const withoutMaterialsUnit = Math.round(priceWithoutMaterials(itemPrices));
-      const ingredients = await getOrderIngredients(dbItem.id, dbItem.name, line.quantity);
+      const ingredients = await getOrderIngredients(dbItem.id, line.quantity);
       const hasMaterials = ingredients.length > 0;
       const effectivePaymentMode = data.payment_mode === "materials_money" && hasMaterials ? "materials_money" : "money_only";
       const unit = effectivePaymentMode === "materials_money" ? withMaterialsUnit : withoutMaterialsUnit;
-      if (unit <= 0) throw new Error(`Preço inválido para ${dbItem.name}. Corrige o item na Gestão de Materiais.`);
+      if (effectivePaymentMode === "materials_money" && unit <= 0) throw new Error(`Preço com material inválido para ${dbItem.name}. Corrige o item na Gestão de Materiais.`);
+      if (effectivePaymentMode === "money_only" && unit <= 0) throw new Error(`Preço sem material inválido para ${dbItem.name}. Corrige o item na Gestão de Materiais.`);
 
       const total = unit * line.quantity;
       const ingredientsJsonStr = effectivePaymentMode === "materials_money" ? JSON.stringify(ingredients) : null;
