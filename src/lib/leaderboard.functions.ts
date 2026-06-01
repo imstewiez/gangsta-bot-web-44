@@ -67,29 +67,51 @@ export const getLeaderboard = createServerFn({ method: "GET" })
     try {
       const rows = await pgQuery<LeaderRow>(
         `with bounds as (select ${bounds.start} as dstart, ${bounds.end} as dend),
-         deliveries_agg as (
-            select im.member_id,
-                   count(*)::int as deliveries,
-                   coalesce(sum(abs(im.quantity) * coalesce(i.xp_points, 1)), 0)::int as material_points
+         active_members as (
+            select id, display_name, nickname, tier
+              from members
+             where deleted_at is null
+               and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')
+         ),
+         delivery_movements as (
+            select im.*,
+                   regexp_replace(coalesce(im.notes,''), '^delivery:', '') as delivery_request_id
               from inventory_movements im
-              left join items i on i.id = im.item_id
               cross join bounds
              where im.movement_type in ('entrega_bairrista','entrega_oficial')
                and im.member_id is not null
-               and im.created_at between bounds.dstart and bounds.dend + interval '1 day'
-             group by im.member_id
+               and im.quantity > 0
+               and im.created_at >= bounds.dstart
+               and im.created_at < bounds.dend + interval '1 day'
          ),
-         sales_agg as (
-            select im.member_id,
-                   count(*)::int as sales,
-                   coalesce(sum(abs(im.quantity) * coalesce(i.xp_points, 1)), 0)::int as sales_points
+         deliveries_agg as (
+            select dm.member_id,
+                   count(distinct nullif(dm.delivery_request_id,''))::int as deliveries,
+                   coalesce(sum(dm.quantity * coalesce(i.xp_points, 0)), 0)::int as material_points
+              from delivery_movements dm
+              left join items i on i.id = dm.item_id
+             group by dm.member_id
+         ),
+         sales_movements as (
+            select im.*,
+                   coalesce(
+                     nullif(regexp_replace(coalesce(im.notes,''), '^delivery:', ''), ''),
+                     nullif(regexp_replace(coalesce(im.notes,''), '^order:', ''), '')
+                   ) as source_id
               from inventory_movements im
-              left join items i on i.id = im.item_id
               cross join bounds
              where im.movement_type = 'venda_bairrista'
                and im.member_id is not null
-               and im.created_at between bounds.dstart and bounds.dend + interval '1 day'
-             group by im.member_id
+               and im.quantity < 0
+               and im.created_at >= bounds.dstart
+               and im.created_at < bounds.dend + interval '1 day'
+         ),
+         sales_agg as (
+            select sm.member_id,
+                   count(distinct nullif(sm.source_id,''))::int as sales,
+                   coalesce(count(distinct nullif(sm.source_id,'')), 0)::int as sales_points
+              from sales_movements sm
+             group by sm.member_id
          ),
          ops_agg as (
             select p.member_id,
@@ -101,7 +123,8 @@ export const getLeaderboard = createServerFn({ method: "GET" })
               join operations o on o.id = p.operation_id and o.deleted_at is null
               cross join bounds
              where o.status = 'concluida'
-               and coalesce(o.end_time, o.start_time, o.date::timestamp) between bounds.dstart and bounds.dend + interval '1 day'
+               and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
+               and coalesce(o.end_time, o.start_time, o.date::timestamp) < bounds.dend + interval '1 day'
              group by p.member_id
          ),
          kills_logs_agg as (
@@ -109,7 +132,8 @@ export const getLeaderboard = createServerFn({ method: "GET" })
               from kill_logs
               cross join bounds
              where killer_id is not null
-               and date between bounds.dstart and bounds.dend
+               and date >= bounds.dstart
+               and date <= bounds.dend
              group by killer_id
          ),
          kills_ops_agg as (
@@ -118,7 +142,8 @@ export const getLeaderboard = createServerFn({ method: "GET" })
               join operations o on o.id = p.operation_id and o.deleted_at is null
               cross join bounds
              where o.status = 'concluida'
-               and coalesce(o.end_time, o.start_time, o.date::timestamp) between bounds.dstart and bounds.dend + interval '1 day'
+               and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
+               and coalesce(o.end_time, o.start_time, o.date::timestamp) < bounds.dend + interval '1 day'
                and p.kills > 0
              group by p.member_id
          ),
@@ -142,18 +167,16 @@ export const getLeaderboard = createServerFn({ method: "GET" })
                 coalesce(s.sales, 0)::int as sales,
                 coalesce(o.ops, 0)::int as ops,
                 coalesce(o.wins, 0)::int as wins,
-                (coalesce(d.material_points, 0) + coalesce(s.sales_points, 0)
+                (coalesce(d.material_points, 0)
+                 + coalesce(s.sales_points, 0) * 5
                  + coalesce(o.ops, 0) * 5 + coalesce(o.wins, 0) * 10
                  + coalesce(k.kills, 0) * 3 - coalesce(o.deaths, 0) * 5)::float8 as score
-           from members m
+           from active_members m
            left join deliveries_agg d on d.member_id = m.id
            left join sales_agg s on s.member_id = m.id
            left join ops_agg o on o.member_id = m.id
            left join kills_agg k on k.member_id = m.id
-          where m.deleted_at is null
-            and (m.status = 'ativo' or m.status is null)
-            and coalesce(m.lifecycle_state, 'active') in ('active', 'promoted')
-            and (coalesce(k.kills,0) + coalesce(o.ops,0) + coalesce(d.deliveries,0) + coalesce(s.sales,0) > 0)
+          where (coalesce(k.kills,0) + coalesce(o.ops,0) + coalesce(d.deliveries,0) + coalesce(s.sales,0) > 0)
           order by ${sortCol} ${sortDir} nulls last
           limit 200`
       );
