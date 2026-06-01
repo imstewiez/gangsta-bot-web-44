@@ -28,12 +28,12 @@ export type DataQualityReport = {
 type CountRow = { count: number };
 type ExampleRow = { label: string | null };
 type RawLine = Record<string, unknown>;
-type RepairResult = { ok: true; scanned: number; repaired: number; rejected: number; dropped_lines: number };
+type RepairResult = { ok: true; scanned: number; repaired: number; rejected: number; dropped_lines: number; assigned_responsibles: number };
 
 const ACTIVE_MEMBER = `coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`;
 const ACTIVE_ITEM = `coalesce(active, true) = true and deleted_at is null`;
 const SALE_PRICE = `coalesce(nullif(min_sale_price, 0), nullif(purchase_price, 0), 0)`;
-const BUY_PRICE = `coalesce(nullif(purchase_price, 0), nullif(morador_purchase_price, 0), 0)`;
+const BUY_PRICE = `coalesce(nullif(purchase_price, 0), nullif(morador_purchase_price, 0), nullif(min_sale_price, 0), 0)`;
 const normSql = (field: string) => `translate(lower(coalesce(${field}, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')`;
 
 async function check(args: Omit<DataQualityCheck, "ok" | "count" | "examples"> & { countSql: string; examplesSql: string; summary: (count: number) => string }): Promise<DataQualityCheck> {
@@ -60,33 +60,13 @@ function summary(checks: DataQualityCheck[]): DataQualityReport["summary"] {
   };
 }
 
-function normalizeText(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
+function normalizeText(value: unknown): string { return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+function positive(value: unknown): number | null { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : null; }
+function money(value: unknown): number | null { const n = Number(value); return Number.isFinite(n) && n >= 0 ? n : null; }
+function isObject(value: unknown): value is RawLine { return Boolean(value && typeof value === "object" && !Array.isArray(value)); }
 
-function positive(value: unknown): number | null {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-function money(value: unknown): number | null {
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
-
-function isObject(value: unknown): value is RawLine {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-async function assertChefia(context: any) {
-  const me = await resolveCurrentMember(context.supabase, context.userId);
-  if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
-}
-
-async function assertSuperadmin(context: any) {
-  const me = await resolveActualMember(context.supabase, context.userId);
-  if (!me?.is_superadmin) throw new Error("Acesso restrito ao Superadmin.");
-}
+async function assertChefia(context: any) { const me = await resolveCurrentMember(context.supabase, context.userId); if (!me?.is_manager) throw new Error("Acesso restrito à chefia."); }
+async function assertSuperadmin(context: any) { const me = await resolveActualMember(context.supabase, context.userId); if (!me?.is_superadmin) throw new Error("Acesso restrito ao Superadmin."); }
 
 export const repairDeliveryLines = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -126,7 +106,21 @@ export const repairDeliveryLines = createServerFn({ method: "POST" })
       await pgQuery(`update inventory_delivery_requests set lines=$2::jsonb, total_qty=$3, total_value=$4, updated_at=now() where id=$1 and status='pending'`, [request.id, JSON.stringify(normalized), totalQty, totalValue]);
       repaired += 1;
     }
-    return { ok: true, scanned: requests.length, repaired, rejected, dropped_lines };
+
+    const assigned = await pgOne<{ count: number }>(
+      `with fixed as (
+         update inventory_delivery_requests r
+         set responsavel_member_id = r.requester_member_id, updated_at = now()
+         from members m
+         where r.status = 'pending'
+           and r.responsavel_member_id is null
+           and r.requester_member_id = m.id
+           and m.deleted_at is null
+         returning r.id
+       ) select count(*)::int as count from fixed`,
+    );
+
+    return { ok: true, scanned: requests.length, repaired, rejected, dropped_lines, assigned_responsibles: assigned?.count ?? 0 };
   });
 
 const deliveryLineSql = `
@@ -152,23 +146,14 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
     const checks: DataQualityCheck[] = [];
 
     checks.push(await check({ id: "members_duplicate_discord", area: "membros", severity: "critical", title: "Membros ativos com Discord duplicado", countSql: `select count(*)::int as count from (select discord_id from members where deleted_at is null and discord_id is not null and trim(discord_id) <> '' and ${ACTIVE_MEMBER} group by discord_id having count(*) > 1) x`, examplesSql: `select ('Discord ' || discord_id || ' · ' || string_agg('#' || id::text || ' ' || coalesce(display_name, username, '?'), ', ' order by id)) as label from members where deleted_at is null and discord_id is not null and trim(discord_id) <> '' and ${ACTIVE_MEMBER} group by discord_id having count(*) > 1 limit 10`, summary: (n) => n ? `${n} Discord ID(s) duplicados em membros ativos.` : "Sem Discord IDs duplicados em membros ativos.", recommendation: "Fundir/remover duplicados para não atribuir stats, prémios e permissões ao membro errado." }));
-
     checks.push(await check({ id: "members_missing_identity", area: "membros", severity: "high", title: "Membros ativos sem nome ou Discord", countSql: `select count(*)::int as count from members where deleted_at is null and ${ACTIVE_MEMBER} and (nullif(trim(coalesce(display_name, '')), '') is null or nullif(trim(coalesce(discord_id, '')), '') is null)`, examplesSql: `select ('#' || id::text || ' · ' || coalesce(display_name, username, 'sem nome') || ' · discord=' || coalesce(discord_id, '—')) as label from members where deleted_at is null and ${ACTIVE_MEMBER} and (nullif(trim(coalesce(display_name, '')), '') is null or nullif(trim(coalesce(discord_id, '')), '') is null) order by id desc limit 10`, summary: (n) => n ? `${n} membro(s) ativo(s) sem nome ou Discord.` : "Todos os membros ativos têm identidade mínima.", recommendation: "Completar display_name/discord_id via sync Discord ou admin." }));
-
     checks.push(await check({ id: "orders_active_without_responsavel", area: "encomendas", severity: "high", title: "Encomendas abertas sem responsável válido", countSql: `select count(*)::int as count from orders o left join members r on r.id = o.responsavel_member_id and r.deleted_at is null where o.status in ('pending','approved','in_progress','ready') and (o.responsavel_member_id is null or r.id is null)`, examplesSql: `select ('#' || o.id::text || ' · status=' || coalesce(o.status, '—') || ' · resp=' || coalesce(o.responsavel_member_id::text, '—')) as label from orders o left join members r on r.id = o.responsavel_member_id and r.deleted_at is null where o.status in ('pending','approved','in_progress','ready') and (o.responsavel_member_id is null or r.id is null) order by o.created_at desc limit 10`, summary: (n) => n ? `${n} encomenda(s) abertas sem responsável válido.` : "Todas as encomendas abertas têm responsável válido.", recommendation: "Atribuir responsável para garantir que só a pessoa certa trata o pedido." }));
-
     checks.push(await check({ id: "orders_total_mismatch", area: "encomendas", severity: "medium", title: "Encomendas com total diferente de preço × quantidade", countSql: `select count(*)::int as count from orders where unit_price is not null and total_price is not null and quantity is not null and abs(coalesce(total_price,0) - coalesce(unit_price,0) * coalesce(quantity,0)) > 1`, examplesSql: `select ('#' || id::text || ' · total=' || total_price::text || ' · esperado=' || (unit_price * quantity)::text) as label from orders where unit_price is not null and total_price is not null and quantity is not null and abs(coalesce(total_price,0) - coalesce(unit_price,0) * coalesce(quantity,0)) > 1 order by created_at desc limit 10`, summary: (n) => n ? `${n} encomenda(s) têm total incoerente.` : "Totais das encomendas estão coerentes.", recommendation: "Recalcular total_price ou documentar ajuste/desconto." }));
-
     checks.push(await check({ id: "deliveries_broken_lines", area: "entregas", severity: "critical", title: "Entregas pendentes com linhas inválidas ou itens inexistentes", countSql: `${deliveryLineSql} select count(*)::int as count from resolved where not (raw_qty ~ '^\\d+(\\.\\d+)?$') or raw_qty::numeric <= 0 or resolved_item_id is null`, examplesSql: `${deliveryLineSql} select ('#' || id::text || ' · linha=' || line::text) as label from resolved where not (raw_qty ~ '^\\d+(\\.\\d+)?$') or raw_qty::numeric <= 0 or resolved_item_id is null order by created_at desc limit 10`, summary: (n) => n ? `${n} linha(s) pendente(s) inválida(s).` : "Entregas pendentes têm linhas válidas.", recommendation: "Usar Reparar para normalizar linhas legacy e rejeitar pedidos sem linhas válidas.", repair_action: "repair_delivery_lines" }));
-
-    checks.push(await check({ id: "deliveries_orphan_requester", area: "entregas", severity: "high", title: "Entregas pendentes com requerente/responsável inexistente", countSql: `select count(*)::int as count from inventory_delivery_requests r left join members requester on requester.id = r.requester_member_id left join members resp on resp.id = r.responsavel_member_id where r.status = 'pending' and (requester.id is null or r.responsavel_member_id is null or resp.id is null)`, examplesSql: `select ('#' || r.id::text || ' · requester=' || coalesce(r.requester_member_id::text, '—') || ' · resp=' || coalesce(r.responsavel_member_id::text, '—')) as label from inventory_delivery_requests r left join members requester on requester.id = r.requester_member_id left join members resp on resp.id = r.responsavel_member_id where r.status = 'pending' and (requester.id is null or r.responsavel_member_id is null or resp.id is null) order by r.created_at desc limit 10`, summary: (n) => n ? `${n} entrega(s) pendente(s) com membro/responsável inválido.` : "Entregas pendentes têm membros associados válidos.", recommendation: "Rejeitar/atribuir responsável antes de conferir a entrega." }));
-
-    checks.push(await check({ id: "items_invalid_price_or_side", area: "precos", severity: "high", title: "Itens ativos com side/preços inválidos", countSql: `select count(*)::int as count from items where ${ACTIVE_ITEM} and (coalesce(side, '') not in ('venda','compra','ambos') or (side in ('venda','ambos') and ${SALE_PRICE} <= 0) or (side in ('compra','ambos') and ${BUY_PRICE} <= 0))`, examplesSql: `select ('#' || id::text || ' · ' || name || ' · side=' || coalesce(side, '—') || ' · sem_material=' || coalesce(purchase_price::text, '—') || ' · com_material=' || coalesce(min_sale_price::text, '—') || ' · org=' || coalesce(morador_purchase_price::text, '—')) as label from items where ${ACTIVE_ITEM} and (coalesce(side, '') not in ('venda','compra','ambos') or (side in ('venda','ambos') and ${SALE_PRICE} <= 0) or (side in ('compra','ambos') and ${BUY_PRICE} <= 0)) order by category, name limit 10`, summary: (n) => n ? `${n} item(ns) ativo(s) com side ou preço inválido.` : "Itens ativos têm side/preços mínimos coerentes.", recommendation: "Para venda basta preço com material OU sem material; para compra basta preço civil OU organização." }));
-
+    checks.push(await check({ id: "deliveries_orphan_requester", area: "entregas", severity: "high", title: "Entregas pendentes com requerente/responsável inexistente", countSql: `select count(*)::int as count from inventory_delivery_requests r left join members requester on requester.id = r.requester_member_id left join members resp on resp.id = r.responsavel_member_id where r.status = 'pending' and (requester.id is null or r.responsavel_member_id is null or resp.id is null)`, examplesSql: `select ('#' || r.id::text || ' · requester=' || coalesce(r.requester_member_id::text, '—') || ' · resp=' || coalesce(r.responsavel_member_id::text, '—')) as label from inventory_delivery_requests r left join members requester on requester.id = r.requester_member_id left join members resp on resp.id = r.responsavel_member_id where r.status = 'pending' and (requester.id is null or r.responsavel_member_id is null or resp.id is null) order by r.created_at desc limit 10`, summary: (n) => n ? `${n} entrega(s) pendente(s) com membro/responsável inválido.` : "Entregas pendentes têm membros associados válidos.", recommendation: "Usar Reparar para atribuir responsável aos pedidos legacy e rejeitar linhas inválidas.", repair_action: "repair_delivery_lines" }));
+    checks.push(await check({ id: "items_invalid_price_or_side", area: "precos", severity: "high", title: "Itens ativos com side/preços inválidos", countSql: `select count(*)::int as count from items where ${ACTIVE_ITEM} and (coalesce(side, '') not in ('venda','compra','ambos') or (side in ('venda','ambos') and ${SALE_PRICE} <= 0) or (side in ('compra','ambos') and ${BUY_PRICE} <= 0))`, examplesSql: `select ('#' || id::text || ' · ' || name || ' · side=' || coalesce(side, '—') || ' · civil=' || coalesce(purchase_price::text, '—') || ' · org=' || coalesce(morador_purchase_price::text, '—') || ' · definido=' || coalesce(min_sale_price::text, '—')) as label from items where ${ACTIVE_ITEM} and (coalesce(side, '') not in ('venda','compra','ambos') or (side in ('venda','ambos') and ${SALE_PRICE} <= 0) or (side in ('compra','ambos') and ${BUY_PRICE} <= 0)) order by category, name limit 10`, summary: (n) => n ? `${n} item(ns) ativo(s) com side ou preço inválido.` : "Itens ativos têm side/preços mínimos coerentes.", recommendation: "Para venda basta preço com material OU sem material; para compra basta preço civil OU organização/definido." }));
     checks.push(await check({ id: "db_recipes_broken_refs", area: "receitas", severity: "critical", title: "Receitas na DB com referências partidas", countSql: `select count(*)::int as count from recipe_ingredients ri left join craft_recipes cr on cr.id = ri.recipe_id left join items ingredient on ingredient.id = ri.ingredient_item_id left join items output on output.id = cr.item_id where cr.id is null or ingredient.id is null or output.id is null or coalesce(ri.quantity,0) <= 0`, examplesSql: `select ('recipe=' || coalesce(ri.recipe_id::text, '—') || ' · ingrediente=' || coalesce(ri.ingredient_item_id::text, '—') || ' · qty=' || coalesce(ri.quantity::text, '—')) as label from recipe_ingredients ri left join craft_recipes cr on cr.id = ri.recipe_id left join items ingredient on ingredient.id = ri.ingredient_item_id left join items output on output.id = cr.item_id where cr.id is null or ingredient.id is null or output.id is null or coalesce(ri.quantity,0) <= 0 limit 10`, summary: (n) => n ? `${n} ingrediente(s)/receita(s) inválidos na DB.` : "Receitas na DB têm referências válidas.", recommendation: "Corrigir receitas no Admin → Materiais." }));
-
     checks.push(await check({ id: "inventory_orphan_or_negative", area: "inventario", severity: "critical", title: "Inventário com movimentos órfãos ou stock negativo", countSql: `select ((select count(*) from inventory_movements im left join items i on i.id = im.item_id where im.item_id is not null and i.id is null) + (select count(*) from inventory_balance ib left join items i on i.id = ib.item_id where i.id is null or coalesce(ib.balance,0) < 0))::int as count`, examplesSql: `select label from (select ('movimento #' || im.id::text || ' · item=' || coalesce(im.item_id::text, '—')) as label from inventory_movements im left join items i on i.id = im.item_id where im.item_id is not null and i.id is null union all select ('stock item=' || ib.item_id::text || ' · qty=' || ib.balance::text) as label from inventory_balance ib left join items i on i.id = ib.item_id where i.id is null or coalesce(ib.balance,0) < 0) x limit 10`, summary: (n) => n ? `${n} problema(s) crítico(s) no inventário.` : "Inventário não tem órfãos nem stock negativo.", recommendation: "Reconciliar movimentos vs balance." }));
-
     checks.push(await check({ id: "notifications_backlog", area: "notificacoes", severity: "medium", title: "Notificações pendentes antigas", countSql: `select count(*)::int as count from pending_notifications where processed_at is null and failed_at is null and created_at < now() - interval '15 minutes'`, examplesSql: `select ('#' || id::text || ' · prioridade=' || coalesce(priority::text, '—') || ' · criado=' || created_at::text) as label from pending_notifications where processed_at is null and failed_at is null and created_at < now() - interval '15 minutes' order by created_at asc limit 10`, summary: (n) => n ? `${n} notificação/notificações antigas por processar.` : "Fila de notificações não tem backlog antigo.", recommendation: "Verificar worker/bot de notificações." }));
 
     const severityOrder: Record<DataQualitySeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
