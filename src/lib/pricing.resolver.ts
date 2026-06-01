@@ -43,15 +43,3 @@ export function resolveItemPrices(
     tier_price,
   };
 }
-
-export function getAllConfigNames(): string[] {
-  return [];
-}
-
-export function getConfigItemByName(_name: string) {
-  return null;
-}
-
-export function getConfigIdByName(_name: string): string | null {
-  return null;
-}
