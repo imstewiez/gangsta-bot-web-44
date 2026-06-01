@@ -49,10 +49,32 @@ type PriceLike = {
 };
 
 type OrderIngredient = { name: string; needed: number };
+type OutputCategory = { category: string | null; subcategory: string | null };
+type RecipeIngredient = { name: string; needed: number; category: string | null; subcategory: string | null };
 
 function positive(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function isOrangeCategory(output: OutputCategory): boolean {
+  return normalizeText(output.category) === "armas_orange" || normalizeText(output.subcategory) === "armas_orange";
+}
+
+function isPiecesIngredient(ingredient: RecipeIngredient): boolean {
+  const name = normalizeText(ingredient.name);
+  const category = normalizeText(ingredient.category);
+  const subcategory = normalizeText(ingredient.subcategory);
+  return name === "peca" || name === "pecas" || category === "peca" || category === "pecas" || subcategory === "peca" || subcategory === "pecas";
+}
+
+function filterOrderIngredients(output: OutputCategory, ingredients: RecipeIngredient[]): RecipeIngredient[] {
+  if (!isOrangeCategory(output)) return ingredients;
+  return ingredients.filter(isPiecesIngredient);
 }
 
 function priceWithMaterials(prices: PriceLike): number {
@@ -63,9 +85,9 @@ function priceWithoutMaterials(prices: PriceLike): number {
   return Number(positive(prices.purchase_price) ?? 0);
 }
 
-async function getOrderIngredients(itemId: number, quantity: number): Promise<OrderIngredient[]> {
-  const dbRows = await pgQuery<{ name: string; qty: number }>(
-    `select i.name, ri.quantity::float as qty
+async function getOrderIngredients(itemId: number, output: OutputCategory, quantity: number): Promise<OrderIngredient[]> {
+  const dbRows = await pgQuery<{ name: string; qty: number; category: string | null; subcategory: string | null }>(
+    `select i.name, i.category, i.subcategory, ri.quantity::float as qty
      from craft_recipes cr
      join recipe_ingredients ri on ri.recipe_id = cr.id
      join items i on i.id = ri.ingredient_item_id
@@ -76,7 +98,8 @@ async function getOrderIngredients(itemId: number, quantity: number): Promise<Or
      order by i.name`,
     [itemId],
   );
-  return dbRows.map((row) => ({ name: row.name, needed: Number(row.qty) * quantity }));
+  return filterOrderIngredients(output, dbRows.map((row) => ({ name: row.name, category: row.category, subcategory: row.subcategory, needed: Number(row.qty) * quantity })))
+    .map((row) => ({ name: row.name, needed: row.needed }));
 }
 
 async function insertOrderHistory(orderId: number, oldStatus: string, newStatus: string, changedBy: string, notes?: string | null) {
@@ -181,13 +204,15 @@ export const createOrder = createServerFn({ method: "POST" })
     const items = await pgQuery<{
       id: number;
       name: string;
+      category: string | null;
+      subcategory: string | null;
       side: string | null;
       min_sale_price: number | null;
       purchase_price: number | null;
       morador_purchase_price: number | null;
       estimated_value: number | null;
     }>(
-      `select id, name, side,
+      `select id, name, category, subcategory, side,
               min_sale_price::float as min_sale_price,
               purchase_price::float as purchase_price,
               morador_purchase_price::float as morador_purchase_price,
@@ -211,7 +236,7 @@ export const createOrder = createServerFn({ method: "POST" })
       const itemPrices = resolveItemPrices(dbItem, null, me.tier ?? null, itemSurcharges);
       const withMaterialsUnit = Math.round(priceWithMaterials(itemPrices));
       const withoutMaterialsUnit = Math.round(priceWithoutMaterials(itemPrices));
-      const ingredients = await getOrderIngredients(dbItem.id, line.quantity);
+      const ingredients = await getOrderIngredients(dbItem.id, dbItem, line.quantity);
       const hasMaterials = ingredients.length > 0;
       const effectivePaymentMode = data.payment_mode === "materials_money" && hasMaterials ? "materials_money" : "money_only";
       const unit = effectivePaymentMode === "materials_money" ? withMaterialsUnit : withoutMaterialsUnit;
