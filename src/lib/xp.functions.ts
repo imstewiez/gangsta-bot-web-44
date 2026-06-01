@@ -2,29 +2,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
-import { getXpPoints, getPromotions, getTierOrder, getTierLabels } from "./config.loader";
+import { getPromotions, getTierOrder, getTierLabels } from "./config.loader";
 
-// ── Pontos por item (espelho do real-gangsta-bot) ───────────────────────────
+// XP vem exclusivamente da Gestão de Materiais: items.xp_points.
+// Sem fallback legacy/config: item sem xp_points explícito vale 0 pontos.
 const ZERO_POINT_CATEGORIES = new Set(["quimicos_droga", "dinheiro"]);
 
-function pointsForItem(name: string, category: string | null): number {
-  if (category && ZERO_POINT_CATEGORIES.has(category.toLowerCase())) return 0;
-  const points = getXpPoints();
-  return points[name.toLowerCase().trim()] ?? 1;
-}
-
 function buildItemPointsCase(): string {
-  const points = getXpPoints();
-  const cases: string[] = [];
-  for (const [name, pts] of Object.entries(points)) {
-    cases.push(`WHEN LOWER(i.name) = '${name.replace(/'/g, "''")}' THEN ${pts}`);
-  }
   const zeroCats = [...ZERO_POINT_CATEGORIES].map((c) => `'${c}'`).join(",");
   return `
     CASE
-      WHEN i.category IN (${zeroCats}) THEN 0
-      ${cases.join("\n      ")}
-      ELSE 1
+      WHEN lower(coalesce(i.category,'')) IN (${zeroCats}) THEN 0
+      ELSE coalesce(i.xp_points, 0)
     END
   `;
 }
@@ -54,11 +43,12 @@ export const getMemberXP = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<MemberXP> => {
     const pointsCase = buildItemPointsCase();
     const row = await pgOne<{ total_points: string }>(
-      `SELECT COALESCE(SUM(im.quantity * ${pointsCase}), 0)::text as total_points
+      `SELECT COALESCE(SUM(abs(im.quantity) * ${pointsCase}), 0)::text as total_points
        FROM inventory_movements im
        JOIN items i ON i.id = im.item_id
        WHERE im.member_id = $1
-         AND im.movement_type = ANY($2::text[])`,
+         AND im.movement_type = ANY($2::text[])
+         AND im.quantity > 0`,
       [
         data.member_id,
         ["entrega_bairrista", "entrega_oficial"],
