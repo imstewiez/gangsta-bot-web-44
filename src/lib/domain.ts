@@ -5,7 +5,6 @@ import {
   getTierLabels,
   getTierGradients,
   getTierAccents,
-  getTierPositions,
   getTierOrder,
 } from "./config.loader";
 
@@ -21,8 +20,26 @@ export type Tier =
 
 export type MemberRole = Tier | "bairrista";
 
-// Etiquetas curtas (sem emoji) — para sítios densos/tabelas.
-export const TIER_LABELS: Record<string, string> = getTierLabels();
+// Cargo real do Discord. Usado em Posição/Cargo, perfil, badges principais e hierarquia.
+export const DISCORD_ROLE_LABELS: Record<string, string> = {
+  young_blood: "Young Blood",
+  o_gunao: "O Gunão",
+  gangster_fodido: "Gangster Fodido",
+  patrao_di_zona: "Patrão di Zona",
+  real_gangster: "Real Gangster",
+  og: "OG",
+  kingpin: "Kingpin",
+  manda_chuva: "Manda-Chuva",
+  bairrista: "Bairrista",
+};
+
+// Tier/progressão interna. Usado apenas para XP, preços, progressão e coluna Tier.
+export const TIER_LABELS: Record<string, string> = {
+  ...getTierLabels(),
+  young_blood: "Bairrista-1",
+  o_gunao: "Bairrista-2",
+  gangster_fodido: "Bairrista-3",
+};
 
 // (TIER_EMOJI removido — usar <TierIcon /> em todo o lado.)
 
@@ -60,10 +77,15 @@ export function tierLabel(tier: string | null | undefined): string {
   return TIER_LABELS[tier] ?? tier;
 }
 
-export const ROLE_LABELS = TIER_LABELS;
+export function roleLabel(tier: string | null | undefined): string {
+  if (!tier) return "—";
+  return DISCORD_ROLE_LABELS[tier] ?? tier;
+}
+
+export const ROLE_LABELS = DISCORD_ROLE_LABELS;
 
 // Posições hierárquicas — o que aparece na coluna "Posição" e no perfil.
-export const POSITION_LABELS: Record<string, string> = getTierPositions();
+export const POSITION_LABELS: Record<string, string> = DISCORD_ROLE_LABELS;
 
 export function tierColor(tier: string | null | undefined): string {
   switch (tier) {
