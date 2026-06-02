@@ -1,53 +1,56 @@
-/* One-by-one header message motion. Each message crosses the whole header lane. */
+/* One-by-one header message motion. Each message visibly crosses the header lane. */
 
 @keyframes header-message-run {
   0% {
+    left: -42%;
     opacity: 0;
-    transform: translateX(-115%);
     filter: blur(3px);
   }
-  10% {
+  8% {
     opacity: 1;
     filter: blur(0);
   }
-  82% {
+  88% {
     opacity: 1;
     filter: blur(0);
   }
   100% {
+    left: 112%;
     opacity: 0;
-    transform: translateX(115%);
     filter: blur(3px);
   }
 }
 
 .header-ticker {
   position: relative;
-  display: flex;
+  display: block;
   min-height: 2.25rem;
-  align-items: center;
   overflow: hidden;
   padding: 0 1rem;
-  mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
 }
 
 .header-ticker-runner {
   position: absolute;
-  inset-block: 0;
-  left: 0;
-  display: flex;
-  width: 100%;
-  min-width: 0;
+  top: 50%;
+  left: -42%;
+  display: inline-flex;
+  width: max-content;
+  min-width: max-content;
   align-items: center;
-  justify-content: center;
-  animation: header-message-run 5.2s linear both;
-  will-change: transform, opacity, filter;
+  transform: translateY(-50%);
+  animation-name: header-message-run;
+  animation-duration: 5.2s;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  will-change: left, opacity, filter;
 }
 
 .header-ticker-runner .header-ticker-item {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  max-width: max-content;
   white-space: nowrap;
   color: color-mix(in oklab, var(--foreground) 88%, transparent);
   text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 32%, transparent);
@@ -65,15 +68,5 @@
   .header-ticker-runner .header-ticker-item {
     font-size: 0.62rem;
     letter-spacing: 0.1em;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .header-ticker-runner {
-    position: static;
-    animation: none !important;
-    opacity: 1;
-    transform: none;
-    filter: none;
   }
 }
