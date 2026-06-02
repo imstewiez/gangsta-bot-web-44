@@ -22,11 +22,33 @@ export type OrderCycle = {
   }[];
 };
 
+const OPEN_ORDER_STATUSES = ["pending", "approved", "in_progress", "ready"];
+
+function orderVisibilitySql(me: { id: number; is_superadmin?: boolean | null }) {
+  return me.is_superadmin ? { sql: "", params: [] as unknown[] } : { sql: " and o.responsavel_member_id = $1", params: [me.id] as unknown[] };
+}
+
+function currentOrderValueSql(alias = "o", itemAlias = "i") {
+  return `
+    case
+      when ${alias}.status in ('pending','approved','in_progress','ready') then
+        coalesce(
+          nullif(${itemAlias}.min_sale_price, 0),
+          nullif(${itemAlias}.purchase_price, 0),
+          ${alias}.unit_price,
+          0
+        ) * ${alias}.quantity
+      else coalesce(${alias}.total_price, 0)
+    end
+  `;
+}
+
 export const getChefiaKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à direção.");
+    const visibility = orderVisibilitySql(me);
 
     const [
       totalMembers,
@@ -40,8 +62,20 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
     ] = await Promise.all([
       pgOne<{ count: number }>(`select count(*)::int as count from members where deleted_at is null`).catch(() => ({ count: 0 })),
       pgOne<{ count: number }>(`select count(*)::int as count from members where deleted_at is null and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')`).catch(() => ({ count: 0 })),
-      pgOne<{ count: number }>(`select count(*)::int as count from orders where status in ('pending', 'approved', 'in_progress', 'ready')`).catch(() => ({ count: 0 })),
-      pgOne<{ count: number }>(`select count(*)::int as count from inventory_delivery_requests where status = 'pending'`).catch(() => ({ count: 0 })),
+      pgOne<{ count: number }>(
+        `select count(*)::int as count
+         from orders o
+         where o.status = any($${visibility.params.length + 1}::text[])
+         ${visibility.sql}`,
+        [...visibility.params, OPEN_ORDER_STATUSES],
+      ).catch(() => ({ count: 0 })),
+      pgOne<{ count: number }>(
+        `select count(*)::int as count
+         from inventory_delivery_requests r
+         where r.status = 'pending'
+         ${me.is_superadmin ? "" : "and r.responsavel_member_id = $1"}`,
+        me.is_superadmin ? [] : [me.id],
+      ).catch(() => ({ count: 0 })),
       pgQuery<{ name: string; balance: number }>(
         `with visible_items as (
            select i.id, i.name
@@ -77,10 +111,13 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
            and i.deleted_at is null`,
       ).catch(() => ({ total: 0 })),
       pgOne<{ total: number }>(
-        `select coalesce(sum(total_price), 0)::float as total
-         from orders
-         where status = 'fulfilled'
-           and created_at >= now() - interval '7 days'`,
+        `select coalesce(sum(${currentOrderValueSql("o", "i")}), 0)::float as total
+         from orders o
+         left join items i on i.id = o.item_id
+         where o.status = 'fulfilled'
+           and o.created_at >= now() - interval '7 days'
+           ${visibility.sql}`,
+        visibility.params,
       ).catch(() => ({ total: 0 })),
       pgQuery<{ display_name: string | null; days: number }>(
         `WITH member_activity AS (
@@ -129,8 +166,9 @@ export const getOrderCycles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OrderCycle[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    const isChefia = me?.tier === "kingpin" || me?.tier === "manda_chuva" || me?.role_label === "kingpin" || me?.role_label === "manda_chuva";
-    if (!isChefia) throw new Error("Acesso restrito. Apenas Kingpin e Manda-Chuva.");
+    const isChefia = me?.tier === "kingpin" || me?.tier === "manda_chuva" || me?.is_superadmin || me?.role_label === "kingpin" || me?.role_label === "manda_chuva";
+    if (!isChefia || !me) throw new Error("Acesso restrito. Apenas Kingpin e Manda-Chuva.");
+    const visibility = orderVisibilitySql(me);
 
     const cycles = await pgQuery<{
       cycle_start: string;
@@ -150,11 +188,12 @@ export const getOrderCycles = createServerFn({ method: "GET" })
           o.id,
           o.status,
           o.quantity,
-          COALESCE(o.total_price, 0) as total_price,
+          ${currentOrderValueSql("o", "i")} as total_price,
           COALESCE(i.estimated_value, 0) as unit_cost
         FROM orders o
         JOIN items i ON i.id = o.item_id
         WHERE o.status NOT IN ('cancelled', 'denied')
+        ${visibility.sql}
       )
       SELECT
         cycle_start,
@@ -170,6 +209,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       GROUP BY cycle_start, cycle_end
       ORDER BY cycle_start DESC
       LIMIT 8`,
+      visibility.params,
     ).catch(() => []);
 
     const items = await pgQuery<{
@@ -184,14 +224,16 @@ export const getOrderCycles = createServerFn({ method: "GET" })
         date_trunc('week', o.created_at)::date as cycle_start,
         i.name as item_name,
         SUM(o.quantity)::int as quantity,
-        SUM(COALESCE(o.total_price, 0))::float as revenue,
+        SUM(${currentOrderValueSql("o", "i")})::float as revenue,
         SUM(o.quantity * COALESCE(i.estimated_value, 0))::float as cost,
-        SUM(COALESCE(o.total_price, 0) - o.quantity * COALESCE(i.estimated_value, 0))::float as profit
+        SUM(${currentOrderValueSql("o", "i")} - o.quantity * COALESCE(i.estimated_value, 0))::float as profit
       FROM orders o
       JOIN items i ON i.id = o.item_id
       WHERE o.status NOT IN ('cancelled', 'denied')
+      ${visibility.sql}
       GROUP BY date_trunc('week', o.created_at)::date, i.name
       ORDER BY cycle_start DESC, profit DESC`,
+      visibility.params,
     ).catch(() => []);
 
     return cycles.map((c) => ({
