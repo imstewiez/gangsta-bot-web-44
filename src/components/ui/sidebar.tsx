@@ -1,21 +1,13 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, X } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -60,6 +52,7 @@ const SidebarProvider = React.forwardRef<
   const [openMobile, setOpenMobile] = React.useState(false);
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+
   const setOpen = React.useCallback((value: boolean | ((value: boolean) => boolean)) => {
     const openState = typeof value === "function" ? value(open) : value;
     if (setOpenProp) setOpenProp(openState);
@@ -68,7 +61,8 @@ const SidebarProvider = React.forwardRef<
   }, [setOpenProp, open]);
 
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
+    if (isMobile) setOpenMobile((current) => !current);
+    else setOpen((current) => !current);
   }, [isMobile, setOpen]);
 
   React.useEffect(() => {
@@ -77,6 +71,7 @@ const SidebarProvider = React.forwardRef<
         event.preventDefault();
         toggleSidebar();
       }
+      if (event.key === "Escape") setOpenMobile(false);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -111,29 +106,50 @@ const Sidebar = React.forwardRef<
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
-  const forceMobileDrawer = openMobile;
+  const useMobileDrawer = isMobile || openMobile;
 
   if (collapsible === "none") {
     return <div className={cn("app-sidebar-liquid flex h-full w-(--sidebar-width) flex-col text-sidebar-foreground", className)} ref={ref} {...props}>{children}</div>;
   }
 
-  if (isMobile || forceMobileDrawer) {
+  if (useMobileDrawer) {
+    const hiddenTransform = side === "left" ? "translateX(-105%)" : "translateX(105%)";
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
+      <>
+        {openMobile && (
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setOpenMobile(false)}
+            className="fixed inset-0 bg-black/82 backdrop-blur-[2px]"
+            style={{ zIndex: 9000 }}
+          />
+        )}
+        <aside
+          ref={ref}
           data-sidebar="sidebar"
           data-mobile="true"
-          className="app-sidebar-liquid w-[18rem] max-w-[86vw] p-0 text-sidebar-foreground [&>button]:hidden"
-          style={{ "--sidebar-width": SIDEBAR_WIDTH_MOBILE } as React.CSSProperties}
-          side={side}
+          className={cn("app-sidebar-liquid fixed top-0 flex h-dvh flex-col overflow-hidden text-sidebar-foreground shadow-2xl transition-transform duration-300 ease-out", side === "left" ? "left-0" : "right-0", className)}
+          style={{
+            zIndex: 9010,
+            width: SIDEBAR_WIDTH_MOBILE,
+            maxWidth: "86vw",
+            transform: openMobile ? "translateX(0)" : hiddenTransform,
+            "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+          } as React.CSSProperties}
+          {...props}
         >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Menu</SheetTitle>
-            <SheetDescription>Menu lateral da aplicação.</SheetDescription>
-          </SheetHeader>
-          <div className="relative z-10 flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setOpenMobile(false)}
+            className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-xl border border-primary/25 bg-background/40 text-muted-foreground backdrop-blur-xl hover:bg-primary/10 hover:text-primary"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="relative z-10 flex h-full w-full flex-col pt-1">{children}</div>
+        </aside>
+      </>
     );
   }
 
