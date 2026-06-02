@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, ShieldCheck, X } from "lucide-react";
+import { Eye, X } from "lucide-react";
 import { useAuthedServerFn, getViewAsMemberId, setViewAsMemberId } from "@/lib/authed-server-fn";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { listViewAsTargets } from "@/lib/view-as.functions";
@@ -27,7 +27,7 @@ export function ViewAsSwitcher() {
   const options = (targets.data ?? []).map((member) => ({
     value: String(member.id),
     label: labelFor(member),
-    group: member.is_superadmin ? "Direção Total" : member.is_manager ? "Chefia" : "Membros",
+    group: member.is_superadmin ? "Administração" : member.is_manager ? "Gestão" : "Membros",
   }));
 
   function refresh() {
@@ -48,19 +48,16 @@ export function ViewAsSwitcher() {
   }
 
   return (
-    <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.075] px-2 py-1.5 backdrop-blur-xl sm:w-[min(360px,48vw)] lg:w-[320px]">
-      <span className="hidden h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25 sm:grid">
+    <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-primary/25 bg-background/45 px-2 py-1.5 backdrop-blur-xl sm:w-[360px] lg:w-[380px]">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25">
         <Eye className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="mb-1 hidden items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-primary/90 sm:flex">
-          <ShieldCheck className="h-3 w-3" /> Ver como
-        </div>
         <SearchableSelect
           value={current}
           onChange={change}
           options={options}
-          placeholder={me.data?.is_viewing_as ? me.data.display_name ?? "Membro" : "Escolher membro"}
+          placeholder={me.data?.is_viewing_as ? me.data.display_name ?? "Membro" : "Ver como..."}
           searchPlaceholder="Procurar membro..."
           emptyText="Sem membros disponíveis."
           className="h-8 min-w-0 border-primary/25 bg-background/55 text-xs shadow-none"
