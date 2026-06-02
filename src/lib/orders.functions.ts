@@ -9,16 +9,43 @@ import { resolveItemPrices } from "./pricing.resolver";
 import { getSurchargeForItem } from "./tier-pricing.functions";
 
 type OrderRow = {
-  id: number; member_id: number | null; member_name: string | null; item_id: number | null; item_name: string | null; quantity: number; status: string; unit_price: number | null; total_price: number | null; notes: string | null; created_at: string; delivered_at: string | null; responsavel_member_id: number | null; responsavel_name: string | null; ingredients_json: Array<{ name: string; needed: number }> | null; batch_id: string | null; payment_mode: string | null; material_cost: number | null; money_cost: number | null;
+  id: number;
+  member_id: number | null;
+  member_name: string | null;
+  item_id: number | null;
+  item_name: string | null;
+  quantity: number;
+  status: string;
+  unit_price: number | null;
+  total_price: number | null;
+  notes: string | null;
+  created_at: string;
+  delivered_at: string | null;
+  responsavel_member_id: number | null;
+  responsavel_name: string | null;
+  ingredients_json: Array<{ name: string; needed: number }> | null;
+  batch_id: string | null;
+  payment_mode: string | null;
+  material_cost: number | null;
+  money_cost: number | null;
 };
+
 const ORDER_STATUSES = ["pending", "approved", "in_progress", "ready", "fulfilled", "denied", "cancelled"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 const TERMINAL_STATUSES = new Set<OrderStatus>(["fulfilled", "denied", "cancelled"]);
-const ALLOWED_TRANSITIONS: Record<string, OrderStatus[]> = { pending: ["approved", "denied", "cancelled"], approved: ["in_progress", "cancelled"], in_progress: ["ready", "cancelled"], ready: ["fulfilled", "cancelled"] };
+const ALLOWED_TRANSITIONS: Record<string, OrderStatus[]> = {
+  pending: ["approved", "denied", "cancelled"],
+  approved: ["in_progress", "cancelled"],
+  in_progress: ["ready", "cancelled"],
+  ready: ["fulfilled", "cancelled"],
+};
+const RESPONSIBLE_TIERS = ["patrao_di_zona", "kingpin", "manda_chuva"];
+
 type PriceLike = { tier_price?: number | null; tier_price_with_material?: number | null; tier_price_without_material?: number | null; min_sale_price?: number | null; purchase_price?: number | null };
 type OrderIngredient = { name: string; needed: number };
 type OutputCategory = { category: string | null; subcategory: string | null };
 type RecipeIngredient = { name: string; needed: number; category: string | null; subcategory: string | null };
+
 function positive(value: unknown): number | null { const parsed = Number(value); return Number.isFinite(parsed) && parsed > 0 ? parsed : null; }
 function normalizeText(value: unknown): string { return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); }
 function isOrangeCategory(output: OutputCategory): boolean { return normalizeText(output.category) === "armas_orange" || normalizeText(output.subcategory) === "armas_orange"; }
@@ -26,6 +53,20 @@ function isPiecesIngredient(ingredient: RecipeIngredient): boolean { const name 
 function filterOrderIngredients(output: OutputCategory, ingredients: RecipeIngredient[]): RecipeIngredient[] { return isOrangeCategory(output) ? ingredients.filter(isPiecesIngredient) : ingredients; }
 function priceWithMaterials(prices: PriceLike): number { return Number(positive(prices.tier_price_with_material) ?? positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? 0); }
 function priceWithoutMaterials(prices: PriceLike): number { return Number(positive(prices.tier_price_without_material) ?? positive(prices.purchase_price) ?? 0); }
+
+async function assertResponsibleExists(memberId: number) {
+  const responsible = await pgOne<{ id: number }>(
+    `select id
+     from members
+     where id = $1
+       and deleted_at is null
+       and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')
+       and tier = any($2::text[])`,
+    [memberId, RESPONSIBLE_TIERS],
+  );
+  if (!responsible) throw new Error("Responsável inválido. Só Patrão di Zona, Kingpin ou Manda-Chuva podem ser responsáveis.");
+}
+
 async function getOrderIngredients(itemId: number, output: OutputCategory, quantity: number, tier: string | null): Promise<OrderIngredient[]> {
   const dbRows = await pgQuery<{ name: string; qty: number; category: string | null; subcategory: string | null }>(
     `select i.name, i.category, i.subcategory, coalesce(o.quantity, ri.quantity)::float as qty
@@ -42,18 +83,46 @@ async function getOrderIngredients(itemId: number, output: OutputCategory, quant
   ));
   return filterOrderIngredients(output, dbRows.map((row) => ({ name: row.name, category: row.category, subcategory: row.subcategory, needed: Number(row.qty) * quantity }))).map((row) => ({ name: row.name, needed: row.needed }));
 }
-async function insertOrderHistory(orderId: number, oldStatus: string, newStatus: string, changedBy: string, notes?: string | null) { try { await pgQuery(`insert into order_status_history (order_id, old_status, new_status, changed_by, notes, created_at) values ($1, $2, $3, $4, $5, now())`, [orderId, oldStatus, newStatus, changedBy, notes ?? null]); } catch {} }
-export const listOrders = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).inputValidator((d: { scope?: "mine" | "manage"; status?: string | null; statuses?: string[] | null }) => { const scope = DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine"; const status = OrderStatusSchema.optional().nullable().parse(d?.status) ?? null; const statusesRaw = z.array(OrderStatusSchema).optional().nullable().parse(d?.statuses); const statuses = statusesRaw && statusesRaw.length > 0 ? statusesRaw : null; return { scope, status, statuses }; }).handler(async ({ data, context }): Promise<OrderRow[]> => {
-  const me = await resolveCurrentMember(context.supabase, context.userId); const params: unknown[] = []; const conds: string[] = [];
-  if (data.scope === "mine") { if (!me) return []; params.push(me.id); conds.push(`o.member_id = $${params.length}`); } else { if (!me?.is_manager) return []; if (!me.is_superadmin) { params.push(me.id); conds.push(`o.responsavel_member_id = $${params.length}`); } }
+
+async function insertOrderHistory(orderId: number, oldStatus: string, newStatus: string, changedBy: string, notes?: string | null) {
+  try { await pgQuery(`insert into order_status_history (order_id, old_status, new_status, changed_by, notes, created_at) values ($1, $2, $3, $4, $5, now())`, [orderId, oldStatus, newStatus, changedBy, notes ?? null]); } catch {}
+}
+
+export const listOrders = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).inputValidator((d: { scope?: "mine" | "manage"; status?: string | null; statuses?: string[] | null }) => {
+  const scope = DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine";
+  const status = OrderStatusSchema.optional().nullable().parse(d?.status) ?? null;
+  const statusesRaw = z.array(OrderStatusSchema).optional().nullable().parse(d?.statuses);
+  const statuses = statusesRaw && statusesRaw.length > 0 ? statusesRaw : null;
+  return { scope, status, statuses };
+}).handler(async ({ data, context }): Promise<OrderRow[]> => {
+  const me = await resolveCurrentMember(context.supabase, context.userId);
+  const params: unknown[] = [];
+  const conds: string[] = [];
+  if (data.scope === "mine") {
+    if (!me) return [];
+    params.push(me.id); conds.push(`o.member_id = $${params.length}`);
+  } else {
+    if (!me?.is_manager) return [];
+    if (!me.is_superadmin) { params.push(me.id); conds.push(`o.responsavel_member_id = $${params.length}`); }
+  }
   if (data.statuses) { params.push(data.statuses); conds.push(`o.status = ANY($${params.length})`); } else if (data.status) { params.push(data.status); conds.push(`o.status = $${params.length}`); }
   const where = conds.length ? `where ${conds.join(" and ")}` : "";
-  return pgQuery<OrderRow>(`select o.id, o.member_id, m.display_name as member_name, o.item_id, i.name as item_name, o.quantity, o.status, o.unit_price::float as unit_price, o.total_price::float as total_price, o.notes, o.created_at, o.delivered_at, o.responsavel_member_id, mr.display_name as responsavel_name, o.ingredients_json, o.batch_id, o.payment_mode, o.material_cost::float as material_cost, o.money_cost::float as money_cost from orders o left join members m on m.id = o.member_id left join members mr on mr.id = o.responsavel_member_id left join items i on i.id = o.item_id ${where} order by o.created_at desc limit 200`, params);
+  return pgQuery<OrderRow>(`select o.id, o.member_id, m.display_name as member_name, o.item_id, i.name as item_name, o.quantity, o.status, o.unit_price::float as unit_price, o.total_price::float as total_price, o.notes, o.created_at, o.delivered_at, o.responsavel_member_id, coalesce(mr.display_name, mr.nickname) as responsavel_name, o.ingredients_json, o.batch_id, o.payment_mode, o.material_cost::float as material_cost, o.money_cost::float as money_cost from orders o left join members m on m.id = o.member_id left join members mr on mr.id = o.responsavel_member_id left join items i on i.id = o.item_id ${where} order by o.created_at desc limit 200`, params);
 });
-export const createOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: "materials_money" | "money_only" }) => { if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio"); if (d.lines.length > 50) throw new Error("Máximo 50 itens por encomenda"); for (const l of d.lines) { if (!Number.isFinite(l.item_id) || l.item_id <= 0) throw new Error("Item inválido"); if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("Quantidade inválida"); } if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) throw new Error("Tens de escolher um responsável"); const paymentMode = d.payment_mode ?? "materials_money"; if (paymentMode !== "materials_money" && paymentMode !== "money_only") throw new Error("Modo de pagamento inválido"); return { ...d, payment_mode: paymentMode, notes: NotesSchema.parse(d.notes) }; }).handler(async ({ data, context }) => {
+
+export const createOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: "materials_money" | "money_only" }) => {
+  if (!Array.isArray(d.lines) || d.lines.length === 0) throw new Error("Carrinho vazio");
+  if (d.lines.length > 50) throw new Error("Máximo 50 itens por encomenda");
+  for (const l of d.lines) { if (!Number.isFinite(l.item_id) || l.item_id <= 0) throw new Error("Item inválido"); if (!Number.isFinite(l.quantity) || l.quantity <= 0) throw new Error("Quantidade inválida"); }
+  if (d.responsavel_member_id == null || !Number.isFinite(d.responsavel_member_id) || d.responsavel_member_id <= 0) throw new Error("Tens de escolher um responsável");
+  const paymentMode = d.payment_mode ?? "materials_money";
+  if (paymentMode !== "materials_money" && paymentMode !== "money_only") throw new Error("Modo de pagamento inválido");
+  return { ...d, payment_mode: paymentMode, notes: NotesSchema.parse(d.notes) };
+}).handler(async ({ data, context }) => {
   const me = await resolveCurrentMember(context.supabase, context.userId); if (!me) throw new Error("Não tens conta de membro associada.");
-  const responsible = await pgOne<{ id: number }>(`select id from members where id = $1 and deleted_at is null and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`, [data.responsavel_member_id]); if (!responsible) throw new Error("Responsável inválido");
-  const itemIds = data.lines.map((l) => l.item_id); const items = await pgQuery<any>(`select id, name, category, subcategory, side, min_sale_price::float as min_sale_price, purchase_price::float as purchase_price, morador_purchase_price::float as morador_purchase_price, estimated_value::float as estimated_value from items where id = ANY($1::int[]) and coalesce(active, true) = true and deleted_at is null`, [itemIds]);
+  await assertResponsibleExists(data.responsavel_member_id);
+  const itemIds = data.lines.map((l) => l.item_id);
+  const items = await pgQuery<any>(`select id, name, category, subcategory, side, min_sale_price::float as min_sale_price, purchase_price::float as purchase_price, morador_purchase_price::float as morador_purchase_price, estimated_value::float as estimated_value from items where id = ANY($1::int[]) and coalesce(active, true) = true and deleted_at is null`, [itemIds]);
   const itemMap = new Map(items.map((i) => [i.id, i])); const batchId = crypto.randomUUID(); const results: { id: number; item_name: string; quantity: number }[] = [];
   for (const line of data.lines) {
     const dbItem = itemMap.get(line.item_id); if (!dbItem) throw new Error(`Item não encontrado: ${line.item_id}`); if (dbItem.side !== "venda" && dbItem.side !== "ambos") throw new Error(`Esse item não está disponível para encomenda: ${dbItem.name}`);
@@ -66,12 +135,23 @@ export const createOrder = createServerFn({ method: "POST" }).middleware([requir
   }
   await logAdminAction(context.supabase, { action: "order_created", actorId: context.userId, actorName: me.display_name ?? "Membro", targetType: "order", targetId: results.map((r) => r.id).join(","), details: `${results.length} encomenda(s) criada(s): ${results.map((r) => `${r.quantity}× ${r.item_name}`).join(", ")}`, afterState: { batch_id: batchId, items: results } }); return { ids: results.map((r) => r.id) };
 });
+
 export const transitionOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { id: number; to: OrderStatus }) => ({ id: IdSchema.parse(d.id), to: OrderStatusSchema.parse(d.to) as OrderStatus })).handler(async ({ data, context }) => {
-  const me = await resolveCurrentMember(context.supabase, context.userId); if (!me?.is_manager) throw new Error("Sem permissão"); const order = await pgOne<{ status: string; member_id: number | null; item_id: number | null; quantity: number; batch_id: string | null }>(`select status, member_id, item_id, quantity, batch_id from orders where id=$1`, [data.id]); if (!order) throw new Error("Encomenda não encontrada"); if (TERMINAL_STATUSES.has(order.status as OrderStatus)) throw new Error("Encomenda já fechada"); if (!ALLOWED_TRANSITIONS[order.status]?.includes(data.to)) throw new Error("Transição inválida");
-  await pgQuery(`update orders set status=$2, updated_at=now(), updated_by=$3, delivered_at = case when $2='fulfilled' then now() else delivered_at end where id=$1`, [data.id, data.to, `web:${context.userId}`]); await insertOrderHistory(data.id, order.status, data.to, `web:${context.userId}`);
+  const me = await resolveCurrentMember(context.supabase, context.userId); if (!me?.is_manager) throw new Error("Sem permissão");
+  const order = await pgOne<{ status: string; member_id: number | null; item_id: number | null; quantity: number; batch_id: string | null; responsavel_member_id: number | null }>(`select status, member_id, item_id, quantity, batch_id, responsavel_member_id from orders where id=$1`, [data.id]);
+  if (!order) throw new Error("Encomenda não encontrada");
+  if (!order.responsavel_member_id) throw new Error("Encomenda sem responsável. Define um responsável antes de tratar.");
+  if (!me.is_superadmin && order.responsavel_member_id !== me.id) throw new Error("Sem permissão — só o responsável pode tratar esta encomenda");
+  if (TERMINAL_STATUSES.has(order.status as OrderStatus)) throw new Error("Encomenda já fechada");
+  if (!ALLOWED_TRANSITIONS[order.status]?.includes(data.to)) throw new Error("Transição inválida");
+  await pgQuery(`update orders set status=$2, updated_at=now(), updated_by=$3, delivered_at = case when $2='fulfilled' then now() else delivered_at end where id=$1`, [data.id, data.to, `web:${context.userId}`]);
+  await insertOrderHistory(data.id, order.status, data.to, `web:${context.userId}`);
   if (data.to === "fulfilled" && order.item_id && order.member_id) await pgQuery(`insert into inventory_movements (item_id, member_id, movement_type, quantity, notes, created_by, created_at) values ($1,$2,'venda_bairrista',$3,$4,$5,now())`, [order.item_id, order.member_id, -Math.abs(order.quantity), `order:${data.id}`, `web:${context.userId}`]);
   await logAdminAction(context.supabase, { action: "order_status_changed", actorId: context.userId, actorName: me.display_name ?? "Direção", targetType: "order", targetId: data.id, details: `Encomenda ${data.id}: ${order.status} → ${data.to}` }); return { ok: true };
 });
+
 export const cancelOwnOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { ids: number[] }) => { if (!Array.isArray(d.ids) || d.ids.length === 0) throw new Error("IDs inválidos"); for (const id of d.ids) IdSchema.parse(id); return { ids: d.ids }; }).handler(async ({ data, context }) => { const me = await resolveCurrentMember(context.supabase, context.userId); if (!me) throw new Error("Membro não encontrado"); await pgQuery(`update orders set status='cancelled', updated_at=now(), updated_by=$2 where id = any($1::int[]) and member_id = $3 and status = 'pending'`, [data.ids, `web:${context.userId}`, me.id]); await Promise.all(data.ids.map((id) => insertOrderHistory(id, "pending", "cancelled", `web:${context.userId}`, "Cancelada pelo membro"))); return { ok: true }; });
-export const listOrderComments = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).inputValidator((d: { order_id: number }) => ({ order_id: IdSchema.parse(d.order_id) })).handler(async ({ data }) => pgQuery<{ id: number; body: string; created_at: string; author_name: string | null }>(`select c.id, c.body, c.created_at, coalesce(m.display_name, p.display_name) as author_name from order_comments c left join profiles p on p.user_id = c.author_id left join members m on m.discord_id = p.discord_id where c.order_id=$1 order by c.created_at asc`, [data.order_id]));
-export const addOrderComment = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { order_id: number; body: string }) => ({ order_id: IdSchema.parse(d.order_id), body: NotesSchema.parse(d.body) })).handler(async ({ data, context }) => { await pgQuery(`insert into order_comments (order_id, author_id, body) values ($1,$2,$3)`, [data.order_id, context.userId, data.body]); return { ok: true }; });
+
+export const listOrderComments = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).inputValidator((d: { order_id: number }) => ({ order_id: IdSchema.parse(d.order_id) })).handler(async ({ data }) => pgQuery<any>(`select c.id, c.content, c.created_at, coalesce(m.display_name, m.nickname) as author_name from order_comments c left join members m on m.id = c.author_member_id where c.order_id = $1 order by c.created_at asc`, [data.order_id]));
+
+export const addOrderComment = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { order_id: number; content: string }) => ({ order_id: IdSchema.parse(d.order_id), content: z.string().trim().min(1).max(1000).parse(d.content) })).handler(async ({ data, context }) => { const me = await resolveCurrentMember(context.supabase, context.userId); if (!me) throw new Error("Membro não encontrado"); await pgQuery(`insert into order_comments (order_id, author_member_id, content, created_at) values ($1,$2,$3,now())`, [data.order_id, me.id, data.content]); return { ok: true }; });
