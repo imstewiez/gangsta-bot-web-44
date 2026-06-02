@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Sparkles } from "lucide-react";
+import { Activity, Database, Sparkles } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
@@ -17,20 +17,25 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
-            <div className="mx-auto w-full max-w-7xl rounded-[1.35rem] border border-white/10 bg-background/34 px-3 py-2 shadow-[0_18px_70px_-42px_rgba(0,0,0,0.95)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/24">
-              <div aria-hidden className="pointer-events-none absolute inset-x-8 top-3 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
-              <div className="relative flex min-h-10 flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-                <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl border border-border/45 bg-white/[0.04] text-muted-foreground hover:border-primary/45 hover:bg-primary/10 hover:text-primary" />
-
-                <div className="hidden min-w-0 items-center gap-3 lg:flex">
-                  <div className="h-7 w-px bg-gradient-to-b from-transparent via-primary/35 to-transparent" />
+            <div className="app-shell-topbar mx-auto w-full max-w-7xl px-3 py-2 md:px-4">
+              <div className="relative flex min-h-12 flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl border border-border/45 bg-white/[0.04] text-muted-foreground hover:border-primary/45 hover:bg-primary/10 hover:text-primary" />
+                  <div className="hidden h-8 w-px bg-gradient-to-b from-transparent via-primary/35 to-transparent sm:block" />
                   <div className="min-w-0">
-                    <div className="text-display text-[10px] tracking-[0.32em] text-primary/90">Painel interno</div>
-                    <div className="truncate text-xs text-muted-foreground/65">Operação · Membros · Inventário</div>
+                    <div className="flex items-center gap-2 text-display text-[10px] tracking-[0.28em] text-primary/90">
+                      <Activity className="h-3.5 w-3.5" />
+                      Painel interno
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/70">
+                      <span className="inline-flex items-center gap-1.5"><Database className="h-3 w-3 text-primary/60" /> Dados em tempo real</span>
+                      <span className="hidden opacity-45 sm:inline">·</span>
+                      <span className="hidden sm:inline">Operação, membros e inventário</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="ml-auto flex min-w-0 flex-1 justify-end lg:flex-none">
+                <div className="flex min-w-0 flex-1 justify-start lg:justify-end">
                   <ViewAsSwitcher />
                 </div>
               </div>
