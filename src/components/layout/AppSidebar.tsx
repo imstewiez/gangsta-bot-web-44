@@ -55,8 +55,8 @@ const GROUPS: NavGroup[] = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const collapsed = !isMobile && state === "collapsed";
   const { profile, signOut } = useAuth();
   const loc = useLocation();
   const navigate = useNavigate();
@@ -76,17 +76,23 @@ export function AppSidebar() {
     return loc.pathname.startsWith(to + "/");
   };
 
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className={cn("relative z-10", collapsed ? "p-1" : "p-2")}>
         <div className={cn("sidebar-liquid-card flex rounded-2xl", collapsed ? "w-full flex-col items-center gap-1.5 p-1" : "items-center gap-2 p-2")}>
-          <Link to="/dashboard" className={cn("group grid shrink-0 place-items-center rounded-xl", collapsed ? "h-8 w-8" : "h-9 w-9")} title="Ballas Gang">
+          <Link to="/dashboard" onClick={closeMobile} className={cn("group grid shrink-0 place-items-center rounded-xl", collapsed ? "h-8 w-8" : "h-9 w-9")} title="Ballas Gang">
             <img src={ballasLogo} alt="Ballas Gang" className={cn("logo-hd rounded-sm object-contain transition-transform group-hover:scale-105", collapsed ? "h-7 w-7" : "h-8 w-8")} />
           </Link>
           {!collapsed && <div className="min-w-0 flex-1 text-display text-sm tracking-[0.22em]"><span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Ballas</span> Gang</div>}
-          <SidebarTrigger className={cn("shrink-0 rounded-xl border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14", collapsed ? "h-8 w-8" : "h-8 w-8")} title={collapsed ? "Abrir menu" : "Fechar menu"}>
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </SidebarTrigger>
+          {!isMobile && (
+            <SidebarTrigger className={cn("shrink-0 rounded-xl border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14", collapsed ? "h-8 w-8" : "h-8 w-8")} title={collapsed ? "Abrir menu" : "Fechar menu"}>
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </SidebarTrigger>
+          )}
         </div>
       </SidebarHeader>
 
@@ -113,7 +119,7 @@ export function AppSidebar() {
                           tooltip={it.label}
                           className="h-9 rounded-xl border border-transparent text-sidebar-foreground/74 hover:border-primary/30 hover:bg-primary/10 hover:text-primary data-[active=true]:border-primary/35 data-[active=true]:bg-primary/16 data-[active=true]:text-primary"
                         >
-                          <Link to={it.to} className="flex items-center gap-2.5">
+                          <Link to={it.to} onClick={closeMobile} className="flex items-center gap-2.5">
                             <it.icon className="h-4 w-4 shrink-0" />
                             <span className="text-display text-[12px] tracking-[0.1em]">{it.label}</span>
                           </Link>
