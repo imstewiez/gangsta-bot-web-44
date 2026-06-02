@@ -8,7 +8,18 @@ import { Reveal } from "./Reveal";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 
+const TICKER_MESSAGES = [
+  "Ballas Gang!",
+  "É a firma moh!",
+  "Sim sim...",
+  "Tudo controlado.",
+  "Sem stress, sem ruído.",
+  "Operação em movimento.",
+];
+
 export function AppShell({ children }: { children: ReactNode }) {
+  const ticker = [...TICKER_MESSAGES, ...TICKER_MESSAGES];
+
   return (
     <SidebarProvider>
       <div className="ambient-bg flex h-screen w-full overflow-hidden">
@@ -17,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
-            <div className="app-shell-topbar mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 md:px-4">
+            <div className="app-shell-topbar mx-auto grid w-full max-w-7xl grid-cols-1 gap-2 px-3 py-2 md:px-4 lg:grid-cols-[minmax(170px,auto)_minmax(220px,1fr)_auto] lg:items-center">
               <div className="liquid-content flex min-w-0 items-center gap-3">
                 <span className="shell-liquid-mark shrink-0">
                   <Waves className="h-4 w-4 text-primary" />
@@ -27,7 +38,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <div className="hidden text-xs text-muted-foreground/70 sm:block">Painel interno</div>
                 </div>
               </div>
-              <div className="liquid-content min-w-0 shrink-0">
+
+              <div className="liquid-content header-ticker min-w-0 order-3 lg:order-none">
+                <div className="header-ticker-track">
+                  {ticker.map((message, index) => (
+                    <span key={`${message}-${index}`} className="header-ticker-item">
+                      <span className="header-ticker-dot" />
+                      {message}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="liquid-content min-w-0 justify-self-stretch lg:justify-self-end">
                 <ViewAsSwitcher />
               </div>
             </div>
