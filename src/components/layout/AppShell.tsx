@@ -55,7 +55,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 export function PageHeader({
-  eyebrow, title, action, icon: Icon,
+  eyebrow,
+  title,
+  action,
+  icon: Icon = Sparkles,
 }: {
   eyebrow?: string;
   title: string;
@@ -63,30 +66,32 @@ export function PageHeader({
   action?: ReactNode;
   icon?: React.ComponentType<{ className?: string }>;
 }) {
+  const section = eyebrow || "Ballas Gang";
+
   return (
-    <div className="relative mb-7 md:mb-9">
-      <div className="flex flex-wrap items-end justify-between gap-4 pb-4">
-        <div className="min-w-0">
-          {eyebrow && (
-            <Reveal delay={0} direction="up">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_16px_color-mix(in_oklab,var(--primary)_80%,transparent)]" />
-                <span className="text-display text-[11px] tracking-[0.35em] text-primary">{eyebrow}</span>
-              </div>
-            </Reveal>
-          )}
-          <Reveal delay={eyebrow ? 60 : 0} direction="up">
-            <h1 className="flex items-center gap-3 text-display text-3xl font-black leading-[0.95] tracking-tight text-foreground md:text-4xl">
-              {Icon && (
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-primary/35 bg-primary/10 text-primary backdrop-blur-xl">
-                  <Icon className="h-5 w-5" />
-                </span>
-              )}
-              <span className="min-w-0 break-words">{title}</span>
-            </h1>
+    <div className="page-header relative mb-7 md:mb-9">
+      <div className="flex flex-col gap-4 pb-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0 flex-1">
+          <Reveal delay={0} direction="up">
+            <div className="page-header-kicker mb-2 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_16px_color-mix(in_oklab,var(--primary)_80%,transparent)]" />
+              <span className="text-display text-[11px] tracking-[0.35em] text-primary">{section}</span>
+            </div>
+          </Reveal>
+
+          <Reveal delay={60} direction="up">
+            <div className="page-header-title-row flex min-w-0 items-center gap-3">
+              <span className="page-header-icon grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-primary/35 bg-primary/10 text-primary backdrop-blur-xl shadow-[0_0_28px_-16px_color-mix(in_oklab,var(--primary)_90%,transparent)]">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h1 className="min-w-0 break-words text-display text-3xl font-black leading-[0.95] tracking-tight text-foreground md:text-4xl">
+                {title}
+              </h1>
+            </div>
           </Reveal>
         </div>
-        {action && <div className="relative shrink-0">{action}</div>}
+
+        {action && <div className="page-header-action relative shrink-0 md:pb-1">{action}</div>}
       </div>
       <div className="hairline-top opacity-60" />
     </div>
