@@ -58,9 +58,12 @@ type HomeKpis = {
   prize: PrizeHighlight | null;
 };
 
+const ACTIVE_ORG_TIERS = `('young_blood','o_gunao','gangster_fodido','patrao_di_zona','real_gangster','og','kingpin','manda_chuva')`;
+
 const ACTIVE_MEMBER_CONDITION = `
   m.deleted_at is null
   and coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
+  and m.tier in ${ACTIVE_ORG_TIERS}
 `;
 
 function scoreCtes(startSql: string, endSql: string) {
@@ -121,6 +124,7 @@ function scoreCtes(startSql: string, endSql: string) {
              count(*) filter (where p.died = true)::int as deaths
       from operation_participants p
       join operations o on o.id = p.operation_id and o.deleted_at is null
+      join active_members am on am.id = p.member_id
       cross join bounds
       where o.status = 'concluida'
         and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
@@ -130,6 +134,7 @@ function scoreCtes(startSql: string, endSql: string) {
     kills_logs_agg as (
       select killer_id as member_id, count(*)::int as kills
       from kill_logs
+      join active_members am on am.id = killer_id
       cross join bounds
       where killer_id is not null
         and date >= bounds.dstart
@@ -140,6 +145,7 @@ function scoreCtes(startSql: string, endSql: string) {
       select p.member_id, sum(p.kills)::int as kills
       from operation_participants p
       join operations o on o.id = p.operation_id and o.deleted_at is null
+      join active_members am on am.id = p.member_id
       cross join bounds
       where o.status = 'concluida'
         and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
@@ -261,12 +267,13 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
         `select coalesce(sum(kills)::text, '0') as count from (
-          select count(*) as kills from kill_logs where date >= now() - interval '7 days'
+          select count(*) as kills from kill_logs kl join members m on m.id = kl.killer_id where ${ACTIVE_MEMBER_CONDITION} and kl.date >= now() - interval '7 days'
           union all
           select coalesce(sum(p.kills),0)::int as kills
           from operation_participants p
           join operations o on o.id = p.operation_id and o.deleted_at is null
-          where o.status = 'concluida' and coalesce(o.end_time, o.start_time, o.date::timestamp) >= now() - interval '7 days'
+          join members m on m.id = p.member_id
+          where ${ACTIVE_MEMBER_CONDITION} and o.status = 'concluida' and coalesce(o.end_time, o.start_time, o.date::timestamp) >= now() - interval '7 days'
         ) src`,
       ).catch(() => ({ count: "0" })),
       pgQuery<{ wins: number; total: number }>(
