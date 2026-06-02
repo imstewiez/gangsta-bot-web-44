@@ -1,57 +1,59 @@
-/* One-by-one header message motion. */
+/* One-by-one header message motion. Each message crosses the whole header lane. */
 
-@keyframes header-message-slide {
+@keyframes header-message-run {
   0% {
     opacity: 0;
-    transform: translateX(-120%) scale(0.96);
-    filter: blur(4px);
+    transform: translateX(-115%);
+    filter: blur(3px);
   }
-  14% {
+  10% {
     opacity: 1;
-    transform: translateX(0) scale(1);
     filter: blur(0);
   }
-  72% {
+  82% {
     opacity: 1;
-    transform: translateX(0) scale(1);
     filter: blur(0);
   }
   100% {
     opacity: 0;
-    transform: translateX(120%) scale(0.98);
+    transform: translateX(115%);
     filter: blur(3px);
   }
 }
 
 .header-ticker {
+  position: relative;
   display: flex;
   min-height: 2.25rem;
   align-items: center;
-  justify-content: center;
+  overflow: hidden;
   padding: 0 1rem;
+  mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
 }
 
-.header-ticker-single {
+.header-ticker-runner {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
   display: flex;
   width: 100%;
   min-width: 0;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  animation: header-message-slide 3.2s cubic-bezier(0.22, 0.8, 0.22, 1) both;
+  animation: header-message-run 5.2s linear both;
   will-change: transform, opacity, filter;
 }
 
-.header-ticker-single .header-ticker-item {
+.header-ticker-runner .header-ticker-item {
   justify-content: center;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: max-content;
+  white-space: nowrap;
   color: color-mix(in oklab, var(--foreground) 88%, transparent);
   text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 32%, transparent);
 }
 
-.header-ticker:hover .header-ticker-single {
+.header-ticker:hover .header-ticker-runner {
   animation-play-state: paused;
 }
 
@@ -60,14 +62,15 @@
     min-height: 2.1rem;
     padding-inline: 0.75rem;
   }
-  .header-ticker-single .header-ticker-item {
+  .header-ticker-runner .header-ticker-item {
     font-size: 0.62rem;
     letter-spacing: 0.1em;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .header-ticker-single {
+  .header-ticker-runner {
+    position: static;
     animation: none !important;
     opacity: 1;
     transform: none;
