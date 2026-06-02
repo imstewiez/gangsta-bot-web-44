@@ -91,6 +91,8 @@ export type CatalogItem = {
   min_sale_price: number | null;
   xp_points: number;
   tier_price?: number | null;
+  tier_price_with_material?: number | null;
+  tier_price_without_material?: number | null;
 };
 
 const ZERO_POINT_CATEGORIES = new Set(["quimicos_droga", "dinheiro"]);
