@@ -44,10 +44,24 @@ type MemberDetail = {
   orders: number;
 };
 
+const ACTIVE_ORG_TIERS = new Set([
+  "young_blood",
+  "o_gunao",
+  "gangster_fodido",
+  "patrao_di_zona",
+  "real_gangster",
+  "og",
+  "kingpin",
+  "manda_chuva",
+]);
+
 const ACTIVE_MEMBER_WHERE = `
   m.deleted_at is null
   and coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
+  and m.tier = any($1::text[])
 `;
+
+const ACTIVE_ORG_TIER_LIST = [...ACTIVE_ORG_TIERS];
 
 function memberSelect(isManager: boolean): string {
   return `m.id,
@@ -55,20 +69,22 @@ function memberSelect(isManager: boolean): string {
           m.display_name,
           m.nickname as nick,
           m.tier,
-          coalesce(m.role,'bairrista') as role_label,
+          coalesce(m.role, m.tier, 'bairrista') as role_label,
           m.joined_at,
           coalesce(m.lifecycle_state::text, m.status, 'active') as status_lifecycle`;
 }
 
 const MEMBER_ORDER = `
-  case coalesce(m.role,'bairrista')
+  case coalesce(m.tier,'')
     when 'manda_chuva' then 1
     when 'kingpin' then 2
     when 'og' then 3
     when 'real_gangster' then 4
     when 'patrao_di_zona' then 5
-    else 6 end,
-  case m.tier when 'gangster_fodido' then 1 when 'o_gunao' then 2 when 'young_blood' then 3 else 4 end,
+    when 'gangster_fodido' then 6
+    when 'o_gunao' then 7
+    when 'young_blood' then 8
+    else 9 end,
   m.display_name nulls last
 `;
 
@@ -83,6 +99,7 @@ export const listMembers = createServerFn({ method: "GET" })
          where ${ACTIVE_MEMBER_WHERE}
          order by ${MEMBER_ORDER}
          limit 500`,
+        [ACTIVE_ORG_TIER_LIST],
       );
       return rows;
     } catch (err) {
@@ -100,9 +117,10 @@ export const listManagers = createServerFn({ method: "GET" })
         `select ${memberSelect(me?.is_manager ?? false)}
          from members m
          where ${ACTIVE_MEMBER_WHERE}
-           and (m.tier in ('patrao_di_zona', 'kingpin', 'manda_chuva') or coalesce(m.role,'') in ('patrao_di_zona','kingpin','manda_chuva','chefia'))
+           and m.tier in ('patrao_di_zona', 'real_gangster', 'og', 'kingpin', 'manda_chuva')
          order by ${MEMBER_ORDER}
          limit 200`,
+        [ACTIVE_ORG_TIER_LIST],
       );
       return rows;
     } catch (err) {
@@ -128,6 +146,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
          where ${ACTIVE_MEMBER_WHERE}
          order by ${MEMBER_ORDER}
          limit 500`,
+        [ACTIVE_ORG_TIER_LIST],
       );
       return rows;
     } catch (err) {
@@ -138,157 +157,70 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
 
 export const getMember = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: number }) => {
-    const id = Number(d.id);
-    if (!Number.isFinite(id) || id <= 0) throw new Error("id inválido");
-    return { id };
+  .inputValidator((data: unknown) => {
+    const parsed = IdSchema.safeParse((data as { id?: unknown })?.id ?? data);
+    if (!parsed.success) throw new Error("ID inválido");
+    return { id: parsed.data };
   })
   .handler(async ({ data, context }): Promise<MemberDetail> => {
     try {
       const me = await resolveCurrentMember(context.supabase, context.userId);
-      const member = await pgOne<MemberRow>(
+      const members = await pgQuery<MemberRow>(
         `select ${memberSelect(me?.is_manager ?? false)}
-         from members m
-         where m.id = $1 and m.deleted_at is null`,
+         from members m where m.id = $2 and ${ACTIVE_MEMBER_WHERE}`,
+        [ACTIVE_ORG_TIER_LIST, data.id],
+      );
+      const member = members[0] ?? null;
+      const contributions = await pgQuery<{ type: string; total: string }>(
+        `select movement_type as type, coalesce(sum(abs(quantity)),0)::text as total
+         from inventory_movements
+         where member_id=$1 group by movement_type order by 2 desc limit 10`,
         [data.id],
       );
-      if (!member) {
-        return { member: null, contributions: [], recentMovements: [], kills: 0, deaths: 0, saidas: 0, deliveries: 0, vendas: 0, orders: 0 };
-      }
-
-      const [contrib, movs, statsRow] = await Promise.all([
-        pgQuery<{ type: string; total: string }>(
-          `select movement_type as type, sum(quantity)::text as total
-           from inventory_movements
-           where member_id = $1
-           group by movement_type order by sum(quantity) desc`,
-          [data.id],
-        ),
-        pgQuery<{
-          id: number;
-          type: string;
-          item_id: number | null;
-          item_name: string | null;
-          qty: number;
-          created_at: string;
-        }>(
-          `select im.id, im.movement_type as type, im.item_id, i.name as item_name,
-                  im.quantity as qty, im.created_at
-           from inventory_movements im
-           left join items i on i.id = im.item_id
-           where im.member_id = $1
-           order by im.created_at desc
-           limit 25`,
-          [data.id],
-        ),
-        pgOne<{
-          kills_total: number;
-          deaths_total: number;
-          saidas_total: number;
-          deliveries: number;
-          sales: number;
-          orders: number;
-        }>(
-          `select
-             coalesce((select count(*)::int from kill_logs where killer_id = $1), 0)
-             + coalesce((select sum(kills)::int from operation_participants where member_id = $1), 0) as kills_total,
-             coalesce((select sum(deaths_count)::int from operation_participants where member_id = $1), 0) as deaths_total,
-             coalesce((select count(distinct operation_id)::int from operation_participants where member_id = $1), 0) as saidas_total,
-             coalesce((select count(*)::int from inventory_movements where member_id = $1 and movement_type = 'entrega_bairrista'), 0) as deliveries,
-             coalesce((select count(*)::int from inventory_movements where member_id = $1 and movement_type = 'venda_bairrista'), 0) as sales,
-             coalesce((select count(*)::int from orders where member_id = $1), 0) as orders`,
-          [data.id],
-        ),
-      ]);
-
+      const recentMovements = await pgQuery<MemberDetail["recentMovements"][number]>(
+        `select im.id, im.movement_type as type, im.item_id, i.name as item_name, im.quantity::float as qty, im.created_at::text
+         from inventory_movements im left join items i on i.id=im.item_id
+         where im.member_id=$1 order by im.created_at desc limit 20`,
+        [data.id],
+      );
+      const stats = await pgOne<{ kills: string; deaths: string; saidas: string; deliveries: string; vendas: string; orders: string }>(
+        `select coalesce(ats.kills_total,0)::text as kills,
+                coalesce(ats.deaths_total,0)::text as deaths,
+                coalesce(ats.saidas_total,0)::text as saidas,
+                coalesce(ats.deliveries,0)::text as deliveries,
+                coalesce(ats.sales,0)::text as vendas,
+                coalesce(ats.orders,0)::text as orders
+         from all_time_stats ats where ats.member_id=$1`,
+        [data.id],
+      );
       return {
         member,
-        contributions: contrib.map((r) => ({ type: r.type, total: Number(r.total) })),
-        recentMovements: movs,
-        kills: statsRow?.kills_total ?? 0,
-        deaths: statsRow?.deaths_total ?? 0,
-        saidas: statsRow?.saidas_total ?? 0,
-        deliveries: statsRow?.deliveries ?? 0,
-        vendas: statsRow?.sales ?? 0,
-        orders: statsRow?.orders ?? 0,
+        contributions: contributions.map((c) => ({ type: c.type, total: Number(c.total) })),
+        recentMovements,
+        kills: Number(stats?.kills ?? 0),
+        deaths: Number(stats?.deaths ?? 0),
+        saidas: Number(stats?.saidas ?? 0),
+        deliveries: Number(stats?.deliveries ?? 0),
+        vendas: Number(stats?.vendas ?? 0),
+        orders: Number(stats?.orders ?? 0),
       };
-    } catch (e) {
-      throw new Error(e instanceof Error ? e.message : "Erro ao carregar perfil do membro");
+    } catch (err) {
+      logger.error("getMember_failed", { error: err instanceof Error ? err.message : String(err), id: data.id });
+      throw new Error(err instanceof Error ? err.message : "DB error");
     }
   });
 
-export const getMyAllTimeStats = createServerFn({ method: "GET" })
+export const renameSelf = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{
-    kills: number;
-    deaths: number;
-    saidas: number;
-    deliveries: number;
-    sales: number;
-    orders: number;
-    wins: number;
-    losses: number;
-    kd: string;
-    winRate: string;
-  }> => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me) throw new Error("Membro não encontrado");
-    const row = await pgOne<{
-      kills_total: number;
-      deaths_total: number;
-      saidas_total: number;
-      deliveries: number;
-      sales: number;
-      orders: number;
-      wins: number;
-      losses: number;
-    }>(
-      `select coalesce(kills_total,0)::int as kills_total,
-              coalesce(deaths_total,0)::int as deaths_total,
-              coalesce(saidas_total,0)::int as saidas_total,
-              coalesce(deliveries,0)::int as deliveries,
-              coalesce(sales,0)::int as sales,
-              coalesce(orders,0)::int as orders,
-              coalesce(wins,0)::int as wins,
-              coalesce(losses,0)::int as losses
-       from all_time_stats where member_id = $1`,
-      [me.id],
-    );
-    const kills = row?.kills_total ?? 0;
-    const deaths = row?.deaths_total ?? 0;
-    const wins = row?.wins ?? 0;
-    const saidas = row?.saidas_total ?? 0;
-    return {
-      kills,
-      deaths,
-      saidas,
-      deliveries: row?.deliveries ?? 0,
-      sales: row?.sales ?? 0,
-      orders: row?.orders ?? 0,
-      wins,
-      losses: row?.losses ?? 0,
-      kd: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(0),
-      winRate: saidas > 0 ? ((wins / saidas) * 100).toFixed(0) : "0",
-    };
-  });
-
-export const updateMyProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { display_name?: string; nickname?: string | null }) => {
-    const name = d.display_name?.trim();
-    if (!name || name.length < 1 || name.length > 80) throw new Error("Nome inválido");
-    const nickname = NicknameSchema.parse(d.nickname);
-    return { display_name: name, nickname };
+  .inputValidator((data: unknown) => {
+    const parsed = NicknameSchema.safeParse((data as { nickname?: unknown })?.nickname);
+    if (!parsed.success) throw new Error("Alcunha inválida");
+    return { nickname: parsed.data };
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Membro não encontrado");
-    await pgQuery(
-      `update members set display_name = $2, nickname = $3, updated_at = now() where id = $1`,
-      [me.id, data.display_name, data.nickname],
-    );
-    if (me.discord_id) {
-      await notifyBot({ action: "rename", discord_id: me.discord_id, new_name: data.display_name });
-    }
+    await pgQuery("update members set nickname=$2, updated_at=now() where id=$1", [me.id, data.nickname]);
+    if (me.discord_id) await notifyBot({ action: "rename", discord_id: me.discord_id, new_name: data.nickname });
     return { ok: true };
   });
