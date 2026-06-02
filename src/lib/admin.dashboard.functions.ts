@@ -23,7 +23,6 @@ export type OrderCycle = {
   }[];
 };
 
-const OPEN_ORDER_STATUSES = ["pending", "approved", "in_progress", "ready"];
 const ACTIVE_ORDER_STATUSES = ["approved", "in_progress", "ready"];
 
 function orderVisibilitySql(me: { id: number; is_superadmin?: boolean | null }) {
@@ -52,20 +51,11 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
     if (!me?.is_manager) throw new Error("Acesso restrito à direção.");
     const visibility = orderVisibilitySql(me);
 
-    const [
-      totalMembers,
-      activeMembers,
-      pendingOrders,
-      pendingDeliveries,
-      lowStock,
-      totalInventoryValue,
-      weeklyRevenue,
-      inactiveMembers,
-    ] = await Promise.all([
+    const [totalMembers, activeMembers, pendingOrders, pendingDeliveries, lowStock, totalInventoryValue, weeklyRevenue, inactiveMembers] = await Promise.all([
       pgOne<{ count: number }>(`select count(*)::int as count from members where deleted_at is null`).catch(() => ({ count: 0 })),
       pgOne<{ count: number }>(`select count(*)::int as count from members where deleted_at is null and coalesce(lifecycle_state::text, 'active') in ('active', 'promoted')`).catch(() => ({ count: 0 })),
       pgOne<{ count: number }>(
-        `select count(*)::int as count
+        `select count(distinct coalesce(o.batch_id, o.id::text))::int as count
          from orders o
          where o.status = 'pending'
          ${visibility.sql}`,
@@ -188,7 +178,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
         SELECT
           date_trunc('week', o.created_at)::date as cycle_start,
           (date_trunc('week', o.created_at)::date + interval '6 days')::date as cycle_end,
-          o.id,
+          coalesce(o.batch_id, o.id::text) as order_key,
           o.status,
           o.quantity,
           ${currentOrderValueSql("o", "i")} as total_price,
@@ -201,14 +191,14 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       SELECT
         cycle_start,
         cycle_end,
-        COUNT(DISTINCT id)::int as total_orders,
+        COUNT(DISTINCT order_key)::int as total_orders,
         SUM(quantity)::int as total_material,
         SUM(total_price)::float as total_revenue,
         SUM(quantity * unit_cost)::float as total_cost,
         SUM(total_price - quantity * unit_cost)::float as total_profit,
-        COUNT(*) FILTER (WHERE status = 'fulfilled')::int as fulfilled_count,
-        COUNT(*) FILTER (WHERE status = 'pending')::int as pending_count,
-        COUNT(*) FILTER (WHERE status = any($${visibility.params.length + 1}::text[]))::int as active_count
+        COUNT(DISTINCT order_key) FILTER (WHERE status = 'fulfilled')::int as fulfilled_count,
+        COUNT(DISTINCT order_key) FILTER (WHERE status = 'pending')::int as pending_count,
+        COUNT(DISTINCT order_key) FILTER (WHERE status = any($${visibility.params.length + 1}::text[]))::int as active_count
       FROM cycle_orders
       GROUP BY cycle_start, cycle_end
       ORDER BY cycle_start DESC
@@ -216,14 +206,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       [...visibility.params, ACTIVE_ORDER_STATUSES],
     ).catch(() => []);
 
-    const items = await pgQuery<{
-      cycle_start: string;
-      item_name: string;
-      quantity: number;
-      revenue: number;
-      cost: number;
-      profit: number;
-    }>(
+    const items = await pgQuery<{ cycle_start: string; item_name: string; quantity: number; revenue: number; cost: number; profit: number }>(
       `SELECT
         date_trunc('week', o.created_at)::date as cycle_start,
         i.name as item_name,
