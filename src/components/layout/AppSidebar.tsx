@@ -56,8 +56,8 @@ const GROUPS: NavGroup[] = [
 ];
 
 export function AppSidebar() {
-  const { state, isMobile, setOpenMobile } = useSidebar();
-  const collapsed = !isMobile && state === "collapsed";
+  const { state, setOpenMobile } = useSidebar();
+  const collapsed = state === "collapsed";
   const { profile, signOut } = useAuth();
   const loc = useLocation();
   const navigate = useNavigate();
@@ -94,7 +94,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <div className="hidden md:block">
+      <div className="app-sidebar-desktop">
         <Sidebar collapsible="icon" className="border-r-0">
           <SidebarHeader className={cn("relative z-10", collapsed ? "p-1" : "p-2")}>
             <div className={cn("sidebar-liquid-card flex rounded-2xl", collapsed ? "w-full flex-col items-center gap-1.5 p-1" : "items-center gap-2 p-2")}>
@@ -118,12 +118,7 @@ export function AppSidebar() {
                       const active = isActive(it.to);
                       return (
                         <SidebarMenuItem key={it.to}>
-                          <SidebarMenuButton
-                            asChild
-                            isActive={active}
-                            tooltip={it.label}
-                            className="h-9 rounded-xl border border-transparent text-sidebar-foreground/74 hover:border-primary/30 hover:bg-primary/10 hover:text-primary data-[active=true]:border-primary/35 data-[active=true]:bg-primary/16 data-[active=true]:text-primary"
-                          >
+                          <SidebarMenuButton asChild isActive={active} tooltip={it.label} className="h-9 rounded-xl border border-transparent text-sidebar-foreground/74 hover:border-primary/30 hover:bg-primary/10 hover:text-primary data-[active=true]:border-primary/35 data-[active=true]:bg-primary/16 data-[active=true]:text-primary">
                             <Link to={it.to} className="flex items-center gap-2.5">
                               <it.icon className="h-4 w-4 shrink-0" />
                               <span className="text-display text-[12px] tracking-[0.1em]">{it.label}</span>
@@ -141,7 +136,7 @@ export function AppSidebar() {
           <SidebarFooter className={cn("relative z-10", collapsed ? "p-1" : "p-2")}>
             {!collapsed ? (
               <div className="sidebar-liquid-card flex items-center gap-2 rounded-2xl p-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border bg-background/40" style={{ borderColor: myAccent ? `color-mix(in oklab, ${myAccent} 55%, transparent)` : undefined }} title={myTierLabel ? `${myTierLabel} · ${myDisplay}` : myDisplay}>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border bg-background/40" style={{ borderColor: myAccent ? `color-mix(in oklab, ${myAccent} 55%, transparent)` : undefined }}>
                   <TierIcon tier={myTier} size="sm" />
                 </span>
                 <div className="min-w-0 flex-1 leading-tight">
@@ -161,51 +156,19 @@ export function AppSidebar() {
         </Sidebar>
       </div>
 
-      <MobileNavDrawer
-        groups={visibleGroups}
-        isActive={isActive}
-        closeMobile={closeMobile}
-        logout={logout}
-        myTier={myTier}
-        myTierLabel={myTierLabel}
-        myAccent={myAccent}
-        myDisplay={myDisplay}
-      />
+      <MobileNavDrawer groups={visibleGroups} isActive={isActive} closeMobile={closeMobile} logout={logout} myTier={myTier} myTierLabel={myTierLabel} myAccent={myAccent} myDisplay={myDisplay} />
     </>
   );
 }
 
-function MobileNavDrawer({
-  groups,
-  isActive,
-  closeMobile,
-  logout,
-  myTier,
-  myTierLabel,
-  myAccent,
-  myDisplay,
-}: {
-  groups: NavGroup[];
-  isActive: (to: string) => boolean;
-  closeMobile: () => void;
-  logout: () => Promise<void>;
-  myTier: string | null;
-  myTierLabel: string | null;
-  myAccent: string | null | undefined;
-  myDisplay: string;
-}) {
+function MobileNavDrawer({ groups, isActive, closeMobile, logout, myTier, myTierLabel, myAccent, myDisplay }: { groups: NavGroup[]; isActive: (to: string) => boolean; closeMobile: () => void; logout: () => Promise<void>; myTier: string | null; myTierLabel: string | null; myAccent: string | null | undefined; myDisplay: string }) {
   const { openMobile } = useSidebar();
 
   return (
-    <div className="md:hidden">
-      {openMobile && <button type="button" aria-label="Fechar menu" onClick={closeMobile} className="fixed inset-0 z-[9000] bg-black/82 backdrop-blur-[2px]" />}
-      <aside
-        className={cn(
-          "app-sidebar-liquid fixed left-0 top-0 z-[9010] flex h-dvh w-[18rem] max-w-[86vw] flex-col overflow-hidden text-sidebar-foreground shadow-2xl transition-transform duration-300 ease-out",
-          openMobile ? "translate-x-0" : "-translate-x-[105%]",
-        )}
-      >
-        <button type="button" aria-label="Fechar menu" onClick={closeMobile} className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-xl border border-primary/25 bg-background/40 text-muted-foreground backdrop-blur-xl hover:bg-primary/10 hover:text-primary">
+    <div className="app-mobile-nav">
+      {openMobile && <button type="button" aria-label="Fechar menu" onClick={closeMobile} className="app-mobile-nav__overlay" />}
+      <aside className={cn("app-mobile-nav__drawer app-sidebar-liquid", openMobile && "is-open")}>
+        <button type="button" aria-label="Fechar menu" onClick={closeMobile} className="app-mobile-nav__close">
           <X className="h-4 w-4" />
         </button>
 
@@ -224,15 +187,7 @@ function MobileNavDrawer({
                 {group.items.map((it) => {
                   const active = isActive(it.to);
                   return (
-                    <Link
-                      key={it.to}
-                      to={it.to}
-                      onClick={closeMobile}
-                      className={cn(
-                        "flex h-10 items-center gap-2.5 rounded-xl border px-3 text-sidebar-foreground/78 transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary",
-                        active ? "border-primary/35 bg-primary/16 text-primary" : "border-transparent",
-                      )}
-                    >
+                    <Link key={it.to} to={it.to} onClick={closeMobile} className={cn("flex h-10 items-center gap-2.5 rounded-xl border px-3 text-sidebar-foreground/78 transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary", active ? "border-primary/35 bg-primary/16 text-primary" : "border-transparent")}>
                       <it.icon className="h-4 w-4 shrink-0" />
                       <span className="text-display text-[12px] tracking-[0.1em]">{it.label}</span>
                     </Link>
