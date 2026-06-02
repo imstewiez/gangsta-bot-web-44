@@ -70,7 +70,20 @@ const CATEGORY_COLORS: Record<string, string> = {
 const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
 
 type AdminItem = any;
-type SurchargeRow = { item_id: number; tier: string; surcharge: number };
+type SurchargeRow = {
+  item_id: number;
+  tier: string;
+  surcharge: number;
+  price_with_material?: number | null;
+  price_without_material?: number | null;
+};
+type TierPriceState = Record<string, { withMaterial: number; withoutMaterial: number }>;
+type RecipeIngredientState = {
+  ingredient_item_id: number;
+  quantity: number;
+  name?: string;
+  tier_quantities?: Record<string, number>;
+};
 
 function canBuy(item: Pick<AdminItem, "side">) {
   return item.side === "compra" || item.side === "ambos";
@@ -82,16 +95,22 @@ function n(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
-function tierFinalPrice(base: number, surcharge?: number) {
-  return n(base) + Number(surcharge ?? 0);
-}
 function tierDelta(base: number, finalValue: number) {
   return Math.round(n(finalValue) - n(base));
 }
 function surchargeMapFor(rows: SurchargeRow[], itemId: number) {
-  const map = new Map<string, number>();
-  for (const row of rows) if (row.item_id === itemId) map.set(row.tier, Number(row.surcharge) || 0);
+  const map = new Map<string, SurchargeRow>();
+  for (const row of rows) if (row.item_id === itemId) map.set(row.tier, row);
   return map;
+}
+function tierWithPrice(item: AdminItem, row?: SurchargeRow) {
+  return n(row?.price_with_material) || (n(item.min_sale_price) + Number(row?.surcharge ?? 0));
+}
+function tierWithoutPrice(item: AdminItem, row?: SurchargeRow) {
+  return n(row?.price_without_material) || n(item.purchase_price);
+}
+function fmtInput(value: unknown) {
+  return n(value) || "";
 }
 
 function AdminItemsPage() {
@@ -99,6 +118,7 @@ function AdminItemsPage() {
     { table: "items", queryKeys: [["dbItemsAdmin"], ["catalog"], ["buyCatalog"], ["recipes"]] },
     { table: "item_tier_surcharges", queryKeys: [["tierSurcharges"], ["catalog"]] },
     { table: "recipe_ingredients", queryKeys: [["dbItemsAdmin"], ["recipes"]] },
+    { table: "recipe_ingredient_tier_overrides", queryKeys: [["dbItemsAdmin"], ["recipes"]] },
   ]);
 
   const qc = useQueryClient();
@@ -141,7 +161,6 @@ function AdminItemsPage() {
     },
     onError: (e: Error) => toast.error(beautifyError(e)),
   });
-
   const updateM = useMutation({
     mutationFn: (data: AdminItem) => updateFn({ data }),
     onSuccess: () => {
@@ -151,81 +170,44 @@ function AdminItemsPage() {
     },
     onError: (e: Error) => toast.error(beautifyError(e)),
   });
-
-  const recipeM = useMutation({
-    mutationFn: (data: AdminItem) => recipeFn({ data }),
-    onSuccess: refresh,
-    onError: (e: Error) => toast.error(beautifyError(e)),
-  });
-
+  const recipeM = useMutation({ mutationFn: (data: AdminItem) => recipeFn({ data }), onSuccess: refresh, onError: (e: Error) => toast.error(beautifyError(e)) });
   const deleteM = useMutation({
     mutationFn: (ids: number[]) => bulkDeleteFn({ data: { item_ids: ids } }),
-    onSuccess: () => {
-      refresh();
-      setSelected(new Set());
-      toast.success("Item(ns) removidos");
-    },
+    onSuccess: () => { refresh(); setSelected(new Set()); toast.success("Item(ns) removidos"); },
     onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
-  const filtered = useMemo(() => {
-    return (items.data ?? []).filter((item: AdminItem) => {
-      const q = filter.trim().toLowerCase();
-      return (!q || item.name.toLowerCase().includes(q)) && (!catFilter || item.category === catFilter) && (!sideFilter || item.side === sideFilter);
-    });
-  }, [items.data, filter, catFilter, sideFilter]);
-
+  const filtered = useMemo(() => (items.data ?? []).filter((item: AdminItem) => {
+    const q = filter.trim().toLowerCase();
+    return (!q || item.name.toLowerCase().includes(q)) && (!catFilter || item.category === catFilter) && (!sideFilter || item.side === sideFilter);
+  }), [items.data, filter, catFilter, sideFilter]);
   const categoriesInUse = useMemo(() => Array.from(new Set((items.data ?? []).map((i: AdminItem) => i.category).filter(Boolean))).sort(), [items.data]);
 
   function toggleSelect(id: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
 
   return (
     <>
       <PageHeader eyebrow="Direção" title="Gestão de Materiais" description="Centro único para itens, preços, compra, venda e receitas" />
-
       <Reveal direction="up" delay={50}>
         <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
           <FilterChip label="Total" value={(items.data ?? []).length} active={!catFilter} onClick={() => setCatFilter("")} />
-          {categoriesInUse.map((category) => <FilterChip key={category} label={getCategoryLabel(category)} value={(items.data ?? []).filter((i: AdminItem) => i.category === category).length} active={catFilter === category} onClick={() => setCatFilter(catFilter === category ? "" : category)} />)}
+          {categoriesInUse.map((category) => <FilterChip key={String(category)} label={getCategoryLabel(String(category))} value={(items.data ?? []).filter((i: AdminItem) => i.category === category).length} active={catFilter === category} onClick={() => setCatFilter(catFilter === category ? "" : String(category))} />)}
           {selected.size > 0 && <FilterChip label="Selecionados" value={selected.size} active />}
         </div>
       </Reveal>
-
       <Reveal direction="up" delay={100}>
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Procurar item..." value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-9" />
-          </div>
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option value="">Todas as categorias</option>
-            {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}
-          </select>
-          <select value={sideFilter} onChange={(e) => setSideFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option value="">Todos os lados</option>
-            <option value="compra">Compra</option>
-            <option value="venda">Venda</option>
-            <option value="ambos">Compra & Venda</option>
-          </select>
+          <div className="relative min-w-[220px] flex-1 max-w-sm"><Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Procurar item..." value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-9" /></div>
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">Todas as categorias</option>{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}</select>
+          <select value={sideFilter} onChange={(e) => setSideFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">Todos os lados</option><option value="compra">Compra</option><option value="venda">Venda</option><option value="ambos">Compra & Venda</option></select>
           <Button size="sm" onClick={() => setShowAdd((v) => !v)}><Plus className="mr-1 h-4 w-4" />{showAdd ? "Cancelar" : "Novo item"}</Button>
           {selected.size > 0 && <Button size="sm" variant="destructive" onClick={() => confirm(`Remover ${selected.size} item(ns)?`) && deleteM.mutate(Array.from(selected))}><Trash2 className="mr-1 h-4 w-4" />Remover {selected.size}</Button>}
         </div>
       </Reveal>
-
       {showAdd && <NewItemCard form={addForm} setForm={setAddForm} onCreate={() => createM.mutate(addForm)} pending={createM.isPending} />}
-
-      {items.isLoading ? (
-        <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : (
-        <ItemsGrid items={filtered} selected={selected} toggleSelect={toggleSelect} onEdit={setEditing} surcharges={surcharges.data ?? []} />
-      )}
-
+      {items.isLoading ? <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : <ItemsGrid items={filtered} selected={selected} toggleSelect={toggleSelect} onEdit={setEditing} surcharges={surcharges.data ?? []} />}
       {editing && <EditItemDialog item={editing} materials={materials.data ?? []} surchargeRows={surcharges.data ?? []} onClose={() => setEditing(null)} onSave={(data) => updateM.mutate(data)} onRecipe={(data) => recipeM.mutate(data)} pending={updateM.isPending || recipeM.isPending} />}
     </>
   );
@@ -236,31 +218,13 @@ function FilterChip({ label, value, active, onClick }: { label: string; value: n
 }
 
 function NewItemCard({ form, setForm, onCreate, pending }: { form: AdminItem; setForm: (f: AdminItem) => void; onCreate: () => void; pending: boolean }) {
-  return (
-    <Reveal direction="up" delay={50}>
-      <Card className="interactive-card mb-4 border-primary/30">
-        <CardContent className="grid gap-3 p-4 md:grid-cols-3">
-          <Input placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}</select>
-          <select value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="compra">Compra</option><option value="venda">Venda</option><option value="ambos">Compra & Venda</option></select>
-          {canBuy(form) && <><Input type="number" placeholder="Preço civil" value={form.purchase_price ?? ""} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /><Input type="number" placeholder="Preço organização" value={form.morador_purchase_price ?? ""} onChange={(e) => setForm({ ...form, morador_purchase_price: Number(e.target.value) })} /></>}
-          {canSell(form) && <><Input type="number" placeholder="Preço com material" value={form.min_sale_price ?? ""} onChange={(e) => setForm({ ...form, min_sale_price: Number(e.target.value) })} /><Input type="number" placeholder="Preço sem material" value={form.purchase_price ?? ""} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /><Input type="number" placeholder="Custo" value={form.estimated_value ?? ""} onChange={(e) => setForm({ ...form, estimated_value: Number(e.target.value) })} /></>}
-          <Input type="number" placeholder="XP" value={form.xp_points ?? ""} onChange={(e) => setForm({ ...form, xp_points: Number(e.target.value) })} />
-          <Button size="sm" onClick={onCreate} disabled={pending || !form.name}>{pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}Criar</Button>
-        </CardContent>
-      </Card>
-    </Reveal>
-  );
+  return <Reveal direction="up" delay={50}><Card className="interactive-card mb-4 border-primary/30"><CardContent className="grid gap-3 p-4 md:grid-cols-3"><Input placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}</select><select value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="compra">Compra</option><option value="venda">Venda</option><option value="ambos">Compra & Venda</option></select>{canBuy(form) && <><Input type="number" placeholder="Preço civil" value={form.purchase_price ?? ""} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /><Input type="number" placeholder="Preço moradores" value={form.morador_purchase_price ?? ""} onChange={(e) => setForm({ ...form, morador_purchase_price: Number(e.target.value) })} /></>}{canSell(form) && <><Input type="number" placeholder="Base com material" value={form.min_sale_price ?? ""} onChange={(e) => setForm({ ...form, min_sale_price: Number(e.target.value) })} /><Input type="number" placeholder="Base sem material" value={form.purchase_price ?? ""} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /><Input type="number" placeholder="Custo interno" value={form.estimated_value ?? ""} onChange={(e) => setForm({ ...form, estimated_value: Number(e.target.value) })} /></>}<Input type="number" placeholder="XP" value={form.xp_points ?? ""} onChange={(e) => setForm({ ...form, xp_points: Number(e.target.value) })} /><Button size="sm" onClick={onCreate} disabled={pending || !form.name}>{pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}Criar</Button></CardContent></Card></Reveal>;
 }
 
 function ItemsGrid({ items, selected, toggleSelect, onEdit, surcharges }: { items: AdminItem[]; selected: Set<number>; toggleSelect: (id: number) => void; onEdit: (item: AdminItem) => void; surcharges: SurchargeRow[] }) {
   if (!items.length) return <div className="py-12 text-center text-sm text-muted-foreground"><Package className="mx-auto mb-3 h-10 w-10 opacity-30" />Nenhum item encontrado</div>;
   const grouped = new Map<string, AdminItem[]>();
-  for (const item of items) {
-    const key = item.category ?? "outros";
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(item);
-  }
+  for (const item of items) { const key = item.category ?? "outros"; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key)!.push(item); }
   return <div className="space-y-6">{Array.from(grouped.entries()).map(([category, list]) => <section key={category}><div className="mb-2 flex items-center justify-between rounded-lg border border-border bg-card/60 px-3 py-2"><div className="text-display text-sm font-semibold uppercase tracking-wider">{getCategoryLabel(category)}</div><div className="text-xs text-muted-foreground">{list.length} item{list.length !== 1 ? "s" : ""}</div></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{list.map((item) => <ItemCard key={item.id} item={item} selected={selected.has(item.id)} onToggle={() => toggleSelect(item.id)} onEdit={() => onEdit(item)} surcharges={surchargeMapFor(surcharges, item.id)} />)}</div></section>)}</div>;
 }
 
@@ -269,94 +233,48 @@ function PriceBox({ label, value, tone = "" }: { label: string; value: number | 
   return <div className="rounded-md bg-muted/40 p-2"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div><div className={cn("font-mono text-sm font-medium", tone)}>{fmtPrice(n(value))}</div></div>;
 }
 
-function ItemCard({ item, selected, onToggle, onEdit, surcharges }: { item: AdminItem; selected: boolean; onToggle: () => void; onEdit: () => void; surcharges: Map<string, number> }) {
+function ItemCard({ item, selected, onToggle, onEdit, surcharges }: { item: AdminItem; selected: boolean; onToggle: () => void; onEdit: () => void; surcharges: Map<string, SurchargeRow> }) {
   const sideMeta = SIDE_META[item.side ?? "venda"] ?? SIDE_META.venda;
   const catClass = CATEGORY_COLORS[item.category ?? "outros"] ?? CATEGORY_COLORS.outros;
-  const tierPrices = TIER_ORDER.map((tier) => ({ tier, label: TIER_LABELS[tier], price: tierFinalPrice(item.min_sale_price, surcharges.get(tier)) }));
-  const showTiers = canSell(item) && tierPrices.some((tier) => tier.price !== n(item.min_sale_price));
-  return (
-    <Card className="interactive-card cursor-pointer overflow-hidden" onClick={onEdit}>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-2.5">
-          <input type="checkbox" checked={selected} onChange={(e) => { e.stopPropagation(); onToggle(); }} onClick={(e) => e.stopPropagation()} className="mt-1" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{item.name}</div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", catClass)}><Tag className="mr-1 h-2.5 w-2.5" />{getCategoryLabel(item.category)}</Badge>
-              <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", sideMeta.color)}>{sideMeta.label}</Badge>
-              {item.xp_points > 0 && <Badge variant="outline" className="h-5 border-amber-500/30 bg-amber-500/10 px-1.5 text-[10px] text-amber-400"><Star className="mr-1 h-2.5 w-2.5" />{item.xp_points} XP</Badge>}
-            </div>
-          </div>
-          <Pencil className="mt-1 h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {canBuy(item) && <><PriceBox label="Preço civil" value={item.purchase_price} tone="text-blue-400" /><PriceBox label="Preço organização" value={item.morador_purchase_price} tone="text-blue-300" /></>}
-          {canSell(item) && <><PriceBox label="Com material" value={item.min_sale_price} tone="text-emerald-400" /><PriceBox label="Sem material" value={item.purchase_price} /><PriceBox label="Custo" value={item.estimated_value} /></>}
-          {showTiers && tierPrices.map((tier) => <PriceBox key={tier.tier} label={tier.label} value={tier.price} tone="text-emerald-400" />)}
-        </div>
-        {canSell(item) && <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">{(item.ingredients ?? []).length > 0 ? `Receita: ${item.ingredients.length} material/is definido(s)` : "Sem receita — só aparece como dinheiro"}</div>}
-      </CardContent>
-    </Card>
-  );
+  const tierPrices = TIER_ORDER.map((tier) => ({ tier, label: TIER_LABELS[tier], withMaterial: tierWithPrice(item, surcharges.get(tier)), withoutMaterial: tierWithoutPrice(item, surcharges.get(tier)) }));
+  const showTierPrices = canSell(item) && tierPrices.some((t) => t.withMaterial !== n(item.min_sale_price) || t.withoutMaterial !== n(item.purchase_price));
+  return <Card className="interactive-card cursor-pointer overflow-hidden" onClick={onEdit}><CardContent className="p-4"><div className="flex items-start gap-2.5"><input type="checkbox" checked={selected} onChange={(e) => { e.stopPropagation(); onToggle(); }} onClick={(e) => e.stopPropagation()} className="mt-1" /><div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{item.name}</div><div className="mt-1.5 flex flex-wrap items-center gap-1.5"><Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", catClass)}><Tag className="mr-1 h-2.5 w-2.5" />{getCategoryLabel(item.category)}</Badge><Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", sideMeta.color)}>{sideMeta.label}</Badge>{item.xp_points > 0 && <Badge variant="outline" className="h-5 border-amber-500/30 bg-amber-500/10 px-1.5 text-[10px] text-amber-400"><Star className="mr-1 h-2.5 w-2.5" />{item.xp_points} XP</Badge>}</div></div><Pencil className="mt-1 h-4 w-4 text-muted-foreground" /></div><div className="mt-3 grid grid-cols-2 gap-2">{canBuy(item) && <><PriceBox label="Civil" value={item.purchase_price} tone="text-blue-400" /><PriceBox label="Moradores" value={item.morador_purchase_price} tone="text-blue-300" /></>}{canSell(item) && <><PriceBox label="Base c/material" value={item.min_sale_price} tone="text-emerald-400" /><PriceBox label="Base s/material" value={item.purchase_price} /><PriceBox label="Custo" value={item.estimated_value} /></>}{showTierPrices && tierPrices.map((t) => <div key={t.tier} className="rounded-md border border-primary/20 bg-primary/5 p-2"><div className="text-[10px] font-semibold uppercase text-primary">{t.label}</div><div className="mt-1 grid grid-cols-2 gap-1 text-[11px]"><span className="text-muted-foreground">C/ mat.</span><span className="text-right font-mono text-emerald-300">{fmtPrice(t.withMaterial)}</span><span className="text-muted-foreground">S/ mat.</span><span className="text-right font-mono">{fmtPrice(t.withoutMaterial)}</span></div></div>)}</div>{canSell(item) && <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">{(item.ingredients ?? []).length > 0 ? `Receita: ${item.ingredients.length} material/is definido(s)` : "Sem receita — só aparece como dinheiro"}</div>}</CardContent></Card>;
 }
 
 function EditItemDialog({ item, materials, surchargeRows, onClose, onSave, onRecipe, pending }: { item: AdminItem; materials: AdminItem[]; surchargeRows: SurchargeRow[]; onClose: () => void; onSave: (data: AdminItem) => void; onRecipe: (data: AdminItem) => void; pending: boolean }) {
   const upsertSurchargeFn = useAuthedServerFn(upsertItemTierSurcharge);
   const baseSurcharges = surchargeMapFor(surchargeRows, item.id);
   const [form, setForm] = useState<AdminItem>({ item_id: item.id, name: item.name, category: item.category ?? "outros", side: item.side ?? "venda", purchase_price: item.purchase_price ?? 0, morador_purchase_price: item.morador_purchase_price ?? 0, min_sale_price: item.min_sale_price ?? 0, estimated_value: item.estimated_value ?? 0, xp_points: item.xp_points ?? 0 });
-  const [tierPrices, setTierPrices] = useState<Record<string, number>>(() => Object.fromEntries(TIER_ORDER.map((tier) => [tier, tierFinalPrice(item.min_sale_price, baseSurcharges.get(tier))])));
-  const [recipeIngredients, setRecipeIngredients] = useState<Array<{ ingredient_item_id: number; quantity: number; name?: string }>>((item.ingredients ?? []).map((ing: any) => ({ ingredient_item_id: ing.ingredient_item_id, quantity: ing.quantity, name: ing.ingredient_name })));
+  const [tierPrices, setTierPrices] = useState<TierPriceState>(() => Object.fromEntries(TIER_ORDER.map((tier) => [tier, { withMaterial: tierWithPrice(item, baseSurcharges.get(tier)), withoutMaterial: tierWithoutPrice(item, baseSurcharges.get(tier)) }])) as TierPriceState);
+  const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientState[]>((item.ingredients ?? []).map((ing: any) => ({ ingredient_item_id: ing.ingredient_item_id, quantity: ing.quantity, name: ing.ingredient_name, tier_quantities: ing.tier_quantities ?? {} })));
   const [newMaterialId, setNewMaterialId] = useState("");
   const [newMaterialQty, setNewMaterialQty] = useState("1");
-
   const availableMaterials = materials.filter((material) => material.id !== item.id && !recipeIngredients.some((r) => r.ingredient_item_id === material.id));
   const showRecipeTab = canSell(form);
 
   function addMaterial() {
-    const id = Number(newMaterialId);
-    if (!id) return;
+    const id = Number(newMaterialId); if (!id) return;
     const material = materials.find((m) => m.id === id);
-    setRecipeIngredients((current) => [...current, { ingredient_item_id: id, quantity: Number(newMaterialQty) || 1, name: material?.name }]);
-    setNewMaterialId("");
-    setNewMaterialQty("1");
+    const qty = Number(newMaterialQty) || 1;
+    setRecipeIngredients((current) => [...current, { ingredient_item_id: id, quantity: qty, name: material?.name, tier_quantities: Object.fromEntries(TIER_ORDER.map((tier) => [tier, qty])) }]);
+    setNewMaterialId(""); setNewMaterialQty("1");
   }
-
   async function handleSave() {
     if (canSell(form)) {
       for (const tier of TIER_ORDER) {
-        await upsertSurchargeFn({ data: { item_id: item.id, tier, surcharge: tierDelta(form.min_sale_price, tierPrices[tier]) } });
+        await upsertSurchargeFn({ data: { item_id: item.id, tier, surcharge: tierDelta(form.min_sale_price, tierPrices[tier].withMaterial), price_with_material: n(tierPrices[tier].withMaterial) || null, price_without_material: n(tierPrices[tier].withoutMaterial) || null } });
       }
     } else {
-      for (const tier of TIER_ORDER) await upsertSurchargeFn({ data: { item_id: item.id, tier, surcharge: 0 } });
+      for (const tier of TIER_ORDER) await upsertSurchargeFn({ data: { item_id: item.id, tier, surcharge: 0, price_with_material: null, price_without_material: null } });
     }
     onSave(form);
-    if (showRecipeTab && (recipeIngredients.length > 0 || (item.ingredients ?? []).length > 0)) {
-      onRecipe({ item_id: item.id, ingredients: recipeIngredients.map((ing) => ({ ingredient_item_id: ing.ingredient_item_id, quantity: ing.quantity })) });
+    if (showRecipeTab || (item.ingredients ?? []).length > 0) {
+      onRecipe({ item_id: item.id, ingredients: recipeIngredients.map((ing) => ({ ingredient_item_id: ing.ingredient_item_id, quantity: ing.quantity, tier_quantities: ing.tier_quantities ?? {} })) });
     }
   }
+  function setTierRecipeQty(ingredientId: number, tier: string, value: number) {
+    setRecipeIngredients((current) => current.map((r) => r.ingredient_item_id === ingredientId ? { ...r, tier_quantities: { ...(r.tier_quantities ?? {}), [tier]: value } } : r));
+  }
 
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4 text-primary" />Editar {item.name}</DialogTitle></DialogHeader>
-        <Tabs defaultValue="geral">
-          <TabsList className="mb-3"><TabsTrigger value="geral">Geral</TabsTrigger><TabsTrigger value="precos">Preços</TabsTrigger>{showRecipeTab && <TabsTrigger value="receita">Receita ({recipeIngredients.length})</TabsTrigger>}</TabsList>
-
-          <TabsContent value="geral" className="space-y-3">
-            <div><label className="mb-1 block text-xs text-muted-foreground">Nome</label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Categoria</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground">{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">Tipo</label><select value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="compra">Compra</option><option value="venda">Venda</option><option value="ambos">Compra & Venda</option></select></div></div>
-            <div><label className="mb-1 block text-xs text-muted-foreground">XP</label><Input type="number" value={form.xp_points} onChange={(e) => setForm({ ...form, xp_points: Number(e.target.value) })} /></div>
-          </TabsContent>
-
-          <TabsContent value="precos" className="space-y-4">
-            {canBuy(form) && <section className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3"><div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-blue-300">Compra pela organização</div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Preço civil</label><Input type="number" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Preço organização</label><Input type="number" value={form.morador_purchase_price} onChange={(e) => setForm({ ...form, morador_purchase_price: Number(e.target.value) })} /></div></div><p className="mt-2 text-[11px] text-muted-foreground">Entregas de stock feitas por bairristas entram a custo 0; estes valores servem para aquisições pagas.</p></section>}
-            {canSell(form) && <section className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3"><div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Venda pela organização</div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Preço com material</label><Input type="number" value={form.min_sale_price} onChange={(e) => { const next = Number(e.target.value); const old = n(form.min_sale_price); setForm({ ...form, min_sale_price: next }); setTierPrices((current) => Object.fromEntries(TIER_ORDER.map((tier) => [tier, current[tier] === old ? next : current[tier]]))); }} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Preço sem material</label><Input type="number" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Custo</label><Input type="number" value={form.estimated_value} onChange={(e) => setForm({ ...form, estimated_value: Number(e.target.value) })} /></div></div><div className="mt-4 rounded-md border border-border bg-background/60 p-3"><div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Preços finais por cargo</div><div className="grid grid-cols-3 gap-3">{TIER_ORDER.map((tier) => <div key={tier}><label className="mb-1 block text-[10px] text-muted-foreground">{TIER_LABELS[tier]}</label><Input type="number" value={tierPrices[tier] ?? 0} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: Number(e.target.value) }))} /></div>)}</div><p className="mt-2 text-[11px] text-muted-foreground">Aqui defines o valor final. O sistema guarda internamente a diferença para manter compatibilidade com o preçário.</p></div></section>}
-          </TabsContent>
-
-          {showRecipeTab && <TabsContent value="receita" className="space-y-3"><div className="rounded-md border border-border bg-muted/20 p-3"><div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Materiais necessários para comprar com materiais</div><div className="flex gap-2"><select value={newMaterialId} onChange={(e) => setNewMaterialId(e.target.value)} className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">Selecionar material...</option>{availableMaterials.map((m) => <option key={m.id} value={m.id}>{m.name} ({getCategoryLabel(m.category)})</option>)}</select><Input type="number" min={1} value={newMaterialQty} onChange={(e) => setNewMaterialQty(e.target.value)} className="w-24" /><Button size="sm" onClick={addMaterial} disabled={!newMaterialId}><Plus className="h-4 w-4" /></Button></div></div>{recipeIngredients.length === 0 ? <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-4 text-center text-sm text-muted-foreground">Sem receita definida. Este item não vai aparecer como compra com materiais.</div> : <div className="space-y-2">{recipeIngredients.map((ing) => { const material = materials.find((m) => m.id === ing.ingredient_item_id); return <div key={ing.ingredient_item_id} className="flex items-center gap-2 rounded-md border border-border bg-card p-2"><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{material?.name ?? ing.name ?? `Material #${ing.ingredient_item_id}`}</div><div className="text-[11px] text-muted-foreground">{getCategoryLabel(material?.category)}</div></div><Input type="number" min={0} value={ing.quantity} onChange={(e) => setRecipeIngredients((current) => current.map((r) => r.ingredient_item_id === ing.ingredient_item_id ? { ...r, quantity: Number(e.target.value) } : r))} className="h-8 w-20 text-right" /><button className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" onClick={() => setRecipeIngredients((current) => current.filter((r) => r.ingredient_item_id !== ing.ingredient_item_id))}><Trash2 className="h-3.5 w-3.5" /></button></div>; })}</div>}</TabsContent>}
-        </Tabs>
-        <DialogFooter className="mt-4"><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={handleSave} disabled={pending}>{pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}Guardar</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4 text-primary" />Editar {item.name}</DialogTitle></DialogHeader><Tabs defaultValue="geral"><TabsList className="mb-3"><TabsTrigger value="geral">Geral</TabsTrigger><TabsTrigger value="precos">Preços</TabsTrigger>{showRecipeTab && <TabsTrigger value="receita">Receita ({recipeIngredients.length})</TabsTrigger>}</TabsList><TabsContent value="geral" className="space-y-3"><div><label className="mb-1 block text-xs text-muted-foreground">Nome</label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Categoria</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground">{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">Tipo</label><select value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="compra">Compra</option><option value="venda">Venda</option><option value="ambos">Compra & Venda</option></select></div></div><div><label className="mb-1 block text-xs text-muted-foreground">XP</label><Input type="number" value={form.xp_points} onChange={(e) => setForm({ ...form, xp_points: Number(e.target.value) })} /></div></TabsContent><TabsContent value="precos" className="space-y-4">{canBuy(form) && <section className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-4"><div className="mb-1 text-[11px] font-black uppercase tracking-wider text-blue-300">Compra pela organização</div><p className="mb-3 text-[11px] text-muted-foreground">Define quanto a organização paga a civis e a moradores por este material.</p><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Preço civil</label><Input type="number" value={fmtInput(form.purchase_price)} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Preço moradores</label><Input type="number" value={fmtInput(form.morador_purchase_price)} onChange={(e) => setForm({ ...form, morador_purchase_price: Number(e.target.value) })} /></div></div></section>}{canSell(form) && <section className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4"><div className="mb-1 text-[11px] font-black uppercase tracking-wider text-emerald-300">Venda pela organização</div><p className="mb-3 text-[11px] text-muted-foreground">Base global + preços finais personalizados para Bairrista-1/2/3 nos dois modos de encomenda.</p><div className="grid gap-3 md:grid-cols-3"><div><label className="mb-1 block text-xs text-muted-foreground">Base com material</label><Input type="number" value={fmtInput(form.min_sale_price)} onChange={(e) => { const next = Number(e.target.value); setForm({ ...form, min_sale_price: next }); }} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Base sem material</label><Input type="number" value={fmtInput(form.purchase_price)} onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Custo interno</label><Input type="number" value={fmtInput(form.estimated_value)} onChange={(e) => setForm({ ...form, estimated_value: Number(e.target.value) })} /></div></div><div className="mt-4 rounded-xl border border-border bg-background/60 p-3"><div className="mb-3 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Preços finais por Bairrista</div><div className="grid gap-3 md:grid-cols-3">{TIER_ORDER.map((tier) => <div key={tier} className="rounded-lg border border-primary/20 bg-primary/5 p-3"><div className="mb-2 text-xs font-bold text-primary">{TIER_LABELS[tier]}</div><label className="mb-1 block text-[10px] text-muted-foreground">Com material</label><Input type="number" value={fmtInput(tierPrices[tier]?.withMaterial)} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: { ...current[tier], withMaterial: Number(e.target.value) } }))} /><label className="mb-1 mt-2 block text-[10px] text-muted-foreground">Sem material</label><Input type="number" value={fmtInput(tierPrices[tier]?.withoutMaterial)} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: { ...current[tier], withoutMaterial: Number(e.target.value) } }))} /></div>)}</div></div></section>}</TabsContent>{showRecipeTab && <TabsContent value="receita" className="space-y-3"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="mb-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Materiais necessários</div><p className="mb-3 text-[11px] text-muted-foreground">A quantidade base aplica-se a todos. Os campos Bairrista permitem quantidades diferentes por cargo.</p><div className="flex gap-2"><select value={newMaterialId} onChange={(e) => setNewMaterialId(e.target.value)} className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">Selecionar material...</option>{availableMaterials.map((m) => <option key={m.id} value={m.id}>{m.name} ({getCategoryLabel(m.category)})</option>)}</select><Input type="number" min={1} value={newMaterialQty} onChange={(e) => setNewMaterialQty(e.target.value)} className="w-24" /><Button size="sm" onClick={addMaterial} disabled={!newMaterialId}><Plus className="h-4 w-4" /></Button></div></div>{recipeIngredients.length === 0 ? <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-4 text-center text-sm text-muted-foreground">Sem receita definida. Este item não vai aparecer como compra com materiais.</div> : <div className="space-y-2">{recipeIngredients.map((ing) => { const material = materials.find((m) => m.id === ing.ingredient_item_id); return <div key={ing.ingredient_item_id} className="rounded-xl border border-border bg-card p-3"><div className="mb-3 flex items-center gap-2"><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{material?.name ?? ing.name ?? `Material #${ing.ingredient_item_id}`}</div><div className="text-[11px] text-muted-foreground">{getCategoryLabel(material?.category)}</div></div><button className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" onClick={() => setRecipeIngredients((current) => current.filter((r) => r.ingredient_item_id !== ing.ingredient_item_id))}><Trash2 className="h-3.5 w-3.5" /></button></div><div className="grid gap-2 md:grid-cols-4"><div><label className="mb-1 block text-[10px] text-muted-foreground">Base</label><Input type="number" min={0} value={ing.quantity} onChange={(e) => { const v = Number(e.target.value); setRecipeIngredients((current) => current.map((r) => r.ingredient_item_id === ing.ingredient_item_id ? { ...r, quantity: v } : r)); }} /></div>{TIER_ORDER.map((tier) => <div key={tier}><label className="mb-1 block text-[10px] text-muted-foreground">{TIER_LABELS[tier]}</label><Input type="number" min={0} value={(ing.tier_quantities?.[tier] ?? ing.quantity) || ""} onChange={(e) => setTierRecipeQty(ing.ingredient_item_id, tier, Number(e.target.value))} /></div>)}</div></div>; })}</div>}</TabsContent>}</Tabs><DialogFooter className="mt-4"><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={handleSave} disabled={pending}>{pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}Guardar</Button></DialogFooter></DialogContent></Dialog>;
 }
