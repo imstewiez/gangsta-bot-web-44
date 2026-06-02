@@ -25,8 +25,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="hidden min-w-0 items-center gap-3 lg:flex">
                   <div className="h-7 w-px bg-gradient-to-b from-transparent via-primary/35 to-transparent" />
                   <div className="min-w-0">
-                    <div className="text-display text-[10px] tracking-[0.32em] text-primary/90">Ballas Control</div>
-                    <div className="truncate text-xs text-muted-foreground/65">Operação · Membros · Material</div>
+                    <div className="text-display text-[10px] tracking-[0.32em] text-primary/90">Painel interno</div>
+                    <div className="truncate text-xs text-muted-foreground/65">Operação · Membros · Inventário</div>
                   </div>
                 </div>
 
@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span>© Ballas Gang</span>
               <span className="inline-flex items-center gap-2">
                 <Sparkles className="h-3 w-3 text-primary/55" />
-                Built for the block
+                Gestão interna
               </span>
             </footer>
           </div>
