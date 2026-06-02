@@ -6,7 +6,7 @@ import {
   ShoppingBag, PackageOpen, Crosshair,
   Tags, Package, Hammer,
   Shield, ScrollText, Database,
-  UserCircle, Activity,
+  Activity,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -28,7 +28,7 @@ import { useAuth } from "@/lib/auth";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { TIER_LABELS, TIER_ACCENT } from "@/lib/domain";
 import { TierIcon } from "@/components/domain/TierIcon";
-import redwoodLogo from "@/assets/ballas-logo.png";
+import ballasLogo from "@/assets/ballas-logo.png";
 import { Button } from "@/components/ui/button";
 
 type NavItem = {
@@ -46,42 +46,38 @@ type NavGroup = {
 
 const GROUPS: NavGroup[] = [
   {
-    label: "Bairro",
+    label: "Geral",
     items: [
-      { to: "/dashboard", label: "Casa",        icon: Home },
-
-      { to: "/membros",   label: "Membros",     icon: Users },
-      { to: "/tops",      label: "Classificação", icon: Trophy },
-      { to: "/premios",       label: "Prémios",       icon: Sparkles },
-
+      { to: "/dashboard", label: "Início", icon: Home },
+      { to: "/membros", label: "Membros", icon: Users },
+      { to: "/tops", label: "Classificação", icon: Trophy },
+      { to: "/premios", label: "Prémios", icon: Sparkles },
     ],
   },
   {
     label: "Operação",
     items: [
-      { to: "/encomendas",      label: "Encomendas",     icon: ShoppingBag },
-      { to: "/entregas",        label: "Entregas",       icon: PackageOpen },
-      { to: "/operacoes",       label: "Saídas",         icon: Crosshair },
-
+      { to: "/encomendas", label: "Encomendas", icon: ShoppingBag },
+      { to: "/entregas", label: "Entregas", icon: PackageOpen },
+      { to: "/operacoes", label: "Saídas", icon: Crosshair },
     ],
   },
   {
-    label: "Material",
+    label: "Inventário",
     items: [
-      { to: "/precario",   label: "Preçário",  icon: Tags },
-      { to: "/inventario", label: "Armazém",   icon: Package, need: "inventory" },
-      { to: "/receitas",   label: "Receitas",  icon: Hammer },
+      { to: "/precario", label: "Preçário", icon: Tags },
+      { to: "/inventario", label: "Inventário", icon: Package, need: "inventory" },
+      { to: "/receitas", label: "Receitas", icon: Hammer },
     ],
   },
   {
-    label: "Chefia",
+    label: "Gestão",
     items: [
-      { to: "/admin/dashboard",   label: "Painel",    icon: Activity,   admin: true },
-      { to: "/admin/itens",       label: "Materiais",        icon: Package,    admin: true },
-      { to: "/admin/dados",       label: "Dados",       icon: Database,   admin: true },
-      { to: "/admin",             label: "Definições",   icon: Shield,     admin: true },
-      { to: "/auditoria",         label: "Auditoria",    icon: ScrollText, admin: true },
-
+      { to: "/admin/dashboard", label: "Painel", icon: Activity, admin: true },
+      { to: "/admin/itens", label: "Itens", icon: Package, admin: true },
+      { to: "/admin/dados", label: "Dados", icon: Database, admin: true },
+      { to: "/admin", label: "Definições", icon: Shield, admin: true },
+      { to: "/auditoria", label: "Auditoria", icon: ScrollText, admin: true },
     ],
   },
 ];
@@ -104,8 +100,6 @@ export function AppSidebar() {
 
   const isActive = (to: string) => {
     if (loc.pathname === to || loc.pathname === to + "/") return true;
-    // Index routes that have their own children in the sidebar should NOT
-    // match when visiting those children (e.g. /admin should not match /admin/dashboard)
     const indexRoutes = ["/admin"];
     if (indexRoutes.includes(to)) return false;
     return loc.pathname.startsWith(to + "/");
@@ -116,7 +110,7 @@ export function AppSidebar() {
       <SidebarHeader>
         <Link to="/dashboard" className="flex items-center gap-2.5 px-2 py-2 group">
           <img
-            src={redwoodLogo}
+            src={ballasLogo}
             alt="Ballas Gang"
             className="h-9 w-9 shrink-0 rounded-sm object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_60%,transparent)] transition-transform group-hover:scale-105"
           />
@@ -198,7 +192,7 @@ export function AppSidebar() {
               size="sm"
               variant="ghost"
               onClick={async () => { await signOut(); navigate({ to: "/login" }); }}
-              title="Sair do bairro"
+              title="Terminar sessão"
               className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
             >
               <LogOut className="h-4 w-4" />
@@ -209,7 +203,7 @@ export function AppSidebar() {
             size="sm"
             variant="ghost"
             onClick={async () => { await signOut(); navigate({ to: "/login" }); }}
-            title="Sair do bairro"
+            title="Terminar sessão"
             className="mx-auto h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
           >
             <LogOut className="h-4 w-4" />
