@@ -206,7 +206,7 @@ function PrizeCard({ prize }: { prize: NonNullable<DashboardAny["prize"]> }) {
               {prize.score != null && <span className="font-mono text-xs">· {fmtNum(Math.round(prize.score))} pts</span>}
             </div>
           </div>
-          <Button asChild variant="premium" size="sm"><Link to="/premios">Ver prémios</Link></Button>
+          <Button asChild size="sm"><Link to="/premios">Ver prémios</Link></Button>
         </CardContent>
       </Card>
     </Reveal>
