@@ -1,0 +1,119 @@
+/* Strong liquid surfaces for shell navigation. */
+
+@keyframes liquid-orbit {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.82; }
+  35% { transform: translate3d(26px, -10px, 0) scale(1.08); opacity: 1; }
+  70% { transform: translate3d(-18px, 14px, 0) scale(0.96); opacity: 0.74; }
+}
+
+@keyframes liquid-sheen {
+  0% { transform: translateX(-130%) skewX(-16deg); opacity: 0; }
+  18% { opacity: 0.55; }
+  55% { opacity: 0.2; }
+  100% { transform: translateX(130%) skewX(-16deg); opacity: 0; }
+}
+
+.app-shell-topbar {
+  min-height: 3.75rem;
+  border-color: color-mix(in oklab, var(--primary) 34%, white 7%);
+  background:
+    radial-gradient(circle at 8% 24%, color-mix(in oklab, var(--primary) 30%, transparent), transparent 26%),
+    radial-gradient(circle at 62% 0%, color-mix(in oklab, #8b5cf6 18%, transparent), transparent 33%),
+    radial-gradient(circle at 100% 72%, color-mix(in oklab, #ff4fd8 12%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in oklab, var(--background) 74%, transparent), color-mix(in oklab, var(--card) 72%, transparent));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 color-mix(in oklab, var(--primary) 18%, transparent),
+    0 26px 90px -54px rgba(0,0,0,1),
+    0 0 64px -48px color-mix(in oklab, var(--primary) 85%, transparent);
+}
+
+.app-shell-topbar::after {
+  content: "";
+  position: absolute;
+  inset: -45% -20%;
+  background:
+    radial-gradient(circle at 18% 50%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 18%),
+    linear-gradient(100deg, transparent 35%, rgba(255,255,255,0.16) 48%, transparent 62%);
+  animation: liquid-sheen 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.shell-liquid-mark {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 42%, transparent);
+  background: color-mix(in oklab, var(--primary) 16%, transparent);
+  box-shadow: 0 0 24px -10px color-mix(in oklab, var(--primary) 88%, transparent), inset 0 1px 0 rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.shell-liquid-mark::before {
+  content: "";
+  position: absolute;
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--primary) 62%, transparent), transparent 62%);
+  filter: blur(7px);
+  animation: liquid-orbit 5s ease-in-out infinite;
+}
+
+.shell-liquid-mark > svg { position: relative; z-index: 1; }
+
+.app-sidebar-liquid {
+  border-right-color: color-mix(in oklab, var(--primary) 42%, transparent);
+  background:
+    radial-gradient(circle at 14% 9%, color-mix(in oklab, var(--primary) 30%, transparent), transparent 27%),
+    radial-gradient(circle at 102% 33%, color-mix(in oklab, #ff4fd8 14%, transparent), transparent 31%),
+    radial-gradient(circle at 20% 82%, color-mix(in oklab, var(--blood) 18%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in oklab, var(--background) 90%, transparent), color-mix(in oklab, var(--card) 70%, transparent));
+  box-shadow:
+    inset -1px 0 0 color-mix(in oklab, white 6%, transparent),
+    inset 1px 0 0 color-mix(in oklab, var(--primary) 14%, transparent),
+    22px 0 90px -62px color-mix(in oklab, var(--primary) 90%, transparent);
+}
+
+.app-sidebar-liquid::before {
+  height: 100%;
+  width: 1px;
+  inset: 0 0 0 auto;
+  background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--primary) 60%, transparent), transparent);
+  opacity: 0.72;
+}
+
+.app-sidebar-liquid::after {
+  left: -6rem;
+  top: 5.5rem;
+  width: 18rem;
+  height: 18rem;
+  background:
+    radial-gradient(circle at 35% 35%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 58%),
+    radial-gradient(circle at 70% 70%, color-mix(in oklab, #ff4fd8 12%, transparent), transparent 52%);
+  opacity: 0.95;
+  animation: liquid-orbit 9s ease-in-out infinite;
+}
+
+.sidebar-liquid-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--primary) 24%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--primary) 13%, transparent), transparent 34%),
+    color-mix(in oklab, white 4%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px -38px rgba(0,0,0,0.95);
+  backdrop-filter: blur(18px);
+}
+
+.sidebar-liquid-card::after {
+  content: "";
+  position: absolute;
+  inset: -40% -70%;
+  background: linear-gradient(115deg, transparent 36%, rgba(255,255,255,0.11) 48%, transparent 60%);
+  animation: liquid-sheen 7s ease-in-out infinite;
+  pointer-events: none;
+}
