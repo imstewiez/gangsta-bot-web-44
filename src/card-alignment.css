@@ -1,0 +1,143 @@
+/* Global card alignment layer.
+   Keeps cards consistent without forcing tables/forms/lists to be center-aligned. */
+
+[data-card="root"],
+.liquid-card,
+.liquid-panel,
+.flame-prize,
+.sidebar-liquid-card {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+[data-card="root"] {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-card="header"],
+[data-card="content"],
+[data-card="footer"],
+.liquid-content {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+[data-card="header"] {
+  width: 100%;
+  align-items: flex-start;
+}
+
+[data-card="content"] {
+  width: 100%;
+}
+
+[data-card="footer"] {
+  width: 100%;
+}
+
+.app-center-card,
+.app-stat-card,
+.app-empty-card {
+  display: flex;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.app-stat-card {
+  min-height: 116px;
+  padding: 1rem;
+}
+
+.app-stat-card > .liquid-content,
+.app-center-card > .liquid-content,
+.app-empty-card > .liquid-content {
+  display: flex;
+  width: 100%;
+  min-height: inherit;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.app-card-grid {
+  display: grid;
+  align-items: stretch;
+}
+
+.app-card-grid > * {
+  min-width: 0;
+}
+
+.app-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.app-section-title-main {
+  min-width: 0;
+}
+
+.app-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  letter-spacing: 0.24em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.app-title-clean {
+  margin-top: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.app-copy-muted {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.app-list-card {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.app-list-card > .liquid-content {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.app-list-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  [data-card="header"],
+  [data-card="content"],
+  [data-card="footer"] {
+    padding-inline: 1rem;
+  }
+
+  .app-stat-card {
+    min-height: 104px;
+  }
+}
