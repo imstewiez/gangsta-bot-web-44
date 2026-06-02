@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Sparkles } from "lucide-react";
+import { Menu, Sparkles } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
@@ -8,7 +8,7 @@ import { HeaderTicker } from "./HeaderTicker";
 import { ViewAsExitButton } from "./ViewAsExitButton";
 import { Reveal } from "./Reveal";
 
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -19,20 +19,26 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
-            <div className="app-shell-topbar mx-auto grid w-full max-w-7xl grid-cols-1 gap-2 px-3 py-2 md:px-4 lg:grid-cols-[minmax(150px,auto)_minmax(220px,1fr)_auto] lg:items-center">
-              <div className="liquid-content flex min-w-0 items-center gap-3">
-                <span className="shell-liquid-mark shrink-0">
+            <div className="app-shell-topbar mx-auto grid w-full max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 md:px-4 lg:grid-cols-[minmax(150px,auto)_minmax(220px,1fr)_auto]">
+              <div className="liquid-content flex min-w-0 items-center gap-2 sm:gap-3">
+                <SidebarTrigger
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/10 text-primary hover:bg-primary/15 md:hidden"
+                  title="Abrir menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </SidebarTrigger>
+                <span className="shell-liquid-mark hidden shrink-0 sm:grid">
                   <Sparkles className="h-4 w-4 text-primary" />
                 </span>
-                <div className="hidden min-w-0 sm:block">
-                  <div className="text-display text-[10px] tracking-[0.28em] text-primary">Ballas Gang</div>
-                  <div className="text-xs text-muted-foreground/70">Painel interno</div>
+                <div className="min-w-0">
+                  <div className="text-display text-[10px] tracking-[0.22em] text-primary sm:tracking-[0.28em]">Ballas Gang</div>
+                  <div className="hidden text-xs text-muted-foreground/70 sm:block">Painel interno</div>
                 </div>
               </div>
 
               <HeaderTicker />
 
-              <div className="liquid-content flex min-w-0 items-center justify-end gap-2 justify-self-stretch lg:justify-self-end">
+              <div className="liquid-content flex min-w-0 items-center justify-end gap-2 justify-self-end">
                 <ViewAsExitButton />
                 <HeaderNotifications />
               </div>
