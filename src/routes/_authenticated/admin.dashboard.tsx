@@ -27,6 +27,8 @@ function AdminDashboardPage() {
     { table: "inventory_balance", queryKeys: [["chefia-kpis"]] },
     { table: "members", queryKeys: [["chefia-kpis"]] },
     { table: "inventory_delivery_requests", queryKeys: [["chefia-kpis"]] },
+    { table: "items", queryKeys: [["chefia-kpis"], ["order-cycles"]] },
+    { table: "item_tier_surcharges", queryKeys: [["chefia-kpis"], ["order-cycles"]] },
   ]);
 
   const managerFn = useAuthedServerFn(checkManagerAccess);
@@ -62,42 +64,30 @@ function AdminDashboardPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Chefia"
-        title="Painel"
-        description="Visão geral da firma"
-        icon={Activity}
-      />
+      <PageHeader eyebrow="Chefia" title="Painel" icon={Activity} />
 
       <div className="mb-4">
-        <Link
-          to="/admin"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Voltar às definições
+        <Link to="/admin" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          ← Voltar
         </Link>
       </div>
 
       <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" staggerDelay={70} baseDelay={100}>
-        <KpiCard icon={Users} label="Membros ativos" value={k?.activeMembers ?? 0} sub={`de ${k?.totalMembers ?? 0} total`} loading={kpis.isLoading} />
-        <KpiCard icon={Package} label="Encomendas pendentes" value={k?.pendingOrders ?? 0} tone="warning" loading={kpis.isLoading} />
-        <KpiCard icon={DollarSign} label="Faturação (7d)" value={`${fmtPrice(k?.weeklyRevenue ?? 0)}`} tone="success" loading={kpis.isLoading} />
-        <KpiCard icon={TrendingUp} label="Valor stock" value={`${fmtPrice(k?.totalInventoryValue ?? 0)}`} loading={kpis.isLoading} />
+        <KpiCard icon={Users} label="Membros" value={k?.activeMembers ?? 0} sub={`de ${k?.totalMembers ?? 0}`} loading={kpis.isLoading} />
+        <KpiCard icon={Package} label="Por confirmar" value={k?.pendingOrders ?? 0} tone="warning" loading={kpis.isLoading} />
+        <KpiCard icon={DollarSign} label="7 dias" value={`${fmtPrice(k?.weeklyRevenue ?? 0)}`} tone="success" loading={kpis.isLoading} />
+        <KpiCard icon={TrendingUp} label="Stock" value={`${fmtPrice(k?.totalInventoryValue ?? 0)}`} loading={kpis.isLoading} />
       </Stagger>
 
-      {/* ── Ciclos de Encomendas (Chefia only) ── */}
       {chefiaCheck.data?.allowed && (
         <Reveal direction="up" delay={150}>
           <div className="mt-6">
             <Card className="interactive-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-display text-sm flex items-center gap-2">
+                <CardTitle className="text-display flex items-center gap-2 text-sm">
                   <ShoppingCart className="h-4 w-4 text-primary" />
-                  Ciclos de Encomendas
+                  Ciclos
                 </CardTitle>
-                <p className="text-[11px] text-muted-foreground">
-                  Ciclo = encomendas de 2ª a domingo, entregues na 2ª seguinte. Custo = ingredientes reais das receitas (corpos com preço interno da chefia).
-                </p>
               </CardHeader>
               <CardContent>
                 {cycles.isLoading && (
@@ -107,16 +97,15 @@ function AdminDashboardPage() {
                   </div>
                 )}
                 {cycles.data && cycles.data.length === 0 && (
-                  <div className="col-span-full text-center py-6">
-                    <ShoppingCart className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <div className="col-span-full py-6 text-center">
+                    <ShoppingCart className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
                     <p className="text-sm font-medium text-foreground">{EMPTY_STATE.orders.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{EMPTY_STATE.orders.description}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{EMPTY_STATE.orders.description}</p>
                   </div>
                 )}
                 <div className="space-y-4">
                   {cycles.data?.map((cycle) => (
-                    <div key={cycle.cycle_start} className="rounded-lg border border-border/50 bg-muted/20 overflow-hidden">
-                      {/* Header do ciclo */}
+                    <div key={cycle.cycle_start} className="overflow-hidden rounded-lg border border-border/50 bg-muted/20">
                       <div className="flex items-center justify-between bg-muted/40 px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -125,18 +114,22 @@ function AdminDashboardPage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[10px]">
-                          <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400 font-medium">
+                          <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-400">
                             {cycle.fulfilled_count} entregues
                           </span>
+                          {cycle.active_count > 0 && (
+                            <span className="rounded bg-blue-500/10 px-2 py-0.5 font-medium text-blue-400">
+                              {cycle.active_count} em curso
+                            </span>
+                          )}
                           {cycle.pending_count > 0 && (
-                            <span className="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400 font-medium">
-                              {cycle.pending_count} pendentes
+                            <span className="rounded bg-amber-500/10 px-2 py-0.5 font-medium text-amber-400">
+                              {cycle.pending_count} por confirmar
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* KPIs do ciclo — grid 5 colunas */}
                       <div className="grid grid-cols-5 divide-x divide-border/30 border-b border-border/30">
                         <CycleKpi label="Encomendas" value={cycle.total_orders} />
                         <CycleKpi label="Material" value={`${fmtNum(cycle.total_material)}u`} />
@@ -145,28 +138,24 @@ function AdminDashboardPage() {
                         <CycleKpi label="Lucro" value={fmtPrice(cycle.total_profit)} tone={cycle.total_profit >= 0 ? "success" : "destructive"} />
                       </div>
 
-                      {/* Detalhe por item — tabela */}
                       {cycle.items.length > 0 && (
                         <div className="px-4 py-3">
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Breakdown por item</p>
+                          <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Por item</p>
                           <div className="space-y-0">
-                            {/* Header */}
-                            <div className="grid grid-cols-[1fr_64px_80px_80px_80px] gap-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-1 mb-1">
-                              <span>Material</span>
+                            <div className="mb-1 grid grid-cols-[1fr_64px_80px_80px_80px] gap-2 border-b border-border/20 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                              <span>Item</span>
                               <span className="text-right">Qtd</span>
                               <span className="text-right">Receita</span>
                               <span className="text-right">Custo</span>
                               <span className="text-right">Lucro</span>
                             </div>
                             {cycle.items.map((item) => (
-                              <div key={item.item_name} className="grid grid-cols-[1fr_64px_80px_80px_80px] gap-2 text-xs py-1 border-b border-border/10 last:border-0 items-center">
+                              <div key={item.item_name} className="grid grid-cols-[1fr_64px_80px_80px_80px] items-center gap-2 border-b border-border/10 py-1 text-xs last:border-0">
                                 <span className="truncate font-medium">{item.item_name}</span>
                                 <span className="text-right tabular-nums text-muted-foreground">{fmtNum(item.quantity)}×</span>
                                 <span className="text-right tabular-nums">{fmtPrice(item.revenue)}</span>
                                 <span className="text-right tabular-nums text-amber-400">{fmtPrice(item.cost)}</span>
-                                <span className={cn("text-right tabular-nums font-medium", item.profit >= 0 ? "text-emerald-400" : "text-destructive")}>
-                                  {fmtPrice(item.profit)}
-                                </span>
+                                <span className={cn("text-right font-medium tabular-nums", item.profit >= 0 ? "text-emerald-400" : "text-destructive")}>{fmtPrice(item.profit)}</span>
                               </div>
                             ))}
                           </div>
@@ -185,17 +174,17 @@ function AdminDashboardPage() {
         <Reveal direction="up" delay={300}>
           <Card className="interactive-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-display text-sm flex items-center gap-2">
+              <CardTitle className="text-display flex items-center gap-2 text-sm">
                 <Users className="h-4 w-4 text-warning" />
-                Membros inativos (+14 dias)
+                Inativos
               </CardTitle>
             </CardHeader>
             <CardContent>
               {k?.inactiveMembers.length === 0 && (
-                <div className="text-center py-6">
-                  <Users className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
-                  <p className="text-sm font-medium text-foreground">Toda a tropa na ativa</p>
-                  <p className="text-xs text-muted-foreground mt-1">Ninguém está inativo há mais de 14 dias.</p>
+                <div className="py-6 text-center">
+                  <Users className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                  <p className="text-sm font-medium text-foreground">Sem inativos</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Últimos 14 dias limpos.</p>
                 </div>
               )}
               <div className="space-y-1.5">
@@ -227,18 +216,16 @@ function KpiCard({ icon: Icon, label, value, sub, tone, loading }: {
     <Card className="interactive-card">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <span className="text-display text-[11px] tracking-[0.18em] text-muted-foreground uppercase">{label}</span>
+          <span className="text-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
           <Icon className={cn("h-4 w-4", tone ? color : "text-muted-foreground/60")} />
         </div>
-        <div className={cn("mt-1 text-3xl font-bold tabular-nums font-display", color)}>
+        <div className={cn("mt-1 font-display text-3xl font-bold tabular-nums", color)}>
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-16 gap-2">
+            <div className="flex h-16 flex-col items-center justify-center gap-2">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               <p className="text-xs text-muted-foreground">{LOADING.dashboard}</p>
             </div>
-          ) : (
-            value
-          )}
+          ) : value}
         </div>
         {sub && <div className="mt-1 text-[10px] text-muted-foreground/60">{sub}</div>}
       </CardContent>
@@ -254,7 +241,7 @@ function CycleKpi({ label, value, tone }: {
   const color = tone === "success" ? "text-emerald-400" : tone === "warning" ? "text-amber-400" : tone === "destructive" ? "text-destructive" : "text-foreground";
   return (
     <div className="px-2 py-2.5 text-center">
-      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5">{label}</div>
+      <div className="mb-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={cn("text-xs font-bold tabular-nums", color)}>{value}</div>
     </div>
   );
