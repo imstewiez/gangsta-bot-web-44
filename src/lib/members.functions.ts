@@ -55,6 +55,8 @@ const ACTIVE_ORG_TIER_LIST = [
   "manda_chuva",
 ];
 
+const RESPONSIBLE_TIER_LIST = ["patrao_di_zona", "kingpin", "manda_chuva"];
+
 const ACTIVE_MEMBER_WHERE = `
   m.deleted_at is null
   and coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
@@ -115,10 +117,10 @@ export const listManagers = createServerFn({ method: "GET" })
         `select ${memberSelect(me?.is_manager ?? false)}
          from members m
          where ${ACTIVE_MEMBER_WHERE}
-           and m.tier in ('patrao_di_zona', 'real_gangster', 'og', 'kingpin', 'manda_chuva')
+           and m.tier = any($2::text[])
          order by ${MEMBER_ORDER}
          limit 200`,
-        [ACTIVE_ORG_TIER_LIST],
+        [ACTIVE_ORG_TIER_LIST, RESPONSIBLE_TIER_LIST],
       );
       return rows;
     } catch (err) {
@@ -178,42 +180,29 @@ export const getMember = createServerFn({ method: "GET" })
           `select movement_type as type, sum(quantity)::text as total
            from inventory_movements
            where member_id = $1
-           group by movement_type order by sum(quantity) desc`,
+           group by movement_type
+           order by abs(sum(quantity)) desc`,
           [data.id],
         ),
-        pgQuery<{
-          id: number;
-          type: string;
-          item_id: number | null;
-          item_name: string | null;
-          qty: number;
-          created_at: string;
-        }>(
-          `select im.id, im.movement_type as type, im.item_id, i.name as item_name,
-                  im.quantity as qty, im.created_at
+        pgQuery<MemberDetail["recentMovements"][number]>(
+          `select im.id, im.movement_type as type, im.item_id, i.name as item_name, im.quantity as qty, im.created_at
            from inventory_movements im
            left join items i on i.id = im.item_id
            where im.member_id = $1
            order by im.created_at desc
-           limit 25`,
+           limit 20`,
           [data.id],
         ),
-        pgOne<{
-          kills_total: number;
-          deaths_total: number;
-          saidas_total: number;
-          deliveries: number;
-          sales: number;
-          orders: number;
-        }>(
-          `select
-             coalesce((select count(*)::int from kill_logs where killer_id = $1), 0)
-             + coalesce((select sum(kills)::int from operation_participants where member_id = $1), 0) as kills_total,
-             coalesce((select sum(deaths_count)::int from operation_participants where member_id = $1), 0) as deaths_total,
-             coalesce((select count(distinct operation_id)::int from operation_participants where member_id = $1), 0) as saidas_total,
-             coalesce((select count(distinct nullif(regexp_replace(coalesce(notes,''), '^delivery:', ''), ''))::int from inventory_movements where member_id = $1 and movement_type in ('entrega_bairrista','entrega_oficial') and quantity > 0), 0) as deliveries,
-             coalesce((select count(distinct coalesce(nullif(regexp_replace(coalesce(notes,''), '^delivery:', ''), ''), nullif(regexp_replace(coalesce(notes,''), '^order:', ''), '')))::int from inventory_movements where member_id = $1 and movement_type = 'venda_bairrista' and quantity < 0), 0) as sales,
-             coalesce((select count(*)::int from orders where member_id = $1), 0) as orders`,
+        pgOne<{ kills: number; deaths: number; saidas: number; deliveries: number; vendas: number; orders: number }>(
+          `select coalesce(ats.kills_total,0)::int as kills,
+                  coalesce(ats.deaths_total,0)::int as deaths,
+                  coalesce(ats.saidas_total,0)::int as saidas,
+                  coalesce(ats.deliveries,0)::int as deliveries,
+                  coalesce(ats.sales,0)::int as vendas,
+                  (select count(*)::int from orders o where o.member_id = $1) as orders
+           from members m
+           left join all_time_stats ats on ats.member_id = m.id
+           where m.id = $1`,
           [data.id],
         ),
       ]);
@@ -222,90 +211,26 @@ export const getMember = createServerFn({ method: "GET" })
         member,
         contributions: contrib.map((r) => ({ type: r.type, total: Number(r.total) })),
         recentMovements: movs,
-        kills: statsRow?.kills_total ?? 0,
-        deaths: statsRow?.deaths_total ?? 0,
-        saidas: statsRow?.saidas_total ?? 0,
-        deliveries: statsRow?.deliveries ?? 0,
-        vendas: statsRow?.sales ?? 0,
-        orders: statsRow?.orders ?? 0,
+        kills: Number(statsRow?.kills ?? 0),
+        deaths: Number(statsRow?.deaths ?? 0),
+        saidas: Number(statsRow?.saidas ?? 0),
+        deliveries: Number(statsRow?.deliveries ?? 0),
+        vendas: Number(statsRow?.vendas ?? 0),
+        orders: Number(statsRow?.orders ?? 0),
       };
-    } catch (e) {
-      throw new Error(e instanceof Error ? e.message : "Erro ao carregar perfil do membro");
+    } catch (err) {
+      logger.error("getMember_failed", { error: err instanceof Error ? err.message : String(err), memberId: data.id });
+      throw new Error(err instanceof Error ? err.message : "DB error");
     }
   });
 
-export const getMyAllTimeStats = createServerFn({ method: "GET" })
+export const updateMemberNick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{
-    kills: number;
-    deaths: number;
-    saidas: number;
-    deliveries: number;
-    sales: number;
-    orders: number;
-    wins: number;
-    losses: number;
-    kd: string;
-    winRate: string;
-  }> => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me) throw new Error("Membro não encontrado");
-    const row = await pgOne<{
-      kills_total: number;
-      deaths_total: number;
-      saidas_total: number;
-      deliveries: number;
-      sales: number;
-      orders: number;
-      wins: number;
-      losses: number;
-    }>(
-      `select coalesce(kills_total,0)::int as kills_total,
-              coalesce(deaths_total,0)::int as deaths_total,
-              coalesce(saidas_total,0)::int as saidas_total,
-              coalesce(deliveries,0)::int as deliveries,
-              coalesce(sales,0)::int as sales,
-              coalesce(orders,0)::int as orders,
-              coalesce(wins,0)::int as wins,
-              coalesce(losses,0)::int as losses
-       from all_time_stats where member_id = $1`,
-      [me.id],
-    );
-    const kills = row?.kills_total ?? 0;
-    const deaths = row?.deaths_total ?? 0;
-    const wins = row?.wins ?? 0;
-    const saidas = row?.saidas_total ?? 0;
-    return {
-      kills,
-      deaths,
-      saidas,
-      deliveries: row?.deliveries ?? 0,
-      sales: row?.sales ?? 0,
-      orders: row?.orders ?? 0,
-      wins,
-      losses: row?.losses ?? 0,
-      kd: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(0),
-      winRate: saidas > 0 ? ((wins / saidas) * 100).toFixed(0) : "0",
-    };
-  });
-
-export const updateMyProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { display_name?: string; nickname?: string | null }) => {
-    const name = d.display_name?.trim();
-    if (!name || name.length < 1 || name.length > 80) throw new Error("Nome inválido");
-    const nickname = NicknameSchema.parse(d.nickname);
-    return { display_name: name, nickname };
-  })
+  .inputValidator((d: { id: number; nick: string }) => ({ id: IdSchema.parse(d.id), nick: NicknameSchema.parse(d.nick) }))
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me) throw new Error("Membro não encontrado");
-    await pgQuery(
-      `update members set display_name = $2, nickname = $3, updated_at = now() where id = $1`,
-      [me.id, data.display_name, data.nickname],
-    );
-    if (me.discord_id) {
-      await notifyBot({ action: "rename", discord_id: me.discord_id, new_name: data.display_name });
-    }
+    if (!me?.is_manager) throw new Error("Sem permissão");
+    await pgQuery(`update members set nickname=$2, updated_at=now(), updated_by=$3 where id=$1`, [data.id, data.nick, `web:${context.userId}`]);
+    await notifyBot("member_nick_updated", { memberId: data.id, nick: data.nick });
     return { ok: true };
   });
