@@ -87,7 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     head: () => ({
       meta: [
         { charSet: "utf-8" },
-        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" },
         { title: "Ballas Gang" },
         {
           name: "description",
@@ -96,7 +96,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         },
         { property: "og:title", content: "Ballas Gang" },
         { name: "twitter:title", content: "Ballas Gang" },
-        { name: "description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
         { property: "og:description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
         { name: "twitter:description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
         { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
@@ -130,6 +129,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-PT">
       <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
         <HeadContent />
       </head>
       <body>
