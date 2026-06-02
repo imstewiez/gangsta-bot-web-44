@@ -17,18 +17,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
-            <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 rounded-2xl border border-white/10 bg-background/38 px-3 shadow-[0_18px_60px_-36px_rgba(0,0,0,0.95)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/28">
-              <div aria-hidden className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-primary/65 to-transparent" />
-              <SidebarTrigger className="h-9 w-9 rounded-xl border border-border/45 bg-white/[0.04] text-muted-foreground hover:border-primary/45 hover:bg-primary/10 hover:text-primary" />
-              <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
-                <div className="h-8 w-px bg-gradient-to-b from-transparent via-primary/35 to-transparent" />
-                <div className="min-w-0">
-                  <div className="text-display text-[10px] tracking-[0.34em] text-primary/90">Ballas Control</div>
-                  <div className="truncate text-xs text-muted-foreground/70">Painel interno · operação, membros e material</div>
+            <div className="mx-auto w-full max-w-7xl rounded-[1.35rem] border border-white/10 bg-background/34 px-3 py-2 shadow-[0_18px_70px_-42px_rgba(0,0,0,0.95)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/24">
+              <div aria-hidden className="pointer-events-none absolute inset-x-8 top-3 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
+              <div className="relative flex min-h-10 flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
+                <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl border border-border/45 bg-white/[0.04] text-muted-foreground hover:border-primary/45 hover:bg-primary/10 hover:text-primary" />
+
+                <div className="hidden min-w-0 items-center gap-3 lg:flex">
+                  <div className="h-7 w-px bg-gradient-to-b from-transparent via-primary/35 to-transparent" />
+                  <div className="min-w-0">
+                    <div className="text-display text-[10px] tracking-[0.32em] text-primary/90">Ballas Control</div>
+                    <div className="truncate text-xs text-muted-foreground/65">Operação · Membros · Material</div>
+                  </div>
                 </div>
-              </div>
-              <div className="ml-auto flex min-w-0 items-center justify-end gap-3">
-                <ViewAsSwitcher />
+
+                <div className="ml-auto flex min-w-0 flex-1 justify-end lg:flex-none">
+                  <ViewAsSwitcher />
+                </div>
               </div>
             </div>
           </header>
