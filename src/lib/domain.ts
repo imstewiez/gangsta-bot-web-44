@@ -18,19 +18,19 @@ export type MemberRole = Tier | "bairrista";
 // Cargo/posição principal — deve bater com o que o Discord mostra à comunidade.
 // Usado em Cargo/Posição, perfil, hierarquia e badges coloridas.
 export const ROLE_LABELS: Record<string, string> = {
-  young_blood: "Bairrista-1",
-  o_gunao: "Bairrista-2",
-  gangster_fodido: "Bairrista-3",
-  patrao_di_zona: "Chefe de Moradores",
-  real_gangster: "Oficiais-1",
-  og: "Oficiais-2",
-  kingpin: "Sub-Chefe",
-  manda_chuva: "Chefe",
+  young_blood: "Young Blood",
+  o_gunao: "O Gunão",
+  gangster_fodido: "Gangster Fodido",
+  patrao_di_zona: "Patrão di Zona",
+  real_gangster: "Real Gangster",
+  og: "OG",
+  kingpin: "Kingpin",
+  manda_chuva: "Manda-Chuva",
   bairrista: "Bairrista",
 };
 
-// Compatibilidade: muito UI legacy ainda importa TIER_LABELS para hierarquia/cargo.
-// Por isso TIER_LABELS continua a representar o cargo visual principal.
+// Compatibilidade: UI antiga ainda importa TIER_LABELS para hierarquia/cargo.
+// Mantém cargo visual principal para não trocar labels em zonas antigas.
 export const TIER_LABELS: Record<string, string> = ROLE_LABELS;
 
 // Tier/descrição — informação secundária, sem substituir o cargo.
@@ -38,7 +38,7 @@ export const TIER_DESCRIPTION_LABELS: Record<string, string> = {
   young_blood: "Entrada / Tier 1",
   o_gunao: "Progressão / Tier 2",
   gangster_fodido: "Progressão / Tier 3",
-  patrao_di_zona: "Gestão de moradores",
+  patrao_di_zona: "Gestão de bairro",
   real_gangster: "Oficial de rua",
   og: "Oficial sénior",
   kingpin: "Subchefia",
