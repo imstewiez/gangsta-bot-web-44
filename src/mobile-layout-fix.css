@@ -1,0 +1,104 @@
+/* Hard mobile layout guardrails. Keep desktop sidebar out of mobile flow. */
+
+.app-sidebar-desktop {
+  display: none !important;
+}
+
+.app-mobile-nav {
+  display: block !important;
+}
+
+.app-mobile-nav__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgb(0 0 0 / 0.82);
+  backdrop-filter: blur(2px);
+}
+
+.app-mobile-nav__drawer {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 9010 !important;
+  display: flex !important;
+  width: min(18rem, 86vw) !important;
+  height: 100dvh !important;
+  max-width: 86vw !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  transform: translateX(-105%) !important;
+  transition: transform 260ms ease-out !important;
+  box-shadow: 24px 0 70px -34px rgb(0 0 0 / 0.9) !important;
+}
+
+.app-mobile-nav__drawer.is-open {
+  transform: translateX(0) !important;
+}
+
+.app-mobile-nav__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 25%, transparent);
+  background: color-mix(in oklab, var(--background) 55%, transparent);
+  color: var(--muted-foreground);
+  backdrop-filter: blur(14px);
+}
+
+html,
+body {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+.ambient-bg {
+  width: 100dvw !important;
+  max-width: 100dvw !important;
+  overflow-x: hidden !important;
+}
+
+.app-shell-topbar,
+.page-header,
+main,
+footer {
+  max-width: 100% !important;
+}
+
+@media (min-width: 768px) {
+  .app-sidebar-desktop {
+    display: block !important;
+  }
+
+  .app-mobile-nav {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .group\/sidebar-wrapper {
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .page-header-title-row h1 {
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    writing-mode: horizontal-tb !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+}
