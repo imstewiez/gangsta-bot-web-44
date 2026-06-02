@@ -48,10 +48,12 @@ export function ViewAsSwitcher() {
   }
 
   return (
-    <div className="flex min-w-[280px] items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5">
-      <Eye className="h-4 w-4 shrink-0 text-primary" />
+    <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.075] px-2 py-1.5 backdrop-blur-xl sm:w-[min(360px,48vw)] lg:w-[320px]">
+      <span className="hidden h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25 sm:grid">
+        <Eye className="h-4 w-4" />
+      </span>
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+        <div className="mb-1 hidden items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-primary/90 sm:flex">
           <ShieldCheck className="h-3 w-3" /> Ver como
         </div>
         <SearchableSelect
@@ -61,10 +63,14 @@ export function ViewAsSwitcher() {
           placeholder={me.data?.is_viewing_as ? me.data.display_name ?? "Membro" : "Escolher membro"}
           searchPlaceholder="Procurar membro..."
           emptyText="Sem membros disponíveis."
-          className="h-8 border-primary/30 bg-background/60 text-xs"
+          className="h-8 min-w-0 border-primary/25 bg-background/55 text-xs shadow-none"
         />
       </div>
-      {current && <Button size="icon" variant="ghost" className="h-8 w-8" onClick={stop} title="Sair do modo ver como"><X className="h-4 w-4" /></Button>}
+      {current && (
+        <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={stop} title="Sair do modo ver como">
+          <X className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }
