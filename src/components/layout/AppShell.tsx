@@ -18,7 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <CinematicBackdrop />
         <AppSidebar />
 
-        <div className="flex h-full min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+        <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 w-full max-w-full shrink-0 overflow-hidden px-3 pt-3 md:px-5">
             <div className="app-shell-topbar mx-auto grid w-full max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 md:px-4 lg:grid-cols-[minmax(150px,auto)_minmax(220px,1fr)_auto]">
               <div className="liquid-content flex min-w-0 items-center gap-2 sm:gap-3">
