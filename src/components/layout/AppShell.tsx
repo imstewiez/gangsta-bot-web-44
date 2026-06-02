@@ -5,6 +5,7 @@ import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
 import { HeaderNotifications } from "./HeaderNotifications";
 import { HeaderTicker } from "./HeaderTicker";
+import { ViewAsExitButton } from "./ViewAsExitButton";
 import { Reveal } from "./Reveal";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -31,7 +32,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               <HeaderTicker />
 
-              <div className="liquid-content min-w-0 justify-self-stretch lg:justify-self-end">
+              <div className="liquid-content flex min-w-0 items-center justify-end gap-2 justify-self-stretch lg:justify-self-end">
+                <ViewAsExitButton />
                 <HeaderNotifications />
               </div>
             </div>
