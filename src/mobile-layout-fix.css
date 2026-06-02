@@ -101,4 +101,166 @@ footer {
     word-break: normal !important;
     overflow-wrap: normal !important;
   }
+
+  /* Mobile content system: cards, grids, tables, tabs, forms and dialogs. */
+  main {
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+  }
+
+  main * {
+    min-width: 0;
+  }
+
+  main .interactive-card,
+  main .card-frame,
+  main [class*="rounded-"][class*="border"] {
+    max-width: 100% !important;
+  }
+
+  main [class*="grid-cols-"],
+  main [class*="grid-cols_["],
+  main [class*="grid-cols-["],
+  main [class*="sm:grid-cols-"],
+  main [class*="md:grid-cols-"],
+  main [class*="lg:grid-cols-"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  main [class*="grid-cols-"] > *,
+  main [class*="grid-cols-["] > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  main [class*="flex"] {
+    min-width: 0;
+  }
+
+  main .flex-wrap,
+  main [class*="flex-wrap"] {
+    row-gap: 0.55rem;
+  }
+
+  main .page-header-action,
+  main .page-header-action > *,
+  main .page-header-action button,
+  main .page-header-action a {
+    width: 100%;
+  }
+
+  main .page-header-action {
+    align-self: stretch;
+  }
+
+  main button,
+  main a,
+  main input,
+  main textarea,
+  main select,
+  main [role="combobox"] {
+    max-width: 100%;
+  }
+
+  main input,
+  main textarea,
+  main [role="combobox"] {
+    font-size: 16px !important;
+  }
+
+  main [role="tablist"],
+  main [data-radix-tabs-list] {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    justify-content: flex-start !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  main [role="tablist"]::-webkit-scrollbar,
+  main [data-radix-tabs-list]::-webkit-scrollbar {
+    display: none;
+  }
+
+  main [role="tab"],
+  main [data-radix-tabs-trigger] {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  main table {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  main thead,
+  main tbody,
+  main tr {
+    min-width: max-content;
+  }
+
+  main th,
+  main td {
+    white-space: nowrap;
+  }
+
+  main [class*="overflow-x-auto"],
+  main [class*="overflow-auto"] {
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  main [class*="min-w-["],
+  main [class*="w-["],
+  main [style*="min-width"] {
+    max-width: 100% !important;
+  }
+
+  main [class*="text-3xl"],
+  main [class*="text-4xl"],
+  main [class*="text-5xl"] {
+    line-height: 1.05 !important;
+  }
+
+  main .interactive-card:hover {
+    transform: none !important;
+  }
+
+  [role="dialog"] {
+    width: calc(100dvw - 1rem) !important;
+    max-width: calc(100dvw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    overflow-y: auto !important;
+    padding: 1rem !important;
+  }
+
+  [role="dialog"] form,
+  [role="dialog"] [class*="grid-cols-"],
+  [role="dialog"] [class*="grid-cols-["] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  [role="dialog"] button,
+  [role="dialog"] input,
+  [role="dialog"] textarea,
+  [role="dialog"] [role="combobox"] {
+    max-width: 100% !important;
+  }
+
+  [data-radix-popper-content-wrapper] {
+    max-width: calc(100dvw - 1rem) !important;
+  }
+
+  [data-radix-select-content],
+  [data-radix-dropdown-menu-content],
+  [data-radix-popover-content] {
+    max-width: calc(100dvw - 1rem) !important;
+  }
 }
