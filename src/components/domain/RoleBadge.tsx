@@ -1,4 +1,4 @@
-import { ROLE_LABELS, TIER_LABELS, TIER_ACCENT, TIER_GRADIENT, isChefia } from "@/lib/domain";
+import { ROLE_LABELS, TIER_DESCRIPTION_LABELS, TIER_ACCENT, TIER_GRADIENT, isChefia } from "@/lib/domain";
 import { TierIcon, BallasIcon } from "./TierIcon";
 
 type Size = "xs" | "sm" | "md";
@@ -65,7 +65,7 @@ export function TierBadge({
   withIcon?: boolean;
 }) {
   if (!tier) return <span className="text-muted-foreground">—</span>;
-  const label = TIER_LABELS[tier] ?? tier;
+  const label = TIER_DESCRIPTION_LABELS[tier] ?? "—";
   return (
     <span
       className={
