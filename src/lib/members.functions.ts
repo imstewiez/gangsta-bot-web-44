@@ -224,6 +224,61 @@ export const getMember = createServerFn({ method: "GET" })
     }
   });
 
+export const getMyAllTimeStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{
+    kills: number;
+    deaths: number;
+    saidas: number;
+    deliveries: number;
+    sales: number;
+    orders: number;
+    wins: number;
+    losses: number;
+    kd: string;
+    winRate: string;
+  }> => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    const row = await pgOne<{
+      kills_total: number;
+      deaths_total: number;
+      saidas_total: number;
+      deliveries: number;
+      sales: number;
+      orders: number;
+      wins: number;
+      losses: number;
+    }>(
+      `select coalesce(kills_total,0)::int as kills_total,
+              coalesce(deaths_total,0)::int as deaths_total,
+              coalesce(saidas_total,0)::int as saidas_total,
+              coalesce(deliveries,0)::int as deliveries,
+              coalesce(sales,0)::int as sales,
+              coalesce(orders,0)::int as orders,
+              coalesce(wins,0)::int as wins,
+              coalesce(losses,0)::int as losses
+       from all_time_stats where member_id = $1`,
+      [me.id],
+    );
+    const kills = row?.kills_total ?? 0;
+    const deaths = row?.deaths_total ?? 0;
+    const wins = row?.wins ?? 0;
+    const saidas = row?.saidas_total ?? 0;
+    return {
+      kills,
+      deaths,
+      saidas,
+      deliveries: row?.deliveries ?? 0,
+      sales: row?.sales ?? 0,
+      orders: row?.orders ?? 0,
+      wins,
+      losses: row?.losses ?? 0,
+      kd: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(0),
+      winRate: saidas > 0 ? ((wins / saidas) * 100).toFixed(0) : "0",
+    };
+  });
+
 export const updateMemberNick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number; nick: string }) => ({ id: IdSchema.parse(d.id), nick: NicknameSchema.parse(d.nick) }))
@@ -231,6 +286,26 @@ export const updateMemberNick = createServerFn({ method: "POST" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
     await pgQuery(`update members set nickname=$2, updated_at=now(), updated_by=$3 where id=$1`, [data.id, data.nick, `web:${context.userId}`]);
-    await notifyBot("member_nick_updated", { memberId: data.id, nick: data.nick });
+    return { ok: true };
+  });
+
+export const updateMyProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { display_name?: string; nickname?: string | null }) => {
+    const name = d.display_name?.trim();
+    if (!name || name.length < 1 || name.length > 80) throw new Error("Nome inválido");
+    const nickname = NicknameSchema.parse(d.nickname);
+    return { display_name: name, nickname };
+  })
+  .handler(async ({ data, context }) => {
+    const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (!me) throw new Error("Membro não encontrado");
+    await pgQuery(
+      `update members set display_name = $2, nickname = $3, updated_at = now() where id = $1`,
+      [me.id, data.display_name, data.nickname],
+    );
+    if (me.discord_id) {
+      await notifyBot({ action: "rename", discord_id: me.discord_id, new_name: data.display_name });
+    }
     return { ok: true };
   });
