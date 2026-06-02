@@ -14,7 +14,8 @@ type OperationalKpis = {
 /**
  * Operational KPIs for the dashboard.
  * Only completed operations with a defined result count towards winrate/KDA.
- * Operations without victory/defeat are intentionally ignored.
+ * For kills, prefer the most detailed source available per operation:
+ * kill_logs -> participant kills -> operation our_kills.
  */
 export const getOperationalKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -31,19 +32,23 @@ export const getOperationalKpis = createServerFn({ method: "GET" })
          where deleted_at is null
            and status = 'concluida'
            and was_profitable is not null
-       ), participant_deaths as (
-         select p.operation_id, count(*) filter (where p.died = true)::int as deaths
-         from operation_participants p
-         join valid_ops vo on vo.id = p.operation_id
-         group by p.operation_id
+       ), op_rollup as (
+         select
+           vo.id,
+           vo.was_profitable,
+           coalesce(nullif(count(distinct kl.id), 0), nullif(sum(coalesce(p.kills, 0)), 0), vo.our_kills, 0)::int as kills,
+           count(distinct p.id) filter (where p.died = true)::int as deaths
+         from valid_ops vo
+         left join kill_logs kl on kl.saida_id = vo.id
+         left join operation_participants p on p.operation_id = vo.id
+         group by vo.id, vo.was_profitable, vo.our_kills
        )
        select
-         coalesce(sum(vo.our_kills), 0)::int as kills,
-         coalesce(sum(coalesce(pd.deaths, 0)), 0)::int as deaths,
-         count(*) filter (where vo.was_profitable = true)::int as wins,
+         coalesce(sum(kills), 0)::int as kills,
+         coalesce(sum(deaths), 0)::int as deaths,
+         count(*) filter (where was_profitable = true)::int as wins,
          count(*)::int as saidas
-       from valid_ops vo
-       left join participant_deaths pd on pd.operation_id = vo.id`,
+       from op_rollup`,
     ).catch(() => ({ kills: 0, deaths: 0, wins: 0, saidas: 0 }));
 
     const kills = Number(row?.kills ?? 0);
