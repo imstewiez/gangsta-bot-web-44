@@ -52,6 +52,8 @@ function toCatalogItem(db: DbCatalogRow, side: "venda" | "compra" | "ambos", pri
     min_sale_price: prices.min_sale_price,
     xp_points: db.xp_points ?? 0,
     tier_price: prices.tier_price,
+    tier_price_with_material: prices.tier_price_with_material,
+    tier_price_without_material: prices.tier_price_without_material,
   };
 }
 
@@ -70,7 +72,7 @@ export const getCatalog = createServerFn({ method: "GET" })
         return toCatalogItem(db, side, prices);
       })
       .filter((item): item is CatalogItem => Boolean(item))
-      .sort((a, b) => (b.tier_price ?? b.min_sale_price ?? b.purchase_price ?? 0) - (a.tier_price ?? a.min_sale_price ?? a.purchase_price ?? 0));
+      .sort((a, b) => (b.tier_price_without_material ?? b.purchase_price ?? b.tier_price_with_material ?? b.min_sale_price ?? 0) - (a.tier_price_without_material ?? a.purchase_price ?? a.tier_price_with_material ?? a.min_sale_price ?? 0));
   });
 
 export const getBuyCatalog = createServerFn({ method: "GET" })
