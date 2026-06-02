@@ -61,8 +61,7 @@ const SidebarProvider = React.forwardRef<
   }, [setOpenProp, open]);
 
   const toggleSidebar = React.useCallback(() => {
-    if (isMobile) setOpenMobile((current) => !current);
-    else setOpen((current) => !current);
+    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen]);
 
   React.useEffect(() => {
@@ -106,16 +105,15 @@ const Sidebar = React.forwardRef<
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
-  const useMobileDrawer = isMobile || openMobile;
+  const hiddenTransform = side === "left" ? "translateX(-105%)" : "translateX(105%)";
 
   if (collapsible === "none") {
     return <div className={cn("app-sidebar-liquid flex h-full w-(--sidebar-width) flex-col text-sidebar-foreground", className)} ref={ref} {...props}>{children}</div>;
   }
 
-  if (useMobileDrawer) {
-    const hiddenTransform = side === "left" ? "translateX(-105%)" : "translateX(105%)";
-    return (
-      <>
+  return (
+    <>
+      <div className="md:hidden">
         {openMobile && (
           <button
             type="button"
@@ -126,7 +124,6 @@ const Sidebar = React.forwardRef<
           />
         )}
         <aside
-          ref={ref}
           data-sidebar="sidebar"
           data-mobile="true"
           className={cn("app-sidebar-liquid fixed top-0 flex h-dvh flex-col overflow-hidden text-sidebar-foreground shadow-2xl transition-transform duration-300 ease-out", side === "left" ? "left-0" : "right-0", className)}
@@ -149,16 +146,14 @@ const Sidebar = React.forwardRef<
           </button>
           <div className="relative z-10 flex h-full w-full flex-col pt-1">{children}</div>
         </aside>
-      </>
-    );
-  }
-
-  return (
-    <div ref={ref} className="group peer hidden text-sidebar-foreground md:block" data-state={state} data-collapsible={state === "collapsed" ? collapsible : ""} data-variant={variant} data-side={side}>
-      <div className={cn("relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear", "group-data-[collapsible=offcanvas]:w-0", "group-data-[side=right]:rotate-180", variant === "floating" || variant === "inset" ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]" : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)", className)} {...props}>
-        <div data-sidebar="sidebar" className="app-sidebar-liquid flex h-full w-full flex-col text-sidebar-foreground">{children}</div>
       </div>
-    </div>
+
+      <div ref={ref} className="group peer hidden text-sidebar-foreground md:block" data-state={state} data-collapsible={state === "collapsed" ? collapsible : ""} data-variant={variant} data-side={side}>
+        <div className={cn("relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear", "group-data-[collapsible=offcanvas]:w-0", "group-data-[side=right]:rotate-180", variant === "floating" || variant === "inset" ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]" : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)", className)} {...props}>
+          <div data-sidebar="sidebar" className="app-sidebar-liquid flex h-full w-full flex-col text-sidebar-foreground">{children}</div>
+        </div>
+      </div>
+    </>
   );
 });
 Sidebar.displayName = "Sidebar";
