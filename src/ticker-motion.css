@@ -1,21 +1,21 @@
-/* One-by-one header message motion. Each message visibly crosses the header lane. */
+/* Header message ticker: desktop-only lane, one message crossing left to right. */
 
 @keyframes header-message-run {
   0% {
-    left: -42%;
+    transform: translate3d(-120%, -50%, 0);
     opacity: 0;
     filter: blur(3px);
   }
-  8% {
+  10% {
     opacity: 1;
     filter: blur(0);
   }
-  88% {
+  86% {
     opacity: 1;
     filter: blur(0);
   }
   100% {
-    left: 112%;
+    transform: translate3d(120%, -50%, 0);
     opacity: 0;
     filter: blur(3px);
   }
@@ -23,50 +23,69 @@
 
 .header-ticker {
   position: relative;
-  display: block;
-  min-height: 2.25rem;
+  display: none;
+  height: 2.35rem;
+  min-width: 0;
+  width: 100%;
   overflow: hidden;
-  padding: 0 1rem;
-  mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--primary) 18%, transparent);
+  background: color-mix(in oklab, var(--background) 26%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 11%, black 89%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 11%, black 89%, transparent);
 }
 
 .header-ticker-runner {
   position: absolute;
+  left: 0;
   top: 50%;
-  left: -42%;
   display: inline-flex;
-  width: max-content;
-  min-width: max-content;
+  width: 100%;
+  min-width: 100%;
   align-items: center;
-  transform: translateY(-50%);
-  animation-name: header-message-run;
-  animation-duration: 5.2s;
-  animation-timing-function: linear;
-  animation-fill-mode: both;
-  will-change: left, opacity, filter;
+  justify-content: center;
+  animation: header-message-run 7.2s linear both;
+  will-change: transform, opacity, filter;
 }
 
-.header-ticker-runner .header-ticker-item {
+.header-ticker-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   white-space: nowrap;
-  color: color-mix(in oklab, var(--foreground) 88%, transparent);
-  text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 32%, transparent);
+  color: color-mix(in oklab, var(--foreground) 86%, transparent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 34%, transparent);
+}
+
+.header-ticker-dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--primary) 80%, transparent);
 }
 
 .header-ticker:hover .header-ticker-runner {
   animation-play-state: paused;
 }
 
-@media (max-width: 780px) {
+@media (min-width: 768px) {
   .header-ticker {
-    min-height: 2.1rem;
-    padding-inline: 0.75rem;
+    display: block;
   }
-  .header-ticker-runner .header-ticker-item {
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-ticker-runner {
+    animation: none !important;
+    transform: translate3d(0, -50%, 0);
+    opacity: 1;
+    filter: none;
   }
 }
