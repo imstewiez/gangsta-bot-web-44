@@ -52,26 +52,6 @@
   backdrop-filter: blur(14px);
 }
 
-html,
-body {
-  width: 100% !important;
-  max-width: 100% !important;
-  overflow-x: hidden !important;
-}
-
-.ambient-bg {
-  width: 100dvw !important;
-  max-width: 100dvw !important;
-  overflow-x: hidden !important;
-}
-
-.app-shell-topbar,
-.page-header,
-main,
-footer {
-  max-width: 100% !important;
-}
-
 @media (min-width: 768px) {
   .app-sidebar-desktop {
     display: block !important;
@@ -83,6 +63,26 @@ footer {
 }
 
 @media (max-width: 767px) {
+  html,
+  body {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .ambient-bg {
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    overflow-x: hidden !important;
+  }
+
+  .app-shell-topbar,
+  .page-header,
+  main,
+  footer {
+    max-width: 100% !important;
+  }
+
   .group\/sidebar-wrapper {
     width: 100dvw !important;
     max-width: 100dvw !important;
