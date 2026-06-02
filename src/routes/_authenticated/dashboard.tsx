@@ -107,23 +107,23 @@ function Dashboard() {
 
   const data = home.data as DashboardAny | undefined;
   const h = new Date().getHours();
-  const saud = h < 5 ? "Ainda na rua" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
-  const nome = profile?.display_name?.split(" ")[0] ?? "mano";
+  const saud = h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
+  const nome = profile?.display_name?.split(" ")[0] ?? "membro";
   const totalMembers = (data?.byTier ?? []).reduce((sum, row) => sum + Number(row.count || 0), 0);
 
   const metrics = [
-    { icon: UserPlus, label: "Entradas", value: fmtNum(data?.newMembersWeek ?? 0), sub: "7 dias" },
-    { icon: Activity, label: "Atividade", value: fmtNum(data?.totalOpsWeek ?? 0), sub: "registos" },
-    { icon: Trophy, label: "Vitórias", value: `${data?.winRate ?? 0}%`, sub: "taxa" },
-    { icon: Crosshair, label: "Abates", value: fmtNum(data?.totalKillsWeek ?? 0), sub: `${data?.avgKillsPerSaida ?? 0}/saída` },
+    { icon: UserPlus, label: "Entradas", value: fmtNum(data?.newMembersWeek ?? 0), sub: "Últimos 7 dias" },
+    { icon: Activity, label: "Atividade", value: fmtNum(data?.totalOpsWeek ?? 0), sub: "Registos operacionais" },
+    { icon: Trophy, label: "Vitórias", value: `${data?.winRate ?? 0}%`, sub: "Taxa semanal" },
+    { icon: Crosshair, label: "Abates", value: fmtNum(data?.totalKillsWeek ?? 0), sub: `${data?.avgKillsPerSaida ?? 0} por saída` },
   ];
 
   return (
     <>
       <PageHeader
-        eyebrow="Casa"
+        eyebrow="Início"
         title={`${saud}, ${nome}.`}
-        description="Um resumo limpo do bairro, com foco no que interessa: evolução, prémios, presença e desempenho."
+        description="Resumo da atividade, desempenho e evolução da organização."
         icon={HomeIcon}
       />
 
@@ -185,11 +185,11 @@ function CommandPanel({ metrics, prize, totalMembers }: {
         <div className="min-w-0 rounded-[1.45rem] border border-white/[0.07] bg-background/18 p-5 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="text-display text-[10px] tracking-[0.32em] text-primary">Ballas Control</div>
-              <h2 className="mt-2 text-display text-2xl font-black tracking-tight md:text-3xl">Painel do bairro</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Visão rápida, limpa e sem ruído. Tudo aqui vem dos registos reais da operação.</p>
+              <div className="text-display text-[10px] tracking-[0.32em] text-primary">Resumo geral</div>
+              <h2 className="mt-2 text-display text-2xl font-black tracking-tight md:text-3xl">Painel operacional</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Indicadores principais com base nos registos reais da aplicação.</p>
             </div>
-            <Badge className="rounded-full border-primary/25 bg-primary/8 px-3 py-1 text-primary">{fmtNum(totalMembers)} ativos</Badge>
+            <Badge className="rounded-full border-primary/25 bg-primary/8 px-3 py-1 text-primary">{fmtNum(totalMembers)} membros ativos</Badge>
           </div>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -260,7 +260,7 @@ function OperationPanel({ data }: { data?: DashboardAny }) {
 
   return (
     <Panel>
-      <SectionTitle icon={MapPin} label="Operação" title="Ritmo da semana" />
+      <SectionTitle icon={MapPin} label="Operação" title="Atividade operacional" />
       <div className="mt-5 space-y-3">
         {last && (
           <div className="rounded-2xl border border-white/[0.08] bg-background/24 p-4">
@@ -296,7 +296,7 @@ function HierarchyPanel({ rows, total, topByTier }: { rows: { tier: string; coun
 
   return (
     <Panel>
-      <SectionTitle icon={Users} label="Hierarquia" title="Membros ativos" value={fmtNum(total)} />
+      <SectionTitle icon={Users} label="Membros" title="Distribuição por cargo" value={fmtNum(total)} />
       <div className="mt-5 space-y-3">
         {sorted.length ? sorted.map((row) => {
           const count = Number(row.count) || 0;
@@ -327,7 +327,7 @@ function LeaderboardPanel({ data }: { data?: DashboardAny }) {
 
   return (
     <Panel>
-      <SectionTitle icon={Trophy} label="Destaques" title="Quem está a puxar" />
+      <SectionTitle icon={Trophy} label="Classificação" title="Destaques de atividade" />
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
         {blocks.map((block) => <LeaderboardBlock key={block.title} {...block} />)}
       </div>
