@@ -78,19 +78,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-      <SidebarHeader className="relative z-10 p-2">
-        <div className={cn("sidebar-liquid-card flex items-center rounded-2xl p-2", collapsed ? "flex-col justify-center gap-2" : "gap-2")}>
-          <Link to="/dashboard" className={cn("group grid h-9 w-9 shrink-0 place-items-center rounded-xl", collapsed ? "mx-auto" : "") } title="Ballas Gang">
-            <img src={ballasLogo} alt="Ballas Gang" className="logo-hd h-8 w-8 rounded-sm object-contain transition-transform group-hover:scale-105" />
+      <SidebarHeader className={cn("relative z-10", collapsed ? "p-1" : "p-2")}>
+        <div className={cn("sidebar-liquid-card flex rounded-2xl", collapsed ? "w-full flex-col items-center gap-1.5 p-1" : "items-center gap-2 p-2")}>
+          <Link to="/dashboard" className={cn("group grid shrink-0 place-items-center rounded-xl", collapsed ? "h-8 w-8" : "h-9 w-9")} title="Ballas Gang">
+            <img src={ballasLogo} alt="Ballas Gang" className={cn("logo-hd rounded-sm object-contain transition-transform group-hover:scale-105", collapsed ? "h-7 w-7" : "h-8 w-8")} />
           </Link>
           {!collapsed && <div className="min-w-0 flex-1 text-display text-sm tracking-[0.22em]"><span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Ballas</span> Gang</div>}
-          <SidebarTrigger className={cn("h-8 w-8 shrink-0 rounded-xl border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14", collapsed && "mx-auto")} title={collapsed ? "Abrir menu" : "Fechar menu"}>
+          <SidebarTrigger className={cn("shrink-0 rounded-xl border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14", collapsed ? "h-8 w-8" : "h-8 w-8")} title={collapsed ? "Abrir menu" : "Fechar menu"}>
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </SidebarTrigger>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="relative z-10 px-2 pb-2">
+      <SidebarContent className={cn("relative z-10 pb-2", collapsed ? "px-1" : "px-2")}>
         {GROUPS.map((g) => {
           const items = g.items.filter((it) => {
             if (it.admin && !(me.data?.is_manager ?? false)) return false;
@@ -128,7 +128,7 @@ export function AppSidebar() {
         })}
       </SidebarContent>
 
-      <SidebarFooter className="relative z-10 p-2">
+      <SidebarFooter className={cn("relative z-10", collapsed ? "p-1" : "p-2")}>
         {!collapsed ? (
           <div className="sidebar-liquid-card flex items-center gap-2 rounded-2xl p-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border bg-background/40" style={{ borderColor: myAccent ? `color-mix(in oklab, ${myAccent} 55%, transparent)` : undefined }} title={myTierLabel ? `${myTierLabel} · ${myDisplay}` : myDisplay}>
