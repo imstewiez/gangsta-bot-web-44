@@ -1,6 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Crosshair, Home as HomeIcon, Loader2, MapPin, Sparkles, Target, Trophy, UserPlus, Users, type LucideIcon } from "lucide-react";
+import {
+  Activity,
+  Home as HomeIcon,
+  Loader2,
+  MapPin,
+  Sparkles,
+  Target,
+  Trophy,
+  UserPlus,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 import { ProfileCard } from "@/components/domain/ProfileCard";
 import { TierIcon } from "@/components/domain/TierIcon";
@@ -22,15 +33,71 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
-type RankRow = { display_name?: string | null; nick?: string | null; score?: number | null; ops?: number | null; kills_count?: number | null; wins_count?: number | null; };
-type DashboardAny = { newMembersWeek?: number; totalKillsWeek?: number; totalOpsWeek?: number; winRate?: number; avgKillsPerSaida?: number; topOpsParticipants?: { display_name?: string | null; tier?: string | null; ops?: number | null }[]; lastSaida?: { tipo?: string | null; spot?: string | null; scheduled_at?: string | null; was_profitable?: boolean | null; our_kills?: number | null; survivors?: number | null; mvp_name?: string | null; } | null; byTier?: { tier: string; count: number }[]; topByTier?: { tier: string; name?: string | null; score?: number | null }[]; topWeek?: RankRow[]; topPrevWeek?: RankRow[]; topMonth?: RankRow[]; prize?: { winner_name?: string | null; winner_tier?: string | null; score?: number | null; prize_description?: string | null; status?: string | null; } | null; };
-type OperationalKpis = { kills: number; deaths: number; wins: number; saidas: number; kda: number; winRate: number };
-type Metric = { icon: LucideIcon; label: string; value: string; sub: string; tone?: "primary" | "success" | "warning" | "info" };
+type RankRow = {
+  display_name?: string | null;
+  nick?: string | null;
+  score?: number | null;
+};
+
+type DashboardAny = {
+  newMembersWeek?: number;
+  avgKillsPerSaida?: number;
+  topOpsParticipants?: { display_name?: string | null; tier?: string | null; ops?: number | null }[];
+  lastSaida?: {
+    tipo?: string | null;
+    spot?: string | null;
+    scheduled_at?: string | null;
+    was_profitable?: boolean | null;
+  } | null;
+  byTier?: { tier: string; count: number }[];
+  topByTier?: { tier: string; name?: string | null; score?: number | null }[];
+  topWeek?: RankRow[];
+  topPrevWeek?: RankRow[];
+  topMonth?: RankRow[];
+  prize?: {
+    winner_name?: string | null;
+    winner_tier?: string | null;
+    score?: number | null;
+    prize_description?: string | null;
+    status?: string | null;
+  } | null;
+};
+
+type OperationalKpis = {
+  kills: number;
+  deaths: number;
+  wins: number;
+  saidas: number;
+  kda: number;
+  winRate: number;
+};
+
+type Metric = {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  sub: string;
+  tone?: "primary" | "success" | "warning" | "info";
+};
 
 function Dashboard() {
-  useRealtimeSync([{ table: "inventory_movements", queryKeys: [["my-xp"], ["home-kpis"]] }, { table: "members", queryKeys: [["me"], ["home-kpis"]] }, { table: "operations", queryKeys: [["home-kpis"], ["operational-kpis"]] }, { table: "operation_participants", queryKeys: [["home-kpis"], ["operational-kpis"]] }, { table: "weekly_rankings", queryKeys: [["home-kpis"], ["leaderboard"]] }, { table: "weekly_prizes", queryKeys: [["home-kpis"]] }, { table: "kill_logs", queryKeys: [["home-kpis"], ["leaderboard"], ["operational-kpis"]] }]);
+  useRealtimeSync([
+    { table: "inventory_movements", queryKeys: [["my-xp"], ["home-kpis"]] },
+    { table: "members", queryKeys: [["me"], ["home-kpis"]] },
+    { table: "operations", queryKeys: [["home-kpis"], ["operational-kpis"]] },
+    { table: "operation_participants", queryKeys: [["home-kpis"], ["operational-kpis"]] },
+    { table: "weekly_rankings", queryKeys: [["home-kpis"], ["leaderboard"]] },
+    { table: "weekly_prizes", queryKeys: [["home-kpis"]] },
+    { table: "kill_logs", queryKeys: [["home-kpis"], ["leaderboard"], ["operational-kpis"]] },
+  ]);
 
-  const homeFn = useAuthedServerFn(getHomeKpis); const opFn = useAuthedServerFn(getOperationalKpis); const xpFn = useAuthedServerFn(getCurrentMemberXP); const statsFn = useAuthedServerFn(getMyAllTimeStats); const meFn = useAuthedServerFn(getCurrentMember); const { profile } = useAuth();
+  const homeFn = useAuthedServerFn(getHomeKpis);
+  const opFn = useAuthedServerFn(getOperationalKpis);
+  const xpFn = useAuthedServerFn(getCurrentMemberXP);
+  const statsFn = useAuthedServerFn(getMyAllTimeStats);
+  const meFn = useAuthedServerFn(getCurrentMember);
+  const { profile } = useAuth();
+
   const home = useQuery({ queryKey: ["home-kpis"], queryFn: () => homeFn() });
   const operational = useQuery({ queryKey: ["operational-kpis"], queryFn: () => opFn(), staleTime: 5_000 });
   const myXP = useQuery({ queryKey: ["my-xp"], queryFn: () => xpFn(), staleTime: 5_000 });
@@ -39,24 +106,239 @@ function Dashboard() {
 
   const data = home.data as DashboardAny | undefined;
   const ops = (operational.data ?? { kills: 0, deaths: 0, wins: 0, saidas: 0, kda: 0, winRate: 0 }) as OperationalKpis;
-  const h = new Date().getHours(); const saud = h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite"; const nome = profile?.display_name?.split(" ")[0] ?? "membro";
+  const hour = new Date().getHours();
+  const greeting = hour < 5 ? "Boa noite" : hour < 12 ? "Bom dia" : hour < 19 ? "Boa tarde" : "Boa noite";
+  const name = profile?.display_name?.split(" ")[0] ?? "membro";
   const totalMembers = (data?.byTier ?? []).reduce((sum, row) => sum + Number(row.count || 0), 0);
+
   const metrics: Metric[] = [
-    { icon: Target, label: "KDA geral", value: String(ops.kda), sub: `${fmtNum(ops.kills)} / ${fmtNum(ops.deaths)}`, tone: "success" },
-    { icon: Trophy, label: "Winrate geral", value: `${ops.winRate}%`, sub: `${fmtNum(ops.wins)} vitórias`, tone: "warning" },
+    { icon: Target, label: "KDA", value: String(ops.kda), sub: `${fmtNum(ops.kills)} / ${fmtNum(ops.deaths)}`, tone: "success" },
+    { icon: Trophy, label: "Winrate", value: `${ops.winRate}%`, sub: `${fmtNum(ops.wins)} vitórias`, tone: "warning" },
     { icon: Activity, label: "Saídas", value: fmtNum(ops.saidas), sub: "com resultado", tone: "primary" },
-    { icon: UserPlus, label: "Entradas", value: fmtNum(data?.newMembersWeek ?? 0), sub: "últimos 7 dias", tone: "info" },
+    { icon: UserPlus, label: "Entradas", value: fmtNum(data?.newMembersWeek ?? 0), sub: "7 dias", tone: "info" },
   ];
 
-  return <><PageHeader eyebrow="Início" title={`${saud}, ${nome}.`} icon={HomeIcon} />{home.error && <Panel className="mb-5 border-destructive/40 bg-destructive/10"><div className="flex flex-wrap items-center gap-3 text-sm"><span className="text-destructive">{(home.error as Error).message || "Erro ao carregar dados"}</span><Button onClick={() => home.refetch()} variant="outline" size="sm" className="ml-auto">Tentar novamente</Button></div></Panel>}{(home.isLoading || operational.isLoading) && <Panel className="mb-5 flex items-center gap-3 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin text-primary" />{LOADING.dashboard}</Panel>}<Reveal direction="up"><CommandPanel metrics={metrics} prize={data?.prize ?? null} totalMembers={totalMembers} /></Reveal><div className="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_400px]"><div className="space-y-7"><ProfileCard member={me.data ?? null} xp={myXP.data ?? null} stats={myStats.data ?? null} /><LeaderboardPanel data={data} /></div><div className="space-y-7 xl:sticky xl:top-6 xl:self-start"><OperationPanel data={data} /><HierarchyPanel rows={data?.byTier ?? []} total={totalMembers} topByTier={data?.topByTier ?? []} /></div></div></>;
+  return (
+    <>
+      <PageHeader eyebrow="Início" title={`${greeting}, ${name}.`} icon={HomeIcon} />
+
+      {home.error && (
+        <Panel className="mb-5 border-destructive/40 bg-destructive/10">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-destructive">{(home.error as Error).message || "Erro ao carregar dados"}</span>
+            <Button onClick={() => home.refetch()} variant="outline" size="sm" className="ml-auto">Repetir</Button>
+          </div>
+        </Panel>
+      )}
+
+      {(home.isLoading || operational.isLoading) && (
+        <Panel className="mb-5 flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          {LOADING.dashboard}
+        </Panel>
+      )}
+
+      <Reveal direction="up">
+        <CommandPanel metrics={metrics} prize={data?.prize ?? null} totalMembers={totalMembers} />
+      </Reveal>
+
+      <div className="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-7">
+          <ProfileCard member={me.data ?? null} xp={myXP.data ?? null} stats={myStats.data ?? null} />
+          <LeaderboardPanel data={data} />
+        </div>
+        <div className="space-y-7 xl:sticky xl:top-6 xl:self-start">
+          <OperationPanel data={data} />
+          <HierarchyPanel rows={data?.byTier ?? []} total={totalMembers} topByTier={data?.topByTier ?? []} />
+        </div>
+      </div>
+    </>
+  );
 }
 
-function Panel({ children, className }: { children: React.ReactNode; className?: string }) { return <div className={cn("liquid-panel p-5", className)}><div className="liquid-content">{children}</div></div>; }
-function CommandPanel({ metrics, prize, totalMembers }: { metrics: Metric[]; prize: DashboardAny["prize"] | null; totalMembers: number; }) { return <section className="liquid-panel p-4 md:p-5"><div className="liquid-content grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.72fr)]"><div className="liquid-card min-w-0 p-5"><div className="liquid-content"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="text-display text-[10px] tracking-[0.32em] text-primary">Resumo geral</div><h2 className="mt-2 text-display text-2xl font-black tracking-tight md:text-3xl">Painel operacional</h2></div><Badge>{fmtNum(totalMembers)} membros ativos</Badge></div><div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <MetricPill key={metric.label} {...metric} />)}</div></div></div><WeeklyPrizeLiquid prize={prize} /></div></section>; }
-function MetricPill({ icon: Icon, label, value, sub, tone = "primary" }: Metric) { const toneMap = { primary: "text-primary border-primary/30 bg-primary/[0.06]", success: "text-success border-success/30 bg-success/[0.06]", warning: "text-warning border-warning/30 bg-warning/[0.06]", info: "text-info border-info/30 bg-info/[0.06]" }; return <div className={cn("liquid-card app-card-hover px-4 py-3", toneMap[tone])}><div className="liquid-content"><div className="mb-3 flex items-center justify-between gap-3"><span className="text-display text-[9px] tracking-[0.22em] text-muted-foreground">{label}</span><Icon className="h-4 w-4" /></div><div className="text-2xl font-black leading-none font-display text-foreground">{value}</div><div className="mt-2 text-[11px] text-muted-foreground/70">{sub}</div></div></div>; }
-function WeeklyPrizeLiquid({ prize }: { prize: DashboardAny["prize"] | null }) { const hasPrize = Boolean(prize?.prize_description); const label = prize?.status === "in_progress" ? "A decorrer" : hasPrize ? "Definido" : "Por definir"; return <div className="flame-prize min-h-[250px] rounded-[1.55rem] p-5"><div className="relative z-10 flex h-full flex-col justify-between gap-6"><div className="flex items-start justify-between gap-4"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/13 ring-1 ring-white/18 backdrop-blur-xl shadow-[0_0_34px_-14px_rgba(255,255,255,0.7)]"><Sparkles className="h-6 w-6 text-white" /></span><Badge className="border-white/18 bg-white/12 text-white">{label}</Badge></div><div><div className="text-display text-[10px] tracking-[0.3em] text-white/70">Prémio da semana</div><div className="mt-2 text-2xl font-black leading-tight font-display text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.35)] md:text-3xl">{prize?.prize_description || "Prémio por definir"}</div><div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/76"><TierIcon tier={prize?.winner_tier ?? null} size="sm" /><span>{prize?.winner_name ?? "Ainda sem vencedor"}</span>{prize?.score != null && <span className="font-mono text-xs">· {fmtNum(Math.round(Number(prize.score)))} pts</span>}</div></div><Button asChild size="sm" variant="outline" className="w-full border-white/18 bg-white/12 text-white hover:bg-white/18 hover:text-white"><Link to="/premios">Ver prémios</Link></Button></div></div>; }
-function OperationPanel({ data }: { data?: DashboardAny }) { const last = data?.lastSaida; const top = data?.topOpsParticipants ?? []; return <Panel><SectionTitle icon={MapPin} label="Operação" title="Atividade operacional" /><div className="mt-5 space-y-3">{last && <div className="liquid-card p-4"><div className="liquid-content"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{last.spot ?? "Local não definido"}</span>{last.was_profitable === true && <Badge className="bg-success/15 text-success">Vitória</Badge>}</div><div className="mt-1 text-xs text-muted-foreground">{last.tipo ?? "Saída"} · {last.scheduled_at ? new Date(last.scheduled_at).toLocaleString("pt-PT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "Data por definir"}</div></div></div>}{top.length > 0 ? top.map((p, i) => <div key={`${p.display_name}-${i}`} className="app-row flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.022] px-3 py-2.5"><span className="grid h-7 w-7 place-items-center rounded-xl bg-primary/10 text-xs font-bold text-primary">#{i + 1}</span><TierIcon tier={p.tier ?? null} size="sm" /><span className="min-w-0 flex-1 truncate text-sm font-medium">{p.display_name ?? "—"}</span><span className="text-display text-xs text-primary">{p.ops ?? 0} saídas</span></div>) : <p className="text-sm text-muted-foreground">Ainda não há atividade suficiente nesta semana.</p>}</div></Panel>; }
-function HierarchyPanel({ rows, total, topByTier }: { rows: { tier: string; count: number }[]; total: number; topByTier: { tier: string; name?: string | null; score?: number | null }[] }) { const sorted = [...rows].sort((a, b) => TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier)); const max = Math.max(1, ...sorted.map((r) => Number(r.count) || 0)); return <Panel><SectionTitle icon={Users} label="Membros" title="Distribuição por cargo" value={fmtNum(total)} /><div className="mt-5 space-y-3">{sorted.length ? sorted.map((row) => { const count = Number(row.count) || 0; const pct = Math.max(4, Math.round((count / max) * 100)); const names = topByTier.filter((m) => m.tier === row.tier).slice(0, 2); return <div key={row.tier} className="liquid-card px-3 py-3"><div className="liquid-content"><div className="flex items-center justify-between gap-3 text-sm"><span className="flex min-w-0 items-center gap-2"><TierIcon tier={row.tier} size="sm" /><span className="truncate font-medium">{TIER_LABELS[row.tier] ?? row.tier}</span></span><span className="text-display text-xs text-primary">{fmtNum(count)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/65"><div className="h-full rounded-full bg-primary/75" style={{ width: `${pct}%` }} /></div>{names.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{names.map((m, i) => <span key={i} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] text-muted-foreground">{m.name ?? "—"}</span>)}</div>}</div></div>; }) : <p className="text-sm text-muted-foreground">{EMPTY_STATE.dashboard.description}</p>}</div></Panel>; }
-function LeaderboardPanel({ data }: { data?: DashboardAny }) { const blocks = [{ title: "Esta semana", rows: data?.topWeek ?? [] }, { title: "Semana passada", rows: data?.topPrevWeek ?? [] }, { title: "Mês", rows: data?.topMonth ?? [] }]; return <Panel><SectionTitle icon={Trophy} label="Classificação" title="Destaques de atividade" /><div className="mt-5 grid gap-3 lg:grid-cols-3">{blocks.map((block) => <LeaderboardBlock key={block.title} {...block} />)}</div></Panel>; }
-function LeaderboardBlock({ title, rows }: { title: string; rows: RankRow[] }) { return <div className="liquid-card p-3"><div className="liquid-content"><div className="mb-3 text-display text-[10px] tracking-[0.22em] text-primary">{title}</div><ol className="space-y-2">{rows.length ? rows.slice(0, 4).map((row, i) => { const name = row.display_name ?? row.nick ?? "Anónimo"; return <li key={`${title}-${name}-${i}`} className="app-row flex items-center gap-2 rounded-xl px-2 py-1.5"><span className="grid h-6 w-6 place-items-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">#{i + 1}</span><span className="min-w-0 flex-1 truncate text-sm">{name}</span><span className="text-display text-xs text-primary">{fmtNum(Math.round(Number(row.score ?? 0)))}</span></li>; }) : <li className="py-4 text-sm text-muted-foreground">{EMPTY_STATE.leaderboard.description}</li>}</ol></div></div>; }
-function SectionTitle({ icon: Icon, label, title, value }: { icon: LucideIcon; label: string; title: string; value?: string }) { return <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2 text-display text-[10px] tracking-[0.28em] text-primary"><Icon className="h-3.5 w-3.5" />{label}</div><h2 className="mt-1 text-display text-lg font-bold tracking-tight">{title}</h2></div>{value && <Badge>{value}</Badge>}</div>; }
+function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn("liquid-panel p-5", className)}><div className="liquid-content">{children}</div></div>;
+}
+
+function CommandPanel({ metrics, prize, totalMembers }: { metrics: Metric[]; prize: DashboardAny["prize"] | null; totalMembers: number }) {
+  return (
+    <section className="liquid-panel p-4 md:p-5">
+      <div className="liquid-content grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.72fr)]">
+        <div className="liquid-card min-w-0 p-5">
+          <div className="liquid-content flex h-full flex-col justify-center">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h2 className="text-display text-2xl font-black tracking-tight md:text-3xl">Painel</h2>
+              <Badge>{fmtNum(totalMembers)} membros</Badge>
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {metrics.map((metric) => <MetricPill key={metric.label} {...metric} />)}
+            </div>
+          </div>
+        </div>
+        <WeeklyPrizeLiquid prize={prize} />
+      </div>
+    </section>
+  );
+}
+
+function MetricPill({ icon: Icon, label, value, sub, tone = "primary" }: Metric) {
+  const toneMap = {
+    primary: "text-primary border-primary/30 bg-primary/[0.06]",
+    success: "text-success border-success/30 bg-success/[0.06]",
+    warning: "text-warning border-warning/30 bg-warning/[0.06]",
+    info: "text-info border-info/30 bg-info/[0.06]",
+  };
+  return (
+    <div className={cn("liquid-card app-card-hover min-h-[116px] px-4 py-4", toneMap[tone])}>
+      <div className="liquid-content flex h-full flex-col items-center justify-center text-center">
+        <div className="mb-2 flex items-center gap-2 text-display text-[10px] tracking-[0.18em] text-muted-foreground">
+          <Icon className="h-4 w-4" />
+          {label}
+        </div>
+        <div className="font-display text-3xl font-black leading-none text-foreground">{value}</div>
+        <div className="mt-2 text-[11px] text-muted-foreground/70">{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function WeeklyPrizeLiquid({ prize }: { prize: DashboardAny["prize"] | null }) {
+  const hasPrize = Boolean(prize?.prize_description);
+  const label = prize?.status === "in_progress" ? "A decorrer" : hasPrize ? "Definido" : "Por definir";
+  return (
+    <div className="flame-prize min-h-[250px] rounded-[1.55rem] p-5">
+      <div className="relative z-10 flex h-full flex-col justify-between gap-5">
+        <div className="flex items-center justify-between gap-4">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/13 ring-1 ring-white/18 backdrop-blur-xl">
+            <Sparkles className="h-6 w-6 text-white" />
+          </span>
+          <Badge className="border-white/18 bg-white/12 text-white">{label}</Badge>
+        </div>
+        <div>
+          <div className="text-display text-[10px] tracking-[0.3em] text-white/70">Prémio</div>
+          <div className="mt-2 font-display text-2xl font-black leading-tight text-white md:text-3xl">
+            {prize?.prize_description || "Por definir"}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/76">
+            <TierIcon tier={prize?.winner_tier ?? null} size="sm" />
+            <span>{prize?.winner_name ?? "Sem vencedor"}</span>
+            {prize?.score != null && <span className="font-mono text-xs">· {fmtNum(Math.round(Number(prize.score)))} pts</span>}
+          </div>
+        </div>
+        <Button asChild size="sm" variant="outline" className="w-full border-white/18 bg-white/12 text-white hover:bg-white/18 hover:text-white">
+          <Link to="/premios">Ver prémios</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function OperationPanel({ data }: { data?: DashboardAny }) {
+  const last = data?.lastSaida;
+  const top = data?.topOpsParticipants ?? [];
+  return (
+    <Panel>
+      <SectionTitle icon={MapPin} label="Operação" title="Última saída" />
+      <div className="mt-5 space-y-3">
+        {last && (
+          <div className="liquid-card p-4">
+            <div className="liquid-content flex min-h-[86px] flex-col justify-center">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">{last.spot ?? "Sem local"}</span>
+                {last.was_profitable === true && <Badge className="bg-success/15 text-success">Vitória</Badge>}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {last.tipo ?? "Saída"} · {last.scheduled_at ? new Date(last.scheduled_at).toLocaleString("pt-PT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "Sem data"}
+              </div>
+            </div>
+          </div>
+        )}
+        {top.length > 0 ? top.map((p, i) => (
+          <div key={`${p.display_name}-${i}`} className="app-row flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.022] px-3 py-2.5">
+            <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary/10 text-xs font-bold text-primary">#{i + 1}</span>
+            <TierIcon tier={p.tier ?? null} size="sm" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.display_name ?? "—"}</span>
+            <span className="text-display text-xs text-primary">{p.ops ?? 0}</span>
+          </div>
+        )) : <p className="text-sm text-muted-foreground">Sem atividade.</p>}
+      </div>
+    </Panel>
+  );
+}
+
+function HierarchyPanel({ rows, total, topByTier }: { rows: { tier: string; count: number }[]; total: number; topByTier: { tier: string; name?: string | null; score?: number | null }[] }) {
+  const sorted = [...rows].sort((a, b) => TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier));
+  const max = Math.max(1, ...sorted.map((r) => Number(r.count) || 0));
+  return (
+    <Panel>
+      <SectionTitle icon={Users} label="Membros" title="Cargos" value={fmtNum(total)} />
+      <div className="mt-5 space-y-3">
+        {sorted.length ? sorted.map((row) => {
+          const count = Number(row.count) || 0;
+          const pct = Math.max(4, Math.round((count / max) * 100));
+          const names = topByTier.filter((m) => m.tier === row.tier).slice(0, 2);
+          return (
+            <div key={row.tier} className="liquid-card px-3 py-3">
+              <div className="liquid-content">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex min-w-0 items-center gap-2"><TierIcon tier={row.tier} size="sm" /><span className="truncate font-medium">{TIER_LABELS[row.tier] ?? row.tier}</span></span>
+                  <span className="text-display text-xs text-primary">{fmtNum(count)}</span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/65"><div className="h-full rounded-full bg-primary/75" style={{ width: `${pct}%` }} /></div>
+                {names.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{names.map((m, i) => <span key={i} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] text-muted-foreground">{m.name ?? "—"}</span>)}</div>}
+              </div>
+            </div>
+          );
+        }) : <p className="text-sm text-muted-foreground">{EMPTY_STATE.dashboard.description}</p>}
+      </div>
+    </Panel>
+  );
+}
+
+function LeaderboardPanel({ data }: { data?: DashboardAny }) {
+  const blocks = [
+    { title: "Semana", rows: data?.topWeek ?? [] },
+    { title: "Anterior", rows: data?.topPrevWeek ?? [] },
+    { title: "Mês", rows: data?.topMonth ?? [] },
+  ];
+  return (
+    <Panel>
+      <SectionTitle icon={Trophy} label="Classificação" title="Top atividade" />
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">{blocks.map((block) => <LeaderboardBlock key={block.title} {...block} />)}</div>
+    </Panel>
+  );
+}
+
+function LeaderboardBlock({ title, rows }: { title: string; rows: RankRow[] }) {
+  return (
+    <div className="liquid-card p-3">
+      <div className="liquid-content flex min-h-[180px] flex-col justify-center">
+        <div className="mb-3 text-center text-display text-[10px] tracking-[0.22em] text-primary">{title}</div>
+        <ol className="space-y-2">
+          {rows.length ? rows.slice(0, 4).map((row, i) => {
+            const name = row.display_name ?? row.nick ?? "Anónimo";
+            return (
+              <li key={`${title}-${name}-${i}`} className="app-row flex items-center gap-2 rounded-xl px-2 py-1.5">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">#{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+                <span className="text-display text-xs text-primary">{fmtNum(Math.round(Number(row.score ?? 0)))}</span>
+              </li>
+            );
+          }) : <li className="py-4 text-center text-sm text-muted-foreground">Sem dados.</li>}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({ icon: Icon, label, title, value }: { icon: LucideIcon; label: string; title: string; value?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="flex items-center gap-2 text-display text-[10px] tracking-[0.28em] text-primary"><Icon className="h-3.5 w-3.5" />{label}</div>
+        <h2 className="mt-1 text-display text-lg font-bold tracking-tight">{title}</h2>
+      </div>
+      {value && <Badge>{value}</Badge>}
+    </div>
+  );
+}
