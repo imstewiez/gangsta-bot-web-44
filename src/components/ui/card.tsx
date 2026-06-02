@@ -8,6 +8,7 @@ const Card = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    data-card="root"
     className={cn(
       "liquid-card app-card-hover flex min-w-0 flex-col text-card-foreground",
       className,
@@ -23,6 +24,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    data-card="header"
     className={cn("relative z-10 flex min-w-0 flex-col gap-1 p-5 pb-3", className)}
     {...props}
   />
@@ -35,6 +37,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    data-card="title"
     className={cn("text-display text-sm font-bold leading-tight tracking-[0.12em]", className)}
     {...props}
   />
@@ -47,6 +50,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    data-card="description"
     className={cn("text-sm leading-relaxed text-muted-foreground", className)}
     {...props}
   />
@@ -59,6 +63,7 @@ const CardContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    data-card="content"
     className={cn("relative z-10 min-w-0 flex-1 p-5 pt-3", className)}
     {...props}
   />
@@ -71,6 +76,7 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    data-card="footer"
     className={cn("relative z-10 flex min-w-0 items-center p-5 pt-3", className)}
     {...props}
   />
