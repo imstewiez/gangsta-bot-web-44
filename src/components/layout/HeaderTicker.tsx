@@ -7,7 +7,7 @@ const MESSAGES = [
   "Bora meter atividade!",
 ];
 
-const INTERVAL_MS = 5200;
+const INTERVAL_MS = 7200;
 
 export function HeaderTicker() {
   const [index, setIndex] = useState(0);
@@ -20,7 +20,7 @@ export function HeaderTicker() {
   }, []);
 
   return (
-    <div className="liquid-content header-ticker min-w-0 order-3 lg:order-none" aria-label="Mensagens do header">
+    <div className="header-ticker" aria-label="Mensagens do header">
       <div className="header-ticker-runner" key={`${index}-${MESSAGES[index]}`}>
         <span className="header-ticker-item">
           <span className="header-ticker-dot" />
