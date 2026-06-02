@@ -12,8 +12,16 @@ type OrderRow = {
   id: number;
   member_id: number | null;
   member_name: string | null;
+  member_tier?: string | null;
   item_id: number | null;
   item_name: string | null;
+  item_category?: string | null;
+  item_subcategory?: string | null;
+  item_side?: string | null;
+  item_min_sale_price?: number | null;
+  item_purchase_price?: number | null;
+  item_morador_purchase_price?: number | null;
+  item_estimated_value?: number | null;
   quantity: number;
   status: string;
   unit_price: number | null;
@@ -33,6 +41,7 @@ type OrderRow = {
 const ORDER_STATUSES = ["pending", "approved", "in_progress", "ready", "fulfilled", "denied", "cancelled"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 const TERMINAL_STATUSES = new Set<OrderStatus>(["fulfilled", "denied", "cancelled"]);
+const ACTIVE_STATUSES = new Set<OrderStatus>(["pending", "approved", "in_progress", "ready"]);
 const ALLOWED_TRANSITIONS: Record<string, OrderStatus[]> = {
   pending: ["approved", "denied", "cancelled"],
   approved: ["in_progress", "cancelled"],
@@ -88,6 +97,40 @@ async function insertOrderHistory(orderId: number, oldStatus: string, newStatus:
   try { await pgQuery(`insert into order_status_history (order_id, old_status, new_status, changed_by, notes, created_at) values ($1, $2, $3, $4, $5, now())`, [orderId, oldStatus, newStatus, changedBy, notes ?? null]); } catch {}
 }
 
+async function withCurrentOrderValues(rows: OrderRow[]): Promise<OrderRow[]> {
+  return Promise.all(rows.map(async (row) => {
+    if (!ACTIVE_STATUSES.has(row.status as OrderStatus) || !row.item_id) return row;
+
+    const dbItem = {
+      id: row.item_id,
+      name: row.item_name ?? "—",
+      category: row.item_category ?? null,
+      subcategory: row.item_subcategory ?? null,
+      side: row.item_side ?? "venda",
+      min_sale_price: row.item_min_sale_price ?? null,
+      purchase_price: row.item_purchase_price ?? null,
+      morador_purchase_price: row.item_morador_purchase_price ?? null,
+      estimated_value: row.item_estimated_value ?? null,
+    };
+
+    const itemSurcharges = await getSurchargeForItem(row.item_id).catch(() => []);
+    const prices = resolveItemPrices(dbItem, null, row.member_tier ?? null, itemSurcharges);
+    const currentIngredients = await getOrderIngredients(row.item_id, dbItem, row.quantity, row.member_tier ?? null).catch(() => row.ingredients_json ?? []);
+    const hasMaterials = currentIngredients.length > 0;
+    const paymentMode = row.payment_mode === "materials_money" && hasMaterials ? "materials_money" : "money_only";
+    const unit = paymentMode === "materials_money" ? Math.round(priceWithMaterials(prices)) : Math.round(priceWithoutMaterials(prices));
+
+    return {
+      ...row,
+      payment_mode: paymentMode,
+      unit_price: unit || row.unit_price,
+      total_price: unit > 0 ? unit * row.quantity : row.total_price,
+      money_cost: unit > 0 ? unit * row.quantity : row.money_cost,
+      ingredients_json: paymentMode === "materials_money" ? currentIngredients : null,
+    };
+  }));
+}
+
 export const listOrders = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).inputValidator((d: { scope?: "mine" | "manage"; status?: string | null; statuses?: string[] | null }) => {
   const scope = DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine";
   const status = OrderStatusSchema.optional().nullable().parse(d?.status) ?? null;
@@ -107,7 +150,8 @@ export const listOrders = createServerFn({ method: "GET" }).middleware([requireS
   }
   if (data.statuses) { params.push(data.statuses); conds.push(`o.status = ANY($${params.length})`); } else if (data.status) { params.push(data.status); conds.push(`o.status = $${params.length}`); }
   const where = conds.length ? `where ${conds.join(" and ")}` : "";
-  return pgQuery<OrderRow>(`select o.id, o.member_id, m.display_name as member_name, o.item_id, i.name as item_name, o.quantity, o.status, o.unit_price::float as unit_price, o.total_price::float as total_price, o.notes, o.created_at, o.delivered_at, o.responsavel_member_id, coalesce(mr.display_name, mr.nickname) as responsavel_name, o.ingredients_json, o.batch_id, o.payment_mode, o.material_cost::float as material_cost, o.money_cost::float as money_cost from orders o left join members m on m.id = o.member_id left join members mr on mr.id = o.responsavel_member_id left join items i on i.id = o.item_id ${where} order by o.created_at desc limit 200`, params);
+  const rows = await pgQuery<OrderRow>(`select o.id, o.member_id, m.display_name as member_name, m.tier as member_tier, o.item_id, i.name as item_name, i.category as item_category, i.subcategory as item_subcategory, i.side as item_side, i.min_sale_price::float as item_min_sale_price, i.purchase_price::float as item_purchase_price, i.morador_purchase_price::float as item_morador_purchase_price, i.estimated_value::float as item_estimated_value, o.quantity, o.status, o.unit_price::float as unit_price, o.total_price::float as total_price, o.notes, o.created_at, o.delivered_at, o.responsavel_member_id, coalesce(mr.display_name, mr.nickname) as responsavel_name, o.ingredients_json, o.batch_id, o.payment_mode, o.material_cost::float as material_cost, o.money_cost::float as money_cost from orders o left join members m on m.id = o.member_id left join members mr on mr.id = o.responsavel_member_id left join items i on i.id = o.item_id ${where} order by o.created_at desc limit 200`, params);
+  return withCurrentOrderValues(rows);
 });
 
 export const createOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { lines: Array<{ item_id: number; quantity: number }>; notes?: string | null; responsavel_member_id?: number | null; payment_mode?: "materials_money" | "money_only" }) => {
