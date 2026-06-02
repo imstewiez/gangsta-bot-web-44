@@ -1,12 +1,13 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "./design-system.css";
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Unbounded:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
-/* Ballas Gang — Cinematic Underworld */
+/* Ballas Gang — dark violet product theme */
 
 @theme inline {
   --font-display: "Unbounded", "Oswald", "Bebas Neue", system-ui, sans-serif;
@@ -58,7 +59,6 @@
 
 :root {
   --radius: 0.625rem;
-  /* Ballas Gang — deep violet underworld */
   --background: oklch(0.12 0.025 300);
   --foreground: oklch(0.97 0.005 300);
   --card: oklch(0.17 0.035 300);
@@ -87,7 +87,6 @@
   --blood: oklch(0.42 0.22 295);
   --blood-foreground: oklch(0.98 0.01 300);
 
-  /* Sidebar colors — Ballas violet theme */
   --sidebar-background: oklch(0.14 0.03 300);
   --sidebar-foreground: oklch(0.97 0.005 300);
   --sidebar-primary: oklch(0.55 0.22 300);
@@ -97,7 +96,6 @@
   --sidebar-border: oklch(0.28 0.06 300);
   --sidebar-ring: oklch(0.62 0.22 300);
 
-  /* Cinematic gradients & shadows — violet edition */
   --shadow-deep:
     0 24px 60px -20px oklch(0 0 0 / 0.7), 0 8px 20px -8px oklch(0 0 0 / 0.5);
   --glow-primary: 0 0 40px color-mix(in oklab, var(--primary) 35%, transparent);
@@ -137,7 +135,6 @@
   }
 }
 
-/* ───────── Utilities ───────── */
 .text-display {
   font-family: var(--font-display);
   letter-spacing: 0.02em;
@@ -153,26 +150,17 @@
   background-size: 4px 4px;
 }
 
-/* The cinematic backdrop is rendered by <CinematicBackdrop /> as a fixed layer.
-   .ambient-bg is now just a positioning context. */
 .ambient-bg {
   position: relative;
   isolation: isolate;
 }
 
 @keyframes drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(-30px, 20px, 0) scale(1.05);
-  }
-  100% {
-    transform: translate3d(40px, -25px, 0) scale(0.98);
-  }
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-30px, 20px, 0) scale(1.05); }
+  100% { transform: translate3d(40px, -25px, 0) scale(0.98); }
 }
 
-/* Layered card with soft inner highlight */
 .card-frame {
   background: linear-gradient(
     180deg,
@@ -186,7 +174,6 @@
   backdrop-filter: blur(8px);
 }
 
-/* Top hairline — cinematic divider */
 .hairline-top {
   background: linear-gradient(
     90deg,
@@ -197,15 +184,9 @@
   height: 1px;
 }
 
-/* Glow utilities */
-.glow-primary {
-  box-shadow: var(--glow-primary);
-}
-.text-glow {
-  text-shadow: 0 0 24px color-mix(in oklab, var(--primary) 50%, transparent);
-}
+.glow-primary { box-shadow: var(--glow-primary); }
+.text-glow { text-shadow: 0 0 24px color-mix(in oklab, var(--primary) 50%, transparent); }
 
-/* Animated shine sweep on buttons */
 .btn-shine {
   position: relative;
   overflow: hidden;
@@ -214,78 +195,38 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    120deg,
-    transparent 30%,
-    color-mix(in oklab, white 18%, transparent) 50%,
-    transparent 70%
-  );
+  background: linear-gradient(120deg, transparent 30%, color-mix(in oklab, white 18%, transparent) 50%, transparent 70%);
   transform: translateX(-120%);
   transition: transform 0.9s ease;
 }
-.btn-shine:hover::after {
-  transform: translateX(120%);
-}
+.btn-shine:hover::after { transform: translateX(120%); }
 
-/* Motion */
 @keyframes float-slow {
-  0%,
-  100% {
-    transform: translateY(0) translateX(0);
-  }
-  50% {
-    transform: translateY(-12px) translateX(6px);
-  }
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-12px) translateX(6px); }
 }
 @keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 35%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 12px color-mix(in oklab, var(--primary) 0%, transparent);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 35%, transparent); }
+  50% { box-shadow: 0 0 0 12px color-mix(in oklab, var(--primary) 0%, transparent); }
 }
 @keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.animate-float-slow {
-  animation: float-slow 9s ease-in-out infinite;
-}
-.animate-pulse-glow {
-  animation: pulse-glow 2.4s ease-out infinite;
-}
-.animate-rise {
-  animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.delay-100 {
-  animation-delay: 0.1s;
-}
-.delay-200 {
-  animation-delay: 0.2s;
-}
-.delay-300 {
-  animation-delay: 0.3s;
-}
-.delay-400 {
-  animation-delay: 0.4s;
-}
+.animate-float-slow { animation: float-slow 9s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2.4s ease-out infinite; }
+.animate-rise { animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
 
-/* Global smooth transitions */
 @layer base {
   a, button {
     transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   }
 }
 
-/* Hover lift for interactive cards */
 .hover-lift {
   transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s ease;
 }
@@ -294,12 +235,8 @@
   box-shadow: var(--shadow-deep);
 }
 
-/* Row hover highlight for tables */
-.row-hover {
-  transition: background-color 0.15s ease;
-}
+.row-hover { transition: background-color 0.15s ease; }
 
-/* Focus ring override for accessibility + style */
 @layer base {
   :focus-visible {
     outline: 2px solid var(--primary);
@@ -308,13 +245,8 @@
   }
 }
 
-/* Sidebar scrollbar — thin & subtle */
-[data-sidebar="content"]::-webkit-scrollbar {
-  width: 4px;
-}
-[data-sidebar="content"]::-webkit-scrollbar-track {
-  background: transparent;
-}
+[data-sidebar="content"]::-webkit-scrollbar { width: 4px; }
+[data-sidebar="content"]::-webkit-scrollbar-track { background: transparent; }
 [data-sidebar="content"]::-webkit-scrollbar-thumb {
   background: color-mix(in oklab, var(--border) 40%, transparent);
   border-radius: 2px;
@@ -324,23 +256,14 @@
   scrollbar-color: color-mix(in oklab, var(--border) 40%, transparent) transparent;
 }
 
-/* Global scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: color-mix(in oklab, var(--border) 60%, transparent);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklab, var(--border) 90%, transparent);
-}
+::-webkit-scrollbar-thumb:hover { background: color-mix(in oklab, var(--border) 90%, transparent); }
 
-/* Ensure dropdowns / popovers / select viewports are scrollable on touch devices */
 [data-radix-popper-content-wrapper],
 [data-radix-popover-content],
 [data-radix-select-viewport],
@@ -349,26 +272,16 @@
   overscroll-behavior: contain;
 }
 
-/* ───────── Interactive hover utilities ───────── */
-
-/* Card that lifts + glows purple on hover */
 .interactive-card {
-  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 0.25s ease,
-    border-color 0.25s ease,
-    background-color 0.25s ease;
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
 }
 .interactive-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 0 24px -6px color-mix(in oklab, var(--primary) 40%, transparent),
-    var(--shadow-deep);
+  box-shadow: 0 0 24px -6px color-mix(in oklab, var(--primary) 40%, transparent), var(--shadow-deep);
   border-color: color-mix(in oklab, var(--primary) 50%, transparent);
 }
-.interactive-card:active {
-  transform: translateY(-1px);
-}
+.interactive-card:active { transform: translateY(-1px); }
 
-/* Row/table item that highlights on hover */
 .interactive-row {
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -377,77 +290,51 @@
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 15%, transparent);
 }
 
-/* Link that glows on hover */
-.interactive-link {
-  transition: color 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease;
-}
+.interactive-link { transition: color 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease; }
 .interactive-link:hover {
   color: var(--primary);
   text-shadow: 0 0 12px color-mix(in oklab, var(--primary) 40%, transparent);
 }
 
-/* Tab/pill that glows when active or hovered */
-.interactive-tab {
-  transition: all 0.2s ease;
-}
+.interactive-tab { transition: all 0.2s ease; }
 .interactive-tab:hover {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   border-color: color-mix(in oklab, var(--primary) 40%, transparent);
   box-shadow: 0 0 12px -4px color-mix(in oklab, var(--primary) 30%, transparent);
 }
 
-/* Badge/tag that glows on hover */
-.interactive-badge {
-  transition: all 0.2s ease;
-}
+.interactive-badge { transition: all 0.2s ease; }
 .interactive-badge:hover {
   box-shadow: 0 0 12px -2px color-mix(in oklab, var(--primary) 35%, transparent);
   transform: translateY(-1px);
 }
 
-/* Glow pulse for active/important items */
-.glow-pulse {
-  animation: glow-pulse 2s ease-in-out infinite;
-}
+.glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
 @keyframes glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 25%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 8px color-mix(in oklab, var(--primary) 0%, transparent);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 25%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in oklab, var(--primary) 0%, transparent); }
 }
 
-/* ───────── Scroll reveal ───────── */
 .reveal {
   opacity: 0;
   transform: translateY(28px);
-  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
-    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
   will-change: opacity, transform;
 }
-.reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
+.reveal.is-visible { opacity: 1; transform: translateY(0); }
 
-/* ───────── Slow bounce for scroll cue ───────── */
 @keyframes bounce-slow {
   0%, 100% { transform: translateY(0); opacity: 0.6; }
   50% { transform: translateY(6px); opacity: 1; }
 }
-.animate-bounce-slow {
-  animation: bounce-slow 2.2s ease-in-out infinite;
-}
+.animate-bounce-slow { animation: bounce-slow 2.2s ease-in-out infinite; }
 
-/* ───────── High-quality logo rendering ───────── */
 .logo-hd {
   image-rendering: -webkit-optimize-contrast;
   filter: drop-shadow(0 0 18px color-mix(in oklab, var(--primary) 55%, transparent))
     drop-shadow(0 0 40px color-mix(in oklab, var(--blood) 30%, transparent));
 }
 
-/* ───────── Uniform icon sizing ───────── */
 svg.lucide {
   stroke-width: 1.75;
   flex-shrink: 0;
@@ -459,14 +346,12 @@ svg.lucide {
 .icon-lg { width: 1.25rem;  height: 1.25rem; }
 .icon-xl { width: 1.5rem;   height: 1.5rem; }
 
-/* Sidebar icons — uniform 16px, slightly bolder stroke */
 [data-sidebar="menu-button"] svg {
   width: 1rem;
   height: 1rem;
   stroke-width: 2;
 }
 
-/* Section header icon chips — uniform */
 .icon-chip {
   display: inline-grid;
   place-items: center;
@@ -481,16 +366,11 @@ svg.lucide {
 .icon-chip:hover {
   transform: translateY(-1px) scale(1.05);
   background: color-mix(in oklab, var(--primary) 18%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 60%, transparent),
-    0 0 20px -6px color-mix(in oklab, var(--primary) 50%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 60%, transparent), 0 0 20px -6px color-mix(in oklab, var(--primary) 50%, transparent);
 }
 
-
-/* ───────── Shimmer sweep for prize card ───────── */
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
-.animate-shimmer {
-  animation: shimmer 3s linear infinite;
-}
+.animate-shimmer { animation: shimmer 3s linear infinite; }
