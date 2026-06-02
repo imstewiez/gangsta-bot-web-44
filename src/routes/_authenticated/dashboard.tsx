@@ -12,6 +12,7 @@ import {
   Trophy,
   UserPlus,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 
 import { ProfileCard } from "@/components/domain/ProfileCard";
@@ -20,7 +21,6 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Reveal } from "@/components/layout/Reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useAuth } from "@/lib/auth";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
@@ -30,6 +30,7 @@ import { getMyAllTimeStats } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
 import { getCurrentMemberXP } from "@/lib/xp.functions";
 import { EMPTY_STATE, LOADING } from "@/lib/messages";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -105,125 +106,169 @@ function Dashboard() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn(), staleTime: 5_000 });
 
   const data = home.data as DashboardAny | undefined;
-  const isLoading = home.isLoading;
   const h = new Date().getHours();
   const saud = h < 5 ? "Ainda na rua" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
   const nome = profile?.display_name?.split(" ")[0] ?? "mano";
   const totalMembers = (data?.byTier ?? []).reduce((sum, row) => sum + Number(row.count || 0), 0);
+
+  const metrics = [
+    { icon: UserPlus, label: "Entradas", value: fmtNum(data?.newMembersWeek ?? 0), sub: "7 dias" },
+    { icon: Activity, label: "Atividade", value: fmtNum(data?.totalOpsWeek ?? 0), sub: "registos" },
+    { icon: Trophy, label: "Vitórias", value: `${data?.winRate ?? 0}%`, sub: "taxa" },
+    { icon: Crosshair, label: "Abates", value: fmtNum(data?.totalKillsWeek ?? 0), sub: `${data?.avgKillsPerSaida ?? 0}/saída` },
+  ];
 
   return (
     <>
       <PageHeader
         eyebrow="Casa"
         title={`${saud}, ${nome}.`}
-        description="Resumo limpo do bairro: atividade, crescimento, prémios e membros em destaque."
+        description="Um resumo limpo do bairro, com foco no que interessa: evolução, prémios, presença e desempenho."
         icon={HomeIcon}
       />
 
       {home.error && (
-        <Card className="mb-5 border-destructive/40 bg-destructive/10">
-          <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm">
+        <Panel className="mb-5 border-destructive/40 bg-destructive/10">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="text-destructive">{(home.error as Error).message || "Erro ao carregar dados"}</span>
-            <Button onClick={() => home.refetch()} variant="outline" size="sm" className="ml-auto">
-              Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
+            <Button onClick={() => home.refetch()} variant="outline" size="sm" className="ml-auto">Tentar novamente</Button>
+          </div>
+        </Panel>
       )}
 
-      {isLoading && (
-        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-border/50 bg-card/60 p-4 text-sm text-muted-foreground backdrop-blur-xl">
+      {home.isLoading && (
+        <Panel className="mb-5 flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
           {LOADING.dashboard}
-        </div>
+        </Panel>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PositiveKpi icon={UserPlus} label="Novas entradas" value={fmtNum(data?.newMembersWeek ?? 0)} sub="Últimos 7 dias" />
-        <PositiveKpi icon={Activity} label="Atividade" value={fmtNum(data?.totalOpsWeek ?? 0)} sub={`${fmtNum(data?.totalSaidasWeek ?? 0)} saídas concluídas`} />
-        <PositiveKpi icon={Trophy} label="Vitórias" value={`${data?.winRate ?? 0}%`} sub="Taxa semanal registada" />
-        <PositiveKpi icon={Crosshair} label="Abates" value={fmtNum(data?.totalKillsWeek ?? 0)} sub={`${data?.avgKillsPerSaida ?? 0} por saída`} />
-      </div>
+      <Reveal direction="up">
+        <CommandPanel
+          metrics={metrics}
+          prize={data?.prize ?? null}
+          totalMembers={totalMembers}
+        />
+      </Reveal>
 
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <div className="space-y-5">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="space-y-6">
           <ProfileCard member={me.data ?? null} xp={myXP.data ?? null} stats={myStats.data ?? null} />
-          {data?.prize && <PrizeCard prize={data.prize} />}
+          <LeaderboardPanel data={data} />
         </div>
-        <div className="space-y-5">
-          <OpsCard data={data} />
-          <HierarchyCard rows={data?.byTier ?? []} total={totalMembers} topByTier={data?.topByTier ?? []} />
+        <div className="space-y-6">
+          <OperationPanel data={data} />
+          <HierarchyPanel rows={data?.byTier ?? []} total={totalMembers} topByTier={data?.topByTier ?? []} />
         </div>
-      </div>
-
-      <div className="mt-6 grid gap-5 lg:grid-cols-3">
-        <TopCard title="Esta semana" icon={<Flame className="h-4 w-4 text-primary" />} subtitle={data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null} rows={data?.topWeek ?? []} />
-        <TopCard title="Semana passada" icon={<CalendarDays className="h-4 w-4 text-info" />} subtitle={data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null} rows={data?.topPrevWeek ?? []} compact />
-        <TopCard title="Mês" icon={<Trophy className="h-4 w-4 text-warning" />} subtitle={data?.topMonthLabel ?? null} rows={data?.topMonth ?? []} compact />
       </div>
     </>
   );
 }
 
-function PositiveKpi({ icon: Icon, label, value, sub }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; sub: string }) {
+function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <Reveal direction="up">
-      <Card className="interactive-card overflow-hidden border-primary/20 bg-card/65 backdrop-blur-xl">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-3">
+    <div className={cn("relative overflow-hidden rounded-3xl border border-border/45 bg-card/55 p-5 shadow-[0_22px_80px_-46px_rgba(0,0,0,0.95)] backdrop-blur-xl", className)}>
+      {children}
+    </div>
+  );
+}
+
+function CommandPanel({ metrics, prize, totalMembers }: {
+  metrics: { icon: LucideIcon; label: string; value: string; sub: string }[];
+  prize: DashboardAny["prize"] | null;
+  totalMembers: number;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-[2rem] border border-primary/25 bg-card/55 p-5 shadow-[0_30px_110px_-58px_rgba(0,0,0,1)] backdrop-blur-2xl md:p-6">
+      <div aria-hidden className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -left-32 bottom-0 h-72 w-72 rounded-full bg-blood/12 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
+
+      <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.75fr)]">
+        <div className="min-w-0 space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="text-display text-[10px] tracking-[0.22em] text-muted-foreground">{label}</div>
-              <div className="mt-2 text-3xl font-black leading-none font-display text-primary">{value}</div>
-              <div className="mt-2 text-xs text-muted-foreground">{sub}</div>
+              <div className="text-display text-[10px] tracking-[0.32em] text-primary">Ballas Control</div>
+              <h2 className="mt-2 text-display text-2xl font-black tracking-tight md:text-3xl">Painel do bairro</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Visão rápida, limpa e sem ruído. Tudo aqui vem dos registos reais da operação.</p>
             </div>
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/30">
-              <Icon className="h-5 w-5 text-primary" />
-            </span>
+            <Badge className="rounded-full border-primary/35 bg-primary/10 px-3 py-1 text-primary">{fmtNum(totalMembers)} membros ativos</Badge>
           </div>
-        </CardContent>
-      </Card>
-    </Reveal>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {metrics.map((metric) => (
+              <MetricPill key={metric.label} {...metric} />
+            ))}
+          </div>
+        </div>
+
+        <WeeklyPrizeLiquid prize={prize} />
+      </div>
+    </section>
   );
 }
 
-function PrizeCard({ prize }: { prize: NonNullable<DashboardAny["prize"]> }) {
+function MetricPill({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string; sub: string }) {
   return (
-    <Reveal direction="up">
-      <Card className="interactive-card overflow-hidden border-primary/30 bg-gradient-to-br from-primary/12 via-card/85 to-card">
-        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/15 ring-1 ring-primary/40">
-            <Sparkles className="h-7 w-7 text-primary" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <span className="text-display text-[10px] tracking-[0.26em] text-primary">Prémio semanal</span>
-              <Badge className="border-primary/30 bg-primary/10 text-primary">{prize.status === "in_progress" ? "A decorrer" : "Definido"}</Badge>
-            </div>
-            <div className="text-xl font-black leading-tight font-display">{prize.prize_description || "Prémio por definir"}</div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <TierIcon tier={prize.winner_tier ?? null} size="sm" />
-              <span className="font-medium text-foreground">{prize.winner_name ?? "Ainda sem vencedor"}</span>
-              {prize.score != null && <span className="font-mono text-xs">· {fmtNum(Math.round(prize.score))} pts</span>}
-            </div>
-          </div>
-          <Button asChild size="sm"><Link to="/premios">Ver prémios</Link></Button>
-        </CardContent>
-      </Card>
-    </Reveal>
+    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur-xl transition-all duration-200 hover:border-primary/35 hover:bg-primary/[0.055]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-display text-[10px] tracking-[0.22em] text-muted-foreground">{label}</span>
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+      <div className="text-2xl font-black leading-none font-display text-foreground">{value}</div>
+      <div className="mt-2 text-[11px] text-muted-foreground/75">{sub}</div>
+    </div>
   );
 }
 
-function OpsCard({ data }: { data?: DashboardAny }) {
+function WeeklyPrizeLiquid({ prize }: { prize: DashboardAny["prize"] | null }) {
+  const hasPrize = Boolean(prize?.prize_description);
+  const label = prize?.status === "in_progress" ? "A decorrer" : hasPrize ? "Definido" : "Por definir";
+
+  return (
+    <div className="relative min-h-[220px] overflow-hidden rounded-[1.65rem] border border-primary/35 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" style={{ background: "linear-gradient(135deg, color-mix(in oklab, var(--primary) 20%, transparent), color-mix(in oklab, var(--card) 86%, transparent) 48%, color-mix(in oklab, var(--blood) 18%, transparent))" }}>
+      <div aria-hidden className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/35 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-blood/25 blur-3xl" />
+      <div aria-hidden className="absolute inset-0 opacity-35" style={{ background: "linear-gradient(115deg, transparent 18%, rgba(255,255,255,0.10) 42%, transparent 66%)", backgroundSize: "220% 100%", animation: "shimmer 4s linear infinite" }} />
+
+      <div className="relative flex h-full flex-col justify-between gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur-xl">
+            <Sparkles className="h-6 w-6 text-primary-foreground" />
+          </span>
+          <Badge className="rounded-full border-white/15 bg-white/10 px-3 py-1 text-white">{label}</Badge>
+        </div>
+
+        <div>
+          <div className="text-display text-[10px] tracking-[0.3em] text-white/65">Prémio da semana</div>
+          <div className="mt-2 text-2xl font-black leading-tight font-display text-white">
+            {prize?.prize_description || "Prémio por definir"}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/70">
+            <TierIcon tier={prize?.winner_tier ?? null} size="sm" />
+            <span>{prize?.winner_name ?? "Ainda sem vencedor"}</span>
+            {prize?.score != null && <span className="font-mono text-xs">· {fmtNum(Math.round(Number(prize.score)))} pts</span>}
+          </div>
+        </div>
+
+        <Button asChild size="sm" variant="outline" className="w-full border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white">
+          <Link to="/premios">Ver prémios</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function OperationPanel({ data }: { data?: DashboardAny }) {
   const last = data?.lastSaida;
   const top = data?.topOpsParticipants ?? [];
+
   return (
-    <Card className="interactive-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-display text-sm"><MapPin className="h-4 w-4 text-primary" /> Ritmo da semana</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel>
+      <SectionTitle icon={MapPin} label="Operação" title="Ritmo da semana" />
+      <div className="mt-5 space-y-4">
         {last && (
-          <div className="rounded-xl border border-border/45 bg-background/30 p-4">
+          <div className="rounded-2xl border border-border/40 bg-background/28 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{last.spot ?? "Local não definido"}</span>
               {last.was_profitable === true && <Badge className="bg-success/15 text-success">Vitória</Badge>}
@@ -236,53 +281,97 @@ function OpsCard({ data }: { data?: DashboardAny }) {
             </div>
           </div>
         )}
+
         {top.length > 0 ? top.map((p, i) => (
-          <div key={`${p.display_name}-${i}`} className="flex items-center gap-3 rounded-xl border border-border/35 bg-white/[0.025] px-3 py-2 interactive-row">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">#{i + 1}</span>
+          <div key={`${p.display_name}-${i}`} className="flex items-center gap-3 rounded-2xl border border-border/30 bg-white/[0.025] px-3 py-2.5 transition-colors hover:bg-primary/[0.045]">
+            <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary/10 text-xs font-bold text-primary">#{i + 1}</span>
             <TierIcon tier={p.tier ?? null} size="sm" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.display_name ?? "—"}</span>
             <span className="text-display text-xs text-primary">{p.ops ?? 0} saídas</span>
           </div>
         )) : <p className="text-sm text-muted-foreground">Ainda não há atividade suficiente nesta semana.</p>}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
-function HierarchyCard({ rows, total, topByTier }: { rows: { tier: string; count: number }[]; total: number; topByTier: { tier: string; name?: string | null; score?: number | null }[] }) {
+function HierarchyPanel({ rows, total, topByTier }: { rows: { tier: string; count: number }[]; total: number; topByTier: { tier: string; name?: string | null; score?: number | null }[] }) {
   const sorted = [...rows].sort((a, b) => TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier));
   const max = Math.max(1, ...sorted.map((r) => Number(r.count) || 0));
+
   return (
-    <Card className="interactive-card">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-3 text-display text-sm"><span className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Membros ativos</span><Badge className="bg-primary/10 text-primary">{fmtNum(total)}</Badge></CardTitle>
-      </CardHeader>
-      <CardContent>
-        {sorted.length ? <ul className="space-y-3">{sorted.map((row) => {
+    <Panel>
+      <SectionTitle icon={Users} label="Hierarquia" title="Membros ativos" value={fmtNum(total)} />
+      <div className="mt-5 space-y-3">
+        {sorted.length ? sorted.map((row) => {
           const count = Number(row.count) || 0;
           const pct = Math.max(4, Math.round((count / max) * 100));
           const names = topByTier.filter((m) => m.tier === row.tier).slice(0, 2);
-          return <li key={row.tier} className="rounded-xl border border-border/35 bg-white/[0.025] px-3 py-2.5"><div className="flex items-center justify-between gap-3 text-sm"><span className="flex min-w-0 items-center gap-2"><TierIcon tier={row.tier} size="sm" /><span className="truncate font-medium">{TIER_LABELS[row.tier] ?? row.tier}</span></span><span className="text-display text-xs text-primary">{fmtNum(count)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/75" style={{ width: `${pct}%` }} /></div>{names.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{names.map((m, i) => <span key={i} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] text-muted-foreground">{m.name ?? "—"}</span>)}</div>}</li>;
-        })}</ul> : <p className="text-sm text-muted-foreground">{EMPTY_STATE.dashboard.description}</p>}
-      </CardContent>
-    </Card>
+          return (
+            <div key={row.tier} className="rounded-2xl border border-border/30 bg-white/[0.025] px-3 py-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex min-w-0 items-center gap-2"><TierIcon tier={row.tier} size="sm" /><span className="truncate font-medium">{TIER_LABELS[row.tier] ?? row.tier}</span></span>
+                <span className="text-display text-xs text-primary">{fmtNum(count)}</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/70"><div className="h-full rounded-full bg-primary/75" style={{ width: `${pct}%` }} /></div>
+              {names.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{names.map((m, i) => <span key={i} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] text-muted-foreground">{m.name ?? "—"}</span>)}</div>}
+            </div>
+          );
+        }) : <p className="text-sm text-muted-foreground">{EMPTY_STATE.dashboard.description}</p>}
+      </div>
+    </Panel>
   );
 }
 
-function TopCard({ title, icon, subtitle, rows, compact }: { title: string; icon: React.ReactNode; subtitle?: string | null; rows: RankRow[]; compact?: boolean }) {
+function LeaderboardPanel({ data }: { data?: DashboardAny }) {
+  const blocks = [
+    { title: "Esta semana", subtitle: data?.topWeekLabel ? formatWeek(data.topWeekLabel) : null, rows: data?.topWeek ?? [] },
+    { title: "Semana passada", subtitle: data?.topPrevWeekLabel ? formatWeek(data.topPrevWeekLabel) : null, rows: data?.topPrevWeek ?? [] },
+    { title: "Mês", subtitle: data?.topMonthLabel ?? null, rows: data?.topMonth ?? [] },
+  ];
+
   return (
-    <Card className="interactive-card h-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-3 text-display text-sm"><span className="flex items-center gap-2">{icon}{title}</span>{subtitle && <span className="text-[10px] text-muted-foreground">{subtitle}</span>}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {rows.length ? <ol className="space-y-2">{rows.slice(0, compact ? 4 : 5).map((row, i) => {
+    <Panel>
+      <SectionTitle icon={Trophy} label="Destaques" title="Quem está a puxar" />
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        {blocks.map((block) => <LeaderboardBlock key={block.title} {...block} />)}
+      </div>
+    </Panel>
+  );
+}
+
+function LeaderboardBlock({ title, subtitle, rows }: { title: string; subtitle?: string | null; rows: RankRow[] }) {
+  return (
+    <div className="rounded-2xl border border-border/30 bg-background/24 p-3">
+      <div className="mb-3">
+        <div className="text-display text-[10px] tracking-[0.22em] text-primary">{title}</div>
+        {subtitle && <div className="mt-1 text-[11px] text-muted-foreground">{subtitle}</div>}
+      </div>
+      <ol className="space-y-2">
+        {rows.length ? rows.slice(0, 4).map((row, i) => {
           const name = row.display_name ?? row.nick ?? "Anónimo";
-          const bits = [row.deliveries ? `${row.deliveries} entregas` : null, row.sales ? `${row.sales} vendas` : null, row.ops ? `${row.ops} saídas` : null, row.kills_count ? `${row.kills_count} abates` : null, row.wins_count ? `${row.wins_count} vitórias` : null].filter(Boolean).join(" · ");
-          return <li key={`${name}-${i}`} className="flex items-center gap-3 rounded-xl border border-border/35 bg-white/[0.025] px-3 py-2"><span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">#{i + 1}</span><div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{name}</div>{!compact && bits && <div className="truncate text-[11px] text-muted-foreground">{bits}</div>}</div><span className="text-display text-sm text-primary">{fmtNum(Math.round(Number(row.score ?? 0)))}</span></li>;
-        })}</ol> : <p className="text-sm text-muted-foreground">{EMPTY_STATE.leaderboard.description}</p>}
-      </CardContent>
-    </Card>
+          return (
+            <li key={`${title}-${name}-${i}`} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-primary/[0.045]">
+              <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">#{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+              <span className="text-display text-xs text-primary">{fmtNum(Math.round(Number(row.score ?? 0)))}</span>
+            </li>
+          );
+        }) : <li className="py-4 text-sm text-muted-foreground">{EMPTY_STATE.leaderboard.description}</li>}
+      </ol>
+    </div>
+  );
+}
+
+function SectionTitle({ icon: Icon, label, title, value }: { icon: LucideIcon; label: string; title: string; value?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="flex items-center gap-2 text-display text-[10px] tracking-[0.28em] text-primary"><Icon className="h-3.5 w-3.5" />{label}</div>
+        <h2 className="mt-1 text-display text-lg font-bold tracking-tight">{title}</h2>
+      </div>
+      {value && <Badge className="rounded-full bg-primary/10 text-primary">{value}</Badge>}
+    </div>
   );
 }
 
