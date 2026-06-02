@@ -4,6 +4,7 @@
 @import "./design-system.css";
 @import "./liquid-overrides.css";
 @import "./ticker-motion.css";
+@import "./card-alignment.css";
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Unbounded:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
 
@@ -68,9 +69,9 @@
   --primary-foreground: oklch(0.98 0.01 300);
   --secondary: oklch(0.24 0.045 300);
   --secondary-foreground: oklch(0.94 0.005 300);
-  --muted: oklch(0.22 0.030 300);
+  --muted: oklch(0.22 0.03 300);
   --muted-foreground: oklch(0.72 0.025 300);
-  --accent: oklch(0.32 0.080 300);
+  --accent: oklch(0.32 0.08 300);
   --accent-foreground: oklch(0.96 0.005 300);
   --destructive: oklch(0.55 0.24 25);
   --destructive-foreground: oklch(0.98 0.01 90);
@@ -80,8 +81,8 @@
   --warning-foreground: oklch(0.1 0 0);
   --info: oklch(0.68 0.14 230);
   --info-foreground: oklch(0.1 0 0);
-  --border: oklch(0.30 0.050 300);
-  --input: oklch(0.24 0.040 300);
+  --border: oklch(0.30 0.05 300);
+  --input: oklch(0.24 0.04 300);
   --ring: oklch(0.62 0.22 300);
   --blood: oklch(0.42 0.22 295);
   --blood-foreground: oklch(0.98 0.01 300);
@@ -162,7 +163,6 @@
 .hover-lift { transition: transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s ease; }
 .hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-deep); }
 .row-hover { transition: background-color .15s ease; }
-
 .interactive-card { transition: transform .25s cubic-bezier(.2,.7,.2,1), box-shadow .25s ease, border-color .25s ease, background-color .25s ease; }
 .interactive-card:hover { transform: translateY(-3px); box-shadow: 0 0 24px -6px color-mix(in oklab, var(--primary) 40%, transparent), var(--shadow-deep); border-color: color-mix(in oklab, var(--primary) 50%, transparent); }
 .interactive-card:active { transform: translateY(-1px); }
@@ -175,11 +175,9 @@
 .interactive-badge { transition: all .2s ease; }
 .interactive-badge:hover { box-shadow: 0 0 12px -2px color-mix(in oklab, var(--primary) 35%, transparent); transform: translateY(-1px); }
 .glow-pulse { animation: pulse-glow 2s ease-in-out infinite; }
-
 .reveal { opacity: 1; transform: translateY(0); }
 .reveal.is-visible { opacity: 1; transform: translateY(0); }
 .logo-hd { image-rendering: -webkit-optimize-contrast; filter: drop-shadow(0 0 18px color-mix(in oklab, var(--primary) 55%, transparent)) drop-shadow(0 0 40px color-mix(in oklab, var(--blood) 30%, transparent)); }
-
 svg.lucide { stroke-width: 1.75; flex-shrink: 0; }
 .icon-xs { width: .875rem; height: .875rem; }
 .icon-sm { width: 1rem; height: 1rem; }
@@ -187,10 +185,8 @@ svg.lucide { stroke-width: 1.75; flex-shrink: 0; }
 .icon-lg { width: 1.25rem; height: 1.25rem; }
 .icon-xl { width: 1.5rem; height: 1.5rem; }
 [data-sidebar="menu-button"] svg { width: 1rem; height: 1rem; stroke-width: 2; }
-
 .icon-chip { display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .375rem; background: color-mix(in oklab, var(--primary) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 35%, transparent); color: var(--primary); transition: transform .25s ease, box-shadow .25s ease, background-color .25s ease; }
 .icon-chip:hover { transform: translateY(-1px) scale(1.05); background: color-mix(in oklab, var(--primary) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 60%, transparent), 0 0 20px -6px color-mix(in oklab, var(--primary) 50%, transparent); }
-
 [data-sidebar="content"]::-webkit-scrollbar, ::-webkit-scrollbar { width: 6px; height: 6px; }
 [data-sidebar="content"]::-webkit-scrollbar-track, ::-webkit-scrollbar-track { background: transparent; }
 [data-sidebar="content"]::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--border) 55%, transparent); border-radius: 3px; }
