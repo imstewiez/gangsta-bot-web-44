@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Waves } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
@@ -16,8 +17,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
-            <div className="app-shell-topbar mx-auto flex w-full max-w-7xl items-center justify-end px-3 py-2 md:px-4">
-              <ViewAsSwitcher />
+            <div className="app-shell-topbar mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 md:px-4">
+              <div className="liquid-content flex min-w-0 items-center gap-3">
+                <span className="shell-liquid-mark shrink-0">
+                  <Waves className="h-4 w-4 text-primary" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-display text-[10px] tracking-[0.28em] text-primary">Liquid Mode</div>
+                  <div className="hidden text-xs text-muted-foreground/70 sm:block">Painel interno</div>
+                </div>
+              </div>
+              <div className="liquid-content min-w-0 shrink-0">
+                <ViewAsSwitcher />
+              </div>
             </div>
           </header>
 
