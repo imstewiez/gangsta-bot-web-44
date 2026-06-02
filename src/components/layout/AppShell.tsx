@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
-import { Activity, Database, Sparkles } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
 import { ViewAsSwitcher } from "./ViewAsSwitcher";
 import { Reveal } from "./Reveal";
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -17,28 +16,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
-            <div className="app-shell-topbar mx-auto w-full max-w-7xl px-3 py-2 md:px-4">
-              <div className="relative flex min-h-12 flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl border border-border/45 bg-white/[0.04] text-muted-foreground hover:border-primary/45 hover:bg-primary/10 hover:text-primary" />
-                  <div className="hidden h-8 w-px bg-gradient-to-b from-transparent via-primary/35 to-transparent sm:block" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-display text-[10px] tracking-[0.28em] text-primary/90">
-                      <Activity className="h-3.5 w-3.5" />
-                      Painel interno
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/70">
-                      <span className="inline-flex items-center gap-1.5"><Database className="h-3 w-3 text-primary/60" /> Dados em tempo real</span>
-                      <span className="hidden opacity-45 sm:inline">·</span>
-                      <span className="hidden sm:inline">Operação, membros e inventário</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex min-w-0 flex-1 justify-start lg:justify-end">
-                  <ViewAsSwitcher />
-                </div>
-              </div>
+            <div className="app-shell-topbar mx-auto flex w-full max-w-7xl items-center justify-end px-3 py-2 md:px-4">
+              <ViewAsSwitcher />
             </div>
           </header>
 
@@ -47,12 +26,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               {children}
             </main>
 
-            <footer className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 border-t border-border/20 px-4 py-6 text-[10px] uppercase tracking-[0.24em] text-muted-foreground/40 font-display md:px-6 xl:px-8">
+            <footer className="mx-auto flex w-full max-w-7xl items-center justify-between border-t border-border/20 px-4 py-5 text-[10px] uppercase tracking-[0.24em] text-muted-foreground/35 font-display md:px-6 xl:px-8">
               <span>© Ballas Gang</span>
-              <span className="inline-flex items-center gap-2">
-                <Sparkles className="h-3 w-3 text-primary/55" />
-                Gestão interna
-              </span>
             </footer>
           </div>
         </div>
@@ -62,7 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 export function PageHeader({
-  eyebrow, title, description, action, icon: Icon,
+  eyebrow, title, action, icon: Icon,
 }: {
   eyebrow?: string;
   title: string;
@@ -92,11 +67,6 @@ export function PageHeader({
               <span className="min-w-0 break-words">{title}</span>
             </h1>
           </Reveal>
-          {description && (
-            <Reveal delay={eyebrow ? 120 : 60} direction="up">
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
-            </Reveal>
-          )}
         </div>
         {action && <div className="relative shrink-0">{action}</div>}
       </div>
