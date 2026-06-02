@@ -13,6 +13,7 @@ export type OrderCycle = {
   total_profit: number;
   fulfilled_count: number;
   pending_count: number;
+  active_count: number;
   items: {
     item_name: string;
     quantity: number;
@@ -23,6 +24,7 @@ export type OrderCycle = {
 };
 
 const OPEN_ORDER_STATUSES = ["pending", "approved", "in_progress", "ready"];
+const ACTIVE_ORDER_STATUSES = ["approved", "in_progress", "ready"];
 
 function orderVisibilitySql(me: { id: number; is_superadmin?: boolean | null }) {
   return me.is_superadmin ? { sql: "", params: [] as unknown[] } : { sql: " and o.responsavel_member_id = $1", params: [me.id] as unknown[] };
@@ -65,9 +67,9 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
       pgOne<{ count: number }>(
         `select count(*)::int as count
          from orders o
-         where o.status = any($${visibility.params.length + 1}::text[])
+         where o.status = 'pending'
          ${visibility.sql}`,
-        [...visibility.params, OPEN_ORDER_STATUSES],
+        visibility.params,
       ).catch(() => ({ count: 0 })),
       pgOne<{ count: number }>(
         `select count(*)::int as count
@@ -180,6 +182,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       total_profit: number;
       fulfilled_count: number;
       pending_count: number;
+      active_count: number;
     }>(
       `WITH cycle_orders AS (
         SELECT
@@ -204,12 +207,13 @@ export const getOrderCycles = createServerFn({ method: "GET" })
         SUM(quantity * unit_cost)::float as total_cost,
         SUM(total_price - quantity * unit_cost)::float as total_profit,
         COUNT(*) FILTER (WHERE status = 'fulfilled')::int as fulfilled_count,
-        COUNT(*) FILTER (WHERE status IN ('pending', 'approved', 'in_progress', 'ready'))::int as pending_count
+        COUNT(*) FILTER (WHERE status = 'pending')::int as pending_count,
+        COUNT(*) FILTER (WHERE status = any($${visibility.params.length + 1}::text[]))::int as active_count
       FROM cycle_orders
       GROUP BY cycle_start, cycle_end
       ORDER BY cycle_start DESC
       LIMIT 8`,
-      visibility.params,
+      [...visibility.params, ACTIVE_ORDER_STATUSES],
     ).catch(() => []);
 
     const items = await pgQuery<{
