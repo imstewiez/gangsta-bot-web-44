@@ -39,19 +39,20 @@ type DeliveryRow = {
   created_at: string;
   decided_at: string | null;
   decision_reason: string;
+  responsavel_member_id: number | null;
+  responsavel_name: string | null;
 };
 
 const SQL_NORMALIZED_NAME = "translate(lower(name), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')";
+const RESPONSIBLE_TIERS = ["patrao_di_zona", "kingpin", "manda_chuva"];
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-
 function asPositiveNumber(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-
 function asOptionalNumber(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
@@ -59,17 +60,20 @@ function asOptionalNumber(value: unknown): number | null {
 
 async function assertResponsibleExists(memberId: number) {
   const row = await pgOne<{ id: number }>(
-    `select id from members
-     where id = $1 and deleted_at is null
-       and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')`,
-    [memberId],
+    `select id
+     from members
+     where id = $1
+       and deleted_at is null
+       and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')
+       and tier = any($2::text[])`,
+    [memberId, RESPONSIBLE_TIERS],
   );
-  if (!row) throw new Error("Responsável inválido ou inativo.");
+  if (!row) throw new Error("Responsável inválido. Só Patrão di Zona, Kingpin ou Manda-Chuva podem ser responsáveis.");
 }
 
 async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "entrega" | "venda" = "entrega"): Promise<DeliveryLine[]> {
   if (!Array.isArray(lines)) {
-    if (strict) throw new Error("Linhas da entrega inválidas");
+    if (strict) throw new Error("Linhas inválidas");
     return [];
   }
 
@@ -117,7 +121,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
     const allowed = item && (tipo === "entrega" ? side === "compra" || side === "ambos" : side === "venda" || side === "ambos");
 
     if (!qty || !item || !allowed) {
-      if (strict) throw new Error(`Linha de entrega inválida: ${JSON.stringify(line)}`);
+      if (strict) throw new Error(`Linha inválida: ${JSON.stringify(line)}`);
       normalized.push({
         item_id: rawId ?? 0,
         item_name: rawName ?? "Item inválido",
@@ -130,7 +134,6 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
     const explicitUnit = asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.effectivePrice ?? line.basePrice);
     const lineValue = asOptionalNumber(line.lineValue);
     const unit = tipo === "entrega" ? 0 : (explicitUnit ?? (lineValue != null ? lineValue / qty : null) ?? item.morador_purchase_price ?? item.purchase_price ?? 0);
-
     normalized.push({ item_id: item.id, item_name: item.name, qty, unit_value: unit });
   }
 
@@ -167,7 +170,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
       where += ` and r.status = 'pending'`;
       if (!me.is_superadmin) {
         params.push(me.id);
-        where += ` and (r.responsavel_member_id = $${params.length} or r.responsavel_member_id is null)`;
+        where += ` and r.responsavel_member_id = $${params.length}`;
       }
     }
 
@@ -175,9 +178,12 @@ export const listDeliveries = createServerFn({ method: "GET" })
       `select r.id, r.requester_member_id, m.display_name as requester_name,
               r.status, coalesce(r.tipo, 'entrega') as tipo, r.lines, r.notes,
               r.total_qty, r.total_value::float as total_value,
-              r.created_at, r.decided_at, r.decision_reason
+              r.created_at, r.decided_at, r.decision_reason,
+              r.responsavel_member_id,
+              coalesce(mr.display_name, mr.nickname) as responsavel_name
        from inventory_delivery_requests r
        left join members m on m.id = r.requester_member_id
+       left join members mr on mr.id = r.responsavel_member_id
        ${where}
        order by r.created_at desc
        limit 200`,
@@ -226,7 +232,7 @@ export const createDelivery = createServerFn({ method: "POST" })
       actorName: me.display_name ?? "Membro",
       targetType: "delivery",
       targetId: row?.id ?? "",
-      details: `${data.tipo === "venda" ? "Venda" : "Entrega"} de ${totalQty} items (${enriched.map((l) => `${l.qty}× ${l.item_name ?? `#${l.item_id}`}`).join(", ")})`,
+      details: `${data.tipo === "venda" ? "Venda" : "Entrega"} de ${totalQty} itens (${enriched.map((l) => `${l.qty}× ${l.item_name ?? `#${l.item_id}`}`).join(", ")})`,
     });
     return { id: row?.id };
   });
@@ -249,7 +255,8 @@ export const decideDelivery = createServerFn({ method: "POST" })
       [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
-    if (!me.is_superadmin && before.responsavel_member_id != null && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
+    if (!before.responsavel_member_id) throw new Error("Pedido sem responsável. Define um responsável antes de tratar.");
+    if (!me.is_superadmin && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
     if (before.status !== "pending") throw new Error("Já decidido");
 
     if (data.approve) {
@@ -258,20 +265,20 @@ export const decideDelivery = createServerFn({ method: "POST" })
       const { totalQty, totalValue } = deliveryTotals(normalizedLines);
       await pgQuery(
         `update inventory_delivery_requests
-         set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now(), responsavel_member_id = coalesce(responsavel_member_id, $5)
+         set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now()
          where id = $1 and status = 'pending'`,
-        [data.id, JSON.stringify(normalizedLines), totalQty, tipo === "entrega" ? 0 : totalValue, me.id],
+        [data.id, JSON.stringify(normalizedLines), totalQty, tipo === "entrega" ? 0 : totalValue],
       );
       await pgQuery(`SELECT public.sp_approve_delivery($1, $2, $3)`, [data.id, `web:${context.userId}`, me.discord_id]);
     } else {
       const rejected = await pgOne<{ id: string }>(
         `update inventory_delivery_requests set
            status = 'rejected', decision_by = $2, decision_reason = $3,
-           decided_at = now(), updated_at = now(), responsavel_member_id = coalesce(responsavel_member_id, $5),
+           decided_at = now(), updated_at = now(),
            approver_discord_id = coalesce(approver_discord_id, $4)
          where id = $1 and status = 'pending'
          returning id`,
-        [data.id, `web:${context.userId}`, data.reason ?? "", me.discord_id, me.id],
+        [data.id, `web:${context.userId}`, data.reason ?? "", me.discord_id],
       );
       if (!rejected) throw new Error("Já decidido");
     }
