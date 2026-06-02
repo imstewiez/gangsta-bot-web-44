@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
-import { Menu, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
 import { HeaderNotifications } from "./HeaderNotifications";
 import { HeaderTicker } from "./HeaderTicker";
+import { MobileSidebarButton } from "./MobileSidebarButton";
 import { ViewAsExitButton } from "./ViewAsExitButton";
 import { Reveal } from "./Reveal";
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -21,12 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <header className="relative z-40 shrink-0 px-3 pt-3 md:px-5">
             <div className="app-shell-topbar mx-auto grid w-full max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 md:px-4 lg:grid-cols-[minmax(150px,auto)_minmax(220px,1fr)_auto]">
               <div className="liquid-content flex min-w-0 items-center gap-2 sm:gap-3">
-                <SidebarTrigger
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/10 text-primary hover:bg-primary/15 md:hidden"
-                  title="Abrir menu"
-                >
-                  <Menu className="h-5 w-5" />
-                </SidebarTrigger>
+                <MobileSidebarButton />
                 <span className="shell-liquid-mark hidden shrink-0 sm:grid">
                   <Sparkles className="h-4 w-4 text-primary" />
                 </span>
