@@ -79,13 +79,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="relative z-10 p-2">
-        <div className={cn("flex items-center gap-2 rounded-2xl border border-primary/20 bg-white/[0.035] p-2", collapsed && "justify-center")}>
-          <Link to="/dashboard" className={cn("group flex min-w-0 items-center gap-2.5", collapsed && "justify-center")}>
-            <img src={ballasLogo} alt="Ballas Gang" className="logo-hd h-9 w-9 shrink-0 rounded-sm object-contain transition-transform group-hover:scale-105" />
-            {!collapsed && <div className="min-w-0 text-display text-sm tracking-[0.22em]"><span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Ballas</span> Gang</div>}
+        <div className={cn("sidebar-liquid-card flex items-center rounded-2xl p-2", collapsed ? "flex-col justify-center gap-2" : "gap-2")}>
+          <Link to="/dashboard" className={cn("group grid h-9 w-9 shrink-0 place-items-center rounded-xl", collapsed ? "mx-auto" : "") } title="Ballas Gang">
+            <img src={ballasLogo} alt="Ballas Gang" className="logo-hd h-8 w-8 rounded-sm object-contain transition-transform group-hover:scale-105" />
           </Link>
-          {!collapsed && <div className="flex-1" />}
-          <SidebarTrigger className="h-8 w-8 shrink-0 rounded-xl border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14" title={collapsed ? "Abrir menu" : "Fechar menu"}>
+          {!collapsed && <div className="min-w-0 flex-1 text-display text-sm tracking-[0.22em]"><span className="bg-gradient-to-b from-primary to-blood bg-clip-text text-transparent">Ballas</span> Gang</div>}
+          <SidebarTrigger className={cn("h-8 w-8 shrink-0 rounded-xl border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14", collapsed && "mx-auto")} title={collapsed ? "Abrir menu" : "Fechar menu"}>
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </SidebarTrigger>
         </div>
@@ -131,7 +130,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="relative z-10 p-2">
         {!collapsed ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2">
+          <div className="sidebar-liquid-card flex items-center gap-2 rounded-2xl p-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border bg-background/40" style={{ borderColor: myAccent ? `color-mix(in oklab, ${myAccent} 55%, transparent)` : undefined }} title={myTierLabel ? `${myTierLabel} · ${myDisplay}` : myDisplay}>
               <TierIcon tier={myTier} size="sm" />
             </span>
