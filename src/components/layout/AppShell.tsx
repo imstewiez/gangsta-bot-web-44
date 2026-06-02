@@ -12,14 +12,10 @@ const TICKER_MESSAGES = [
   "Ballas Gang!",
   "É a firma moh!",
   "Sim sim...",
-  "Tudo controlado.",
-  "Sem stress, sem ruído.",
-  "Operação em movimento.",
+  "Bora meter atividade!",
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const ticker = [...TICKER_MESSAGES, ...TICKER_MESSAGES];
-
   return (
     <SidebarProvider>
       <div className="ambient-bg flex h-screen w-full overflow-hidden">
@@ -39,12 +35,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
               </div>
 
-              <div className="liquid-content header-ticker min-w-0 order-3 lg:order-none">
+              <div className="liquid-content header-ticker min-w-0 order-3 lg:order-none" aria-label="Mensagens do header">
                 <div className="header-ticker-track">
-                  {ticker.map((message, index) => (
-                    <span key={`${message}-${index}`} className="header-ticker-item">
-                      <span className="header-ticker-dot" />
-                      {message}
+                  {TICKER_MESSAGES.map((message) => (
+                    <span key={message} className="header-ticker-message">
+                      <span className="header-ticker-item">
+                        <span className="header-ticker-dot" />
+                        {message}
+                      </span>
                     </span>
                   ))}
                 </div>
