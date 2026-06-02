@@ -1,4 +1,4 @@
-/* One-by-one header message motion. Imported last to override marquee behaviour. */
+/* One-by-one header message motion. */
 
 @keyframes header-message-slide {
   0% {
@@ -6,20 +6,15 @@
     transform: translateX(-120%) scale(0.96);
     filter: blur(4px);
   }
-  8% {
-    opacity: 1;
-    transform: translateX(-18%) scale(1);
-    filter: blur(0);
-  }
-  18%, 38% {
+  14% {
     opacity: 1;
     transform: translateX(0) scale(1);
     filter: blur(0);
   }
-  52% {
-    opacity: 0;
-    transform: translateX(120%) scale(0.98);
-    filter: blur(3px);
+  72% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
   }
   100% {
     opacity: 0;
@@ -36,34 +31,18 @@
   padding: 0 1rem;
 }
 
-.header-ticker-track {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 1.75rem;
-  padding: 0;
-  animation: none;
-  overflow: hidden;
-}
-
-.header-ticker-message {
-  position: absolute;
-  inset: 0;
+.header-ticker-single {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  min-width: 0;
-  opacity: 0;
-  animation: header-message-slide 16s cubic-bezier(0.22, 0.8, 0.22, 1) infinite;
+  overflow: hidden;
+  animation: header-message-slide 3.2s cubic-bezier(0.22, 0.8, 0.22, 1) both;
   will-change: transform, opacity, filter;
 }
 
-.header-ticker-message:nth-child(1) { animation-delay: 0s; }
-.header-ticker-message:nth-child(2) { animation-delay: 4s; }
-.header-ticker-message:nth-child(3) { animation-delay: 8s; }
-.header-ticker-message:nth-child(4) { animation-delay: 12s; }
-
-.header-ticker-message .header-ticker-item {
+.header-ticker-single .header-ticker-item {
   justify-content: center;
   max-width: 100%;
   overflow: hidden;
@@ -72,7 +51,7 @@
   text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 32%, transparent);
 }
 
-.header-ticker:hover .header-ticker-message {
+.header-ticker:hover .header-ticker-single {
   animation-play-state: paused;
 }
 
@@ -81,19 +60,17 @@
     min-height: 2.1rem;
     padding-inline: 0.75rem;
   }
-  .header-ticker-message .header-ticker-item {
+  .header-ticker-single .header-ticker-item {
     font-size: 0.62rem;
     letter-spacing: 0.1em;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .header-ticker-message {
+  .header-ticker-single {
     animation: none !important;
     opacity: 1;
-    position: static;
-  }
-  .header-ticker-message:not(:first-child) {
-    display: none;
+    transform: none;
+    filter: none;
   }
 }
