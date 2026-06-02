@@ -39,7 +39,7 @@ export const TIER_DESCRIPTION_LABELS: Record<string, string> = {
   o_gunao: "Progressão / Tier 2",
   gangster_fodido: "Progressão / Tier 3",
   patrao_di_zona: "Gestão de bairro",
-  real_gangster: "Oficial de rua",
+  real_gangster: "Linha da frente",
   og: "Oficial sénior",
   kingpin: "Subchefia",
   manda_chuva: "Chefia máxima",
