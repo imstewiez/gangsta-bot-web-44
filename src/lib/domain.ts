@@ -29,8 +29,12 @@ export const ROLE_LABELS: Record<string, string> = {
   bairrista: "Bairrista",
 };
 
+// Compatibilidade: muito UI legacy ainda importa TIER_LABELS para hierarquia/cargo.
+// Por isso TIER_LABELS continua a representar o cargo visual principal.
+export const TIER_LABELS: Record<string, string> = ROLE_LABELS;
+
 // Tier/descrição — informação secundária, sem substituir o cargo.
-export const TIER_LABELS: Record<string, string> = {
+export const TIER_DESCRIPTION_LABELS: Record<string, string> = {
   young_blood: "Entrada / Tier 1",
   o_gunao: "Progressão / Tier 2",
   gangster_fodido: "Progressão / Tier 3",
@@ -86,7 +90,7 @@ export function isChefia(tier: string | null | undefined): boolean {
 
 export function tierLabel(tier: string | null | undefined): string {
   if (!tier) return "—";
-  return TIER_LABELS[tier] ?? tier;
+  return TIER_DESCRIPTION_LABELS[tier] ?? tier;
 }
 
 export function roleLabel(tier: string | null | undefined): string {
