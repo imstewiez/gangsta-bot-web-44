@@ -2,6 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 @import "./design-system.css";
+@import "./liquid-overrides.css";
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Unbounded:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
 
