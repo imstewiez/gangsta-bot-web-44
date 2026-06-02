@@ -144,19 +144,15 @@ function Dashboard() {
       )}
 
       <Reveal direction="up">
-        <CommandPanel
-          metrics={metrics}
-          prize={data?.prize ?? null}
-          totalMembers={totalMembers}
-        />
+        <CommandPanel metrics={metrics} prize={data?.prize ?? null} totalMembers={totalMembers} />
       </Reveal>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="space-y-6">
+      <div className="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-7">
           <ProfileCard member={me.data ?? null} xp={myXP.data ?? null} stats={myStats.data ?? null} />
           <LeaderboardPanel data={data} />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-7 xl:sticky xl:top-6 xl:self-start">
           <OperationPanel data={data} />
           <HierarchyPanel rows={data?.byTier ?? []} total={totalMembers} topByTier={data?.topByTier ?? []} />
         </div>
@@ -167,8 +163,9 @@ function Dashboard() {
 
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl border border-border/45 bg-card/55 p-5 shadow-[0_22px_80px_-46px_rgba(0,0,0,0.95)] backdrop-blur-xl", className)}>
-      {children}
+    <div className={cn("relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-card/48 p-5 shadow-[0_24px_90px_-55px_rgba(0,0,0,1)] backdrop-blur-2xl", className)}>
+      <div aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/14 to-transparent" />
+      <div className="relative">{children}</div>
     </div>
   );
 }
@@ -179,26 +176,24 @@ function CommandPanel({ metrics, prize, totalMembers }: {
   totalMembers: number;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-primary/25 bg-card/55 p-5 shadow-[0_30px_110px_-58px_rgba(0,0,0,1)] backdrop-blur-2xl md:p-6">
-      <div aria-hidden className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -left-32 bottom-0 h-72 w-72 rounded-full bg-blood/12 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
+    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[color-mix(in_oklab,var(--card)_62%,transparent)] p-4 shadow-[0_34px_120px_-66px_rgba(0,0,0,1)] backdrop-blur-2xl md:p-5">
+      <div aria-hidden className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-primary/18 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -left-32 bottom-0 h-72 w-72 rounded-full bg-blood/10 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
 
-      <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.75fr)]">
-        <div className="min-w-0 space-y-5">
+      <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)]">
+        <div className="min-w-0 rounded-[1.45rem] border border-white/[0.07] bg-background/18 p-5 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-display text-[10px] tracking-[0.32em] text-primary">Ballas Control</div>
               <h2 className="mt-2 text-display text-2xl font-black tracking-tight md:text-3xl">Painel do bairro</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Visão rápida, limpa e sem ruído. Tudo aqui vem dos registos reais da operação.</p>
             </div>
-            <Badge className="rounded-full border-primary/35 bg-primary/10 px-3 py-1 text-primary">{fmtNum(totalMembers)} membros ativos</Badge>
+            <Badge className="rounded-full border-primary/25 bg-primary/8 px-3 py-1 text-primary">{fmtNum(totalMembers)} ativos</Badge>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {metrics.map((metric) => (
-              <MetricPill key={metric.label} {...metric} />
-            ))}
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {metrics.map((metric) => <MetricPill key={metric.label} {...metric} />)}
           </div>
         </div>
 
@@ -210,13 +205,13 @@ function CommandPanel({ metrics, prize, totalMembers }: {
 
 function MetricPill({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur-xl transition-all duration-200 hover:border-primary/35 hover:bg-primary/[0.055]">
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.028] px-4 py-3 backdrop-blur-xl transition-all duration-200 hover:border-primary/30 hover:bg-primary/[0.045]">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-display text-[10px] tracking-[0.22em] text-muted-foreground">{label}</span>
-        <Icon className="h-4 w-4 text-primary" />
+        <span className="text-display text-[9px] tracking-[0.22em] text-muted-foreground">{label}</span>
+        <Icon className="h-4 w-4 text-primary/90" />
       </div>
       <div className="text-2xl font-black leading-none font-display text-foreground">{value}</div>
-      <div className="mt-2 text-[11px] text-muted-foreground/75">{sub}</div>
+      <div className="mt-2 text-[11px] text-muted-foreground/70">{sub}</div>
     </div>
   );
 }
@@ -226,25 +221,25 @@ function WeeklyPrizeLiquid({ prize }: { prize: DashboardAny["prize"] | null }) {
   const label = prize?.status === "in_progress" ? "A decorrer" : hasPrize ? "Definido" : "Por definir";
 
   return (
-    <div className="relative min-h-[220px] overflow-hidden rounded-[1.65rem] border border-primary/35 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" style={{ background: "linear-gradient(135deg, color-mix(in oklab, var(--primary) 20%, transparent), color-mix(in oklab, var(--card) 86%, transparent) 48%, color-mix(in oklab, var(--blood) 18%, transparent))" }}>
+    <div className="relative min-h-[235px] overflow-hidden rounded-[1.55rem] border border-primary/30 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_24px_70px_-44px_color-mix(in_oklab,var(--primary)_65%,transparent)]" style={{ background: "radial-gradient(circle at 20% 0%, color-mix(in oklab, white 10%, transparent), transparent 28%), linear-gradient(135deg, color-mix(in oklab, var(--primary) 22%, transparent), color-mix(in oklab, var(--card) 84%, transparent) 48%, color-mix(in oklab, var(--blood) 20%, transparent))" }}>
       <div aria-hidden className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/35 blur-3xl" />
       <div aria-hidden className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-blood/25 blur-3xl" />
-      <div aria-hidden className="absolute inset-0 opacity-35" style={{ background: "linear-gradient(115deg, transparent 18%, rgba(255,255,255,0.10) 42%, transparent 66%)", backgroundSize: "220% 100%", animation: "shimmer 4s linear infinite" }} />
+      <div aria-hidden className="absolute inset-0 opacity-40" style={{ background: "linear-gradient(115deg, transparent 18%, rgba(255,255,255,0.12) 42%, transparent 66%)", backgroundSize: "220% 100%", animation: "shimmer 4s linear infinite" }} />
 
       <div className="relative flex h-full flex-col justify-between gap-6">
         <div className="flex items-start justify-between gap-4">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur-xl">
-            <Sparkles className="h-6 w-6 text-primary-foreground" />
+            <Sparkles className="h-6 w-6 text-white" />
           </span>
           <Badge className="rounded-full border-white/15 bg-white/10 px-3 py-1 text-white">{label}</Badge>
         </div>
 
         <div>
           <div className="text-display text-[10px] tracking-[0.3em] text-white/65">Prémio da semana</div>
-          <div className="mt-2 text-2xl font-black leading-tight font-display text-white">
+          <div className="mt-2 text-2xl font-black leading-tight font-display text-white md:text-3xl">
             {prize?.prize_description || "Prémio por definir"}
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/70">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/72">
             <TierIcon tier={prize?.winner_tier ?? null} size="sm" />
             <span>{prize?.winner_name ?? "Ainda sem vencedor"}</span>
             {prize?.score != null && <span className="font-mono text-xs">· {fmtNum(Math.round(Number(prize.score)))} pts</span>}
@@ -266,9 +261,9 @@ function OperationPanel({ data }: { data?: DashboardAny }) {
   return (
     <Panel>
       <SectionTitle icon={MapPin} label="Operação" title="Ritmo da semana" />
-      <div className="mt-5 space-y-4">
+      <div className="mt-5 space-y-3">
         {last && (
-          <div className="rounded-2xl border border-border/40 bg-background/28 p-4">
+          <div className="rounded-2xl border border-white/[0.08] bg-background/24 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{last.spot ?? "Local não definido"}</span>
               {last.was_profitable === true && <Badge className="bg-success/15 text-success">Vitória</Badge>}
@@ -283,7 +278,7 @@ function OperationPanel({ data }: { data?: DashboardAny }) {
         )}
 
         {top.length > 0 ? top.map((p, i) => (
-          <div key={`${p.display_name}-${i}`} className="flex items-center gap-3 rounded-2xl border border-border/30 bg-white/[0.025] px-3 py-2.5 transition-colors hover:bg-primary/[0.045]">
+          <div key={`${p.display_name}-${i}`} className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.022] px-3 py-2.5 transition-colors hover:bg-primary/[0.045]">
             <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary/10 text-xs font-bold text-primary">#{i + 1}</span>
             <TierIcon tier={p.tier ?? null} size="sm" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.display_name ?? "—"}</span>
@@ -308,12 +303,12 @@ function HierarchyPanel({ rows, total, topByTier }: { rows: { tier: string; coun
           const pct = Math.max(4, Math.round((count / max) * 100));
           const names = topByTier.filter((m) => m.tier === row.tier).slice(0, 2);
           return (
-            <div key={row.tier} className="rounded-2xl border border-border/30 bg-white/[0.025] px-3 py-3">
+            <div key={row.tier} className="rounded-2xl border border-white/[0.07] bg-white/[0.022] px-3 py-3">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="flex min-w-0 items-center gap-2"><TierIcon tier={row.tier} size="sm" /><span className="truncate font-medium">{TIER_LABELS[row.tier] ?? row.tier}</span></span>
                 <span className="text-display text-xs text-primary">{fmtNum(count)}</span>
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/70"><div className="h-full rounded-full bg-primary/75" style={{ width: `${pct}%` }} /></div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/65"><div className="h-full rounded-full bg-primary/75" style={{ width: `${pct}%` }} /></div>
               {names.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{names.map((m, i) => <span key={i} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] text-muted-foreground">{m.name ?? "—"}</span>)}</div>}
             </div>
           );
@@ -333,7 +328,7 @@ function LeaderboardPanel({ data }: { data?: DashboardAny }) {
   return (
     <Panel>
       <SectionTitle icon={Trophy} label="Destaques" title="Quem está a puxar" />
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
         {blocks.map((block) => <LeaderboardBlock key={block.title} {...block} />)}
       </div>
     </Panel>
@@ -342,7 +337,7 @@ function LeaderboardPanel({ data }: { data?: DashboardAny }) {
 
 function LeaderboardBlock({ title, subtitle, rows }: { title: string; subtitle?: string | null; rows: RankRow[] }) {
   return (
-    <div className="rounded-2xl border border-border/30 bg-background/24 p-3">
+    <div className="rounded-2xl border border-white/[0.07] bg-background/20 p-3">
       <div className="mb-3">
         <div className="text-display text-[10px] tracking-[0.22em] text-primary">{title}</div>
         {subtitle && <div className="mt-1 text-[11px] text-muted-foreground">{subtitle}</div>}
