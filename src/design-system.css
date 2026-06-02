@@ -16,14 +16,14 @@
 }
 
 @keyframes flame-flow {
-  0% { background-position: 0% 50%; filter: saturate(1.05); }
-  50% { background-position: 100% 50%; filter: saturate(1.22); }
-  100% { background-position: 0% 50%; filter: saturate(1.05); }
+  0% { background-position: 0% 50%; filter: saturate(1.08); }
+  50% { background-position: 100% 50%; filter: saturate(1.32); }
+  100% { background-position: 0% 50%; filter: saturate(1.08); }
 }
 
 @keyframes flame-pulse {
   0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.06); }
+  50% { opacity: 0.95; transform: scale(1.08); }
 }
 
 .app-shell-topbar {
@@ -32,10 +32,11 @@
   border-radius: 1.35rem;
   border: 1px solid var(--app-line);
   background:
-    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 11%, transparent), transparent 26%),
-    linear-gradient(180deg, color-mix(in oklab, var(--background) 72%, transparent), color-mix(in oklab, var(--background) 48%, transparent));
+    radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 28%),
+    radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 24%),
+    linear-gradient(180deg, color-mix(in oklab, var(--background) 74%, transparent), color-mix(in oklab, var(--background) 48%, transparent));
   box-shadow: var(--app-soft-glow), inset 0 1px 0 color-mix(in oklab, white 6%, transparent);
-  backdrop-filter: blur(22px);
+  backdrop-filter: blur(24px);
 }
 
 .app-shell-topbar::before {
@@ -44,6 +45,41 @@
   inset: 0.5px 1rem auto;
   height: 1px;
   background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 58%, transparent), transparent);
+  pointer-events: none;
+}
+
+.app-sidebar-liquid {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid color-mix(in oklab, var(--primary) 24%, transparent);
+  background:
+    radial-gradient(circle at 20% 0%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 30%),
+    radial-gradient(circle at 110% 38%, color-mix(in oklab, var(--blood) 12%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in oklab, var(--background) 86%, transparent), color-mix(in oklab, var(--background) 66%, transparent));
+  box-shadow: inset -1px 0 0 color-mix(in oklab, white 5%, transparent), 20px 0 80px -70px color-mix(in oklab, var(--primary) 75%, transparent);
+  backdrop-filter: blur(24px);
+}
+
+.app-sidebar-liquid::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 55%, transparent), transparent);
+  pointer-events: none;
+}
+
+.app-sidebar-liquid::after {
+  content: "";
+  position: absolute;
+  left: -5rem;
+  top: 7rem;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  filter: blur(48px);
+  animation: liquid-shift 10s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -90,14 +126,8 @@
 
 .liquid-content { position: relative; z-index: 1; }
 
-.app-card-hover {
-  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
-}
-.app-card-hover:hover {
-  transform: translateY(-2px);
-  border-color: var(--app-line-strong);
-  box-shadow: var(--app-primary-glow), var(--app-soft-glow);
-}
+.app-card-hover { transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease; }
+.app-card-hover:hover { transform: translateY(-2px); border-color: var(--app-line-strong); box-shadow: var(--app-primary-glow), var(--app-soft-glow); }
 
 .app-chip {
   display: inline-flex;
@@ -139,68 +169,43 @@
   backdrop-filter: blur(22px);
 }
 
-.app-row {
-  transition: background-color 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
-}
-.app-row:hover {
-  background: color-mix(in oklab, var(--primary) 5%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 14%, transparent);
-}
+.app-row { transition: background-color 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
+.app-row:hover { background: color-mix(in oklab, var(--primary) 5%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 14%, transparent); }
 
-.app-table-wrap {
-  overflow: hidden;
-  border-radius: 1.25rem;
-  border: 1px solid var(--app-line);
-  background: color-mix(in oklab, var(--card) 42%, transparent);
-  backdrop-filter: blur(18px);
-}
-.app-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.app-table th {
-  height: 2.75rem;
-  padding: 0.75rem 1rem;
-  color: color-mix(in oklab, var(--muted-foreground) 92%, transparent);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: color-mix(in oklab, var(--background) 28%, transparent);
-}
-.app-table td {
-  padding: 0.85rem 1rem;
-  border-top: 1px solid color-mix(in oklab, var(--border) 45%, transparent);
-}
+.app-table-wrap { overflow: hidden; border-radius: 1.25rem; border: 1px solid var(--app-line); background: color-mix(in oklab, var(--card) 42%, transparent); backdrop-filter: blur(18px); }
+.app-table { width: 100%; border-collapse: collapse; }
+.app-table th { height: 2.75rem; padding: 0.75rem 1rem; color: color-mix(in oklab, var(--muted-foreground) 92%, transparent); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; background: color-mix(in oklab, var(--background) 28%, transparent); }
+.app-table td { padding: 0.85rem 1rem; border-top: 1px solid color-mix(in oklab, var(--border) 45%, transparent); }
 
 .flame-prize {
   position: relative;
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--primary) 46%, transparent);
+  border: 1px solid color-mix(in oklab, #ffb347 42%, transparent);
   background:
-    radial-gradient(circle at 18% 8%, rgba(255,255,255,0.16), transparent 25%),
-    radial-gradient(circle at 82% 12%, color-mix(in oklab, var(--primary) 42%, transparent), transparent 34%),
+    radial-gradient(circle at 16% 12%, rgba(255,255,255,0.16), transparent 24%),
+    radial-gradient(circle at 78% 12%, color-mix(in oklab, #ffb347 54%, transparent), transparent 31%),
+    radial-gradient(circle at 78% 82%, color-mix(in oklab, #ff4f18 34%, transparent), transparent 35%),
     linear-gradient(135deg,
-      color-mix(in oklab, var(--primary) 30%, transparent),
-      color-mix(in oklab, #7c2dff 42%, transparent) 42%,
-      color-mix(in oklab, #ff4fd8 26%, transparent) 74%,
-      color-mix(in oklab, var(--blood) 34%, transparent));
-  background-size: 100% 100%, 100% 100%, 240% 240%;
-  animation: flame-flow 7s ease-in-out infinite;
+      color-mix(in oklab, #ffb347 32%, transparent),
+      color-mix(in oklab, #ff7a18 38%, transparent) 34%,
+      color-mix(in oklab, var(--primary) 38%, transparent) 72%,
+      color-mix(in oklab, var(--blood) 28%, transparent));
+  background-size: 100% 100%, 100% 100%, 100% 100%, 240% 240%;
+  animation: flame-flow 6.4s ease-in-out infinite;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.14),
-    0 28px 90px -42px color-mix(in oklab, var(--primary) 86%, transparent),
-    0 0 70px -44px color-mix(in oklab, #ff4fd8 80%, transparent);
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 28px 95px -42px color-mix(in oklab, #ff8a1c 86%, transparent),
+    0 0 86px -48px color-mix(in oklab, var(--primary) 72%, transparent);
 }
 .flame-prize::before {
   content: "";
   position: absolute;
   inset: -25%;
   background:
-    radial-gradient(circle at 20% 85%, rgba(255,255,255,0.14), transparent 18%),
-    radial-gradient(circle at 80% 30%, color-mix(in oklab, var(--primary) 42%, transparent), transparent 22%),
-    linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.14) 47%, transparent 62%);
-  opacity: 0.55;
+    radial-gradient(circle at 22% 86%, rgba(255,255,255,0.14), transparent 18%),
+    radial-gradient(circle at 80% 26%, color-mix(in oklab, #ffb347 44%, transparent), transparent 21%),
+    linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.16) 47%, transparent 62%);
+  opacity: 0.62;
   animation: shimmer 4.2s linear infinite;
   pointer-events: none;
 }
@@ -212,8 +217,8 @@
   width: 16rem;
   height: 16rem;
   border-radius: 999px;
-  background: color-mix(in oklab, #ff4fd8 28%, transparent);
+  background: color-mix(in oklab, #ff7a18 32%, transparent);
   filter: blur(50px);
-  animation: flame-pulse 3.6s ease-in-out infinite;
+  animation: flame-pulse 3.4s ease-in-out infinite;
   pointer-events: none;
 }
