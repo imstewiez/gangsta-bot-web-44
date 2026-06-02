@@ -34,6 +34,12 @@ type HomeKpis = {
   totalOpsWeek: number;
   winRate: number;
   avgKillsPerSaida: number;
+  allTimeKills: number;
+  allTimeDeaths: number;
+  allTimeWins: number;
+  allTimeSaidas: number;
+  allTimeKda: number;
+  allTimeWinRate: number;
   topOpsParticipants: { display_name: string | null; tier: string | null; ops: number }[];
   lastSaida: {
     tipo: string | null;
@@ -75,8 +81,7 @@ function scoreCtes(startSql: string, endSql: string) {
       where ${ACTIVE_MEMBER_CONDITION}
     ),
     delivery_movements as (
-      select im.*,
-             regexp_replace(coalesce(im.notes,''), '^delivery:', '') as source_id
+      select im.*, regexp_replace(coalesce(im.notes,''), '^delivery:', '') as source_id
       from inventory_movements im
       cross join bounds
       where im.movement_type in ('entrega_bairrista','entrega_oficial')
@@ -88,20 +93,13 @@ function scoreCtes(startSql: string, endSql: string) {
     deliveries_agg as (
       select dm.member_id,
              count(distinct coalesce(nullif(dm.source_id,''), dm.id::text))::int as deliveries,
-             coalesce(sum(dm.quantity * case
-               when lower(coalesce(i.category,'')) in ('quimicos_droga','dinheiro') then 0
-               else coalesce(i.xp_points, 0)
-             end), 0)::int as material_points
+             coalesce(sum(dm.quantity * case when lower(coalesce(i.category,'')) in ('quimicos_droga','dinheiro') then 0 else coalesce(i.xp_points, 0) end), 0)::int as material_points
       from delivery_movements dm
       left join items i on i.id = dm.item_id
       group by dm.member_id
     ),
     sales_movements as (
-      select im.*,
-             coalesce(
-               nullif(regexp_replace(coalesce(im.notes,''), '^delivery:', ''), ''),
-               nullif(regexp_replace(coalesce(im.notes,''), '^order:', ''), '')
-             ) as source_id
+      select im.*, coalesce(nullif(regexp_replace(coalesce(im.notes,''), '^delivery:', ''), ''), nullif(regexp_replace(coalesce(im.notes,''), '^order:', ''), '')) as source_id
       from inventory_movements im
       cross join bounds
       where im.movement_type = 'venda_bairrista'
@@ -173,12 +171,7 @@ function scoreCtes(startSql: string, endSql: string) {
              coalesce(k.kills, 0)::int as kills_count,
              coalesce(o.wins, 0)::int as wins_count,
              coalesce(o.deaths, 0)::int as deaths_count,
-             (coalesce(d.material_points, 0)
-              + coalesce(s.sales_points, 0) * 5
-              + coalesce(o.ops, 0) * 5
-              + coalesce(o.wins, 0) * 10
-              + coalesce(k.kills, 0) * 3
-              - coalesce(o.deaths, 0) * 5)::float8 as score
+             (coalesce(d.material_points, 0) + coalesce(s.sales_points, 0) * 5 + coalesce(o.ops, 0) * 5 + coalesce(o.wins, 0) * 10 + coalesce(k.kills, 0) * 3 - coalesce(o.deaths, 0) * 5)::float8 as score
       from active_members am
       left join deliveries_agg d on d.member_id = am.id
       left join sales_agg s on s.member_id = am.id
@@ -234,6 +227,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       killsWeek,
       winRateRows,
       avgKillsRow,
+      allTimeRow,
       topOpsRow,
       lastSaidaRow,
       weekLabels,
@@ -252,7 +246,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       pgOne<{ count: string }>(
         `select count(*)::text as count from members m
          where ${ACTIVE_MEMBER_CONDITION}
-           and m.joined_at >= now() - interval '7 days'`
+           and m.joined_at >= now() - interval '7 days'`,
       ).catch(() => ({ count: "0" })),
       pgOne<{ count: string }>(
         `select count(*)::text as count from operations
@@ -277,9 +271,7 @@ export const getHomeKpis = createServerFn({ method: "GET" })
         ) src`,
       ).catch(() => ({ count: "0" })),
       pgQuery<{ wins: number; total: number }>(
-        `select
-           count(*) filter (where was_profitable = true)::int as wins,
-           count(*)::int as total
+        `select count(*) filter (where was_profitable = true)::int as wins, count(*)::int as total
          from operations
          where deleted_at is null
            and status = 'concluida'
@@ -293,6 +285,16 @@ export const getHomeKpis = createServerFn({ method: "GET" })
            and status = 'concluida'
            and coalesce(end_time, start_time, date::timestamp) >= now() - interval '7 days'`,
       ).catch(() => ({ avg: "0" })),
+      pgOne<{ kills: number; deaths: number; wins: number; saidas: number }>(
+        `select
+           coalesce(sum(coalesce(ats.kills_total,0)),0)::int as kills,
+           coalesce(sum(coalesce(ats.deaths_total,0)),0)::int as deaths,
+           coalesce(sum(coalesce(ats.wins,0)),0)::int as wins,
+           coalesce(sum(coalesce(ats.saidas_total,0)),0)::int as saidas
+         from members m
+         left join all_time_stats ats on ats.member_id = m.id
+         where ${ACTIVE_MEMBER_CONDITION}`,
+      ).catch(() => ({ kills: 0, deaths: 0, wins: 0, saidas: 0 })),
       pgQuery<{ display_name: string | null; tier: string | null; ops: number }>(
         `select m.display_name, m.tier, count(*)::int as ops
          from operation_participants p
@@ -318,51 +320,42 @@ export const getHomeKpis = createServerFn({ method: "GET" })
         mvp_name: string | null;
         mvp_kills: number;
       }>(
-        `select
-          o.operation_type as tipo,
-          o.spot,
-          coalesce(o.end_time, o.start_time, o.date::timestamp)::text as scheduled_at,
-          o.was_profitable,
-          o.our_kills,
-          o.enemy_count,
-          coalesce(count(*) filter (where p.survived), 0)::int as survivors,
-          coalesce(count(*) filter (where p.died), 0)::int as deaths,
-          coalesce(mvp.display_name, mvp.nickname) as mvp_name,
-          coalesce(mvp_kills.kills, 0)::int as mvp_kills
-        from operations o
-        left join operation_participants p on p.operation_id = o.id
-        left join lateral (
-          select member_id, sum(kills)::int as kills
-          from (
-            select p2.member_id, count(*)::int as kills
-            from kill_logs kl
-            join operation_participants p2 on p2.operation_id = o.id and p2.member_id = kl.killer_id
-            where kl.saida_id = o.id
-            group by p2.member_id
-            union all
-            select p2.member_id, p2.kills as kills
-            from operation_participants p2
-            where p2.operation_id = o.id and p2.kills > 0
-          ) combined
-          group by member_id
-          order by sum(kills) desc
-          limit 1
-        ) mvp_kills on true
-        left join members mvp on mvp.id = mvp_kills.member_id
-        where o.deleted_at is null
-          and o.status = 'concluida'
-        group by o.id, o.operation_type, o.spot, o.end_time, o.start_time, o.date,
-                 o.was_profitable, o.our_kills, o.enemy_count,
-                 mvp.display_name, mvp.nickname, mvp_kills.kills
-        order by coalesce(o.end_time, o.start_time, o.date::timestamp) desc
-        limit 1`,
+        `select o.operation_type as tipo, o.spot, coalesce(o.end_time, o.start_time, o.date::timestamp)::text as scheduled_at,
+                o.was_profitable, o.our_kills, o.enemy_count,
+                coalesce(count(*) filter (where p.survived), 0)::int as survivors,
+                coalesce(count(*) filter (where p.died), 0)::int as deaths,
+                coalesce(mvp.display_name, mvp.nickname) as mvp_name,
+                coalesce(mvp_kills.kills, 0)::int as mvp_kills
+         from operations o
+         left join operation_participants p on p.operation_id = o.id
+         left join lateral (
+           select member_id, sum(kills)::int as kills
+           from (
+             select p2.member_id, count(*)::int as kills
+             from kill_logs kl
+             join operation_participants p2 on p2.operation_id = o.id and p2.member_id = kl.killer_id
+             where kl.saida_id = o.id
+             group by p2.member_id
+             union all
+             select p2.member_id, p2.kills as kills
+             from operation_participants p2
+             where p2.operation_id = o.id and p2.kills > 0
+           ) combined
+           group by member_id
+           order by sum(kills) desc
+           limit 1
+         ) mvp_kills on true
+         left join members mvp on mvp.id = mvp_kills.member_id
+         where o.deleted_at is null and o.status = 'concluida'
+         group by o.id, o.operation_type, o.spot, o.end_time, o.start_time, o.date, o.was_profitable, o.our_kills, o.enemy_count, mvp.display_name, mvp.nickname, mvp_kills.kills
+         order by coalesce(o.end_time, o.start_time, o.date::timestamp) desc
+         limit 1`,
       ).catch(() => null),
       pgOne<{ current_start: string; prev_start: string; month_label: string; current_week_label: string }>(
-        `select
-           to_char(date_trunc('week', current_date)::date, 'YYYY-MM-DD') as current_start,
-           to_char((date_trunc('week', current_date)::date - interval '7 days')::date, 'YYYY-MM-DD') as prev_start,
-           to_char(current_date, 'TMMonth YYYY') as month_label,
-           to_char(date_trunc('week', current_date)::date,'DD/MM') || ' – ' || to_char((date_trunc('week', current_date)::date + interval '6 days')::date,'DD/MM') as current_week_label`,
+        `select to_char(date_trunc('week', current_date)::date, 'YYYY-MM-DD') as current_start,
+                to_char((date_trunc('week', current_date)::date - interval '7 days')::date, 'YYYY-MM-DD') as prev_start,
+                to_char(current_date, 'TMMonth YYYY') as month_label,
+                to_char(date_trunc('week', current_date)::date,'DD/MM') || ' – ' || to_char((date_trunc('week', current_date)::date + interval '6 days')::date,'DD/MM') as current_week_label`,
       ).catch(() => null),
       topForRange(currentWeekStart, currentWeekEnd),
       topForRange(prevWeekStart, prevWeekEnd),
@@ -395,6 +388,10 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       : null);
 
     const wr = winRateRows[0] ?? { wins: 0, total: 0 };
+    const allTimeKills = Number(allTimeRow?.kills ?? 0);
+    const allTimeDeaths = Number(allTimeRow?.deaths ?? 0);
+    const allTimeWins = Number(allTimeRow?.wins ?? 0);
+    const allTimeSaidas = Number(allTimeRow?.saidas ?? 0);
 
     return {
       newMembersWeek: Number(newMembers?.count ?? 0),
@@ -403,6 +400,12 @@ export const getHomeKpis = createServerFn({ method: "GET" })
       totalOpsWeek: Number(opsWeek?.count ?? 0),
       winRate: wr.total > 0 ? Math.round((wr.wins / wr.total) * 100) : 0,
       avgKillsPerSaida: Number(Number(avgKillsRow?.avg ?? 0).toFixed(1)),
+      allTimeKills,
+      allTimeDeaths,
+      allTimeWins,
+      allTimeSaidas,
+      allTimeKda: allTimeDeaths > 0 ? Number((allTimeKills / allTimeDeaths).toFixed(2)) : allTimeKills,
+      allTimeWinRate: allTimeSaidas > 0 ? Math.round((allTimeWins / allTimeSaidas) * 100) : 0,
       topOpsParticipants: topOpsRow,
       lastSaida: lastSaidaRow,
       byTier: byTier.map((r) => ({ tier: r.tier, count: Number(r.count) })),
