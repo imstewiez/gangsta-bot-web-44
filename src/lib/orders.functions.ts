@@ -43,6 +43,8 @@ const ALLOWED_TRANSITIONS: Record<string, OrderStatus[]> = {
 
 type PriceLike = {
   tier_price?: number | null;
+  tier_price_with_material?: number | null;
+  tier_price_without_material?: number | null;
   min_sale_price?: number | null;
   purchase_price?: number | null;
 };
@@ -77,11 +79,11 @@ function filterOrderIngredients(output: OutputCategory, ingredients: RecipeIngre
 }
 
 function priceWithMaterials(prices: PriceLike): number {
-  return Number(positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? 0);
+  return Number(positive(prices.tier_price_with_material) ?? positive(prices.tier_price) ?? positive(prices.min_sale_price) ?? 0);
 }
 
 function priceWithoutMaterials(prices: PriceLike): number {
-  return Number(positive(prices.purchase_price) ?? 0);
+  return Number(positive(prices.tier_price_without_material) ?? positive(prices.purchase_price) ?? 0);
 }
 
 async function getOrderIngredients(itemId: number, output: OutputCategory, quantity: number): Promise<OrderIngredient[]> {
@@ -280,127 +282,91 @@ export const createOrder = createServerFn({ method: "POST" })
 
 export const transitionOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: number; to: OrderStatus; notes?: string | null }) => z.object({ id: IdSchema, to: OrderStatusSchema, notes: NotesSchema }).parse(d))
+  .inputValidator((d: { id: number; to: OrderStatus }) => {
+    const id = IdSchema.parse(d.id);
+    const to = OrderStatusSchema.parse(d.to) as OrderStatus;
+    return { id, to };
+  })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Sem permissão");
-
-    const current = await pgOne<{ status: OrderStatus; member_id: number; item_id: number | null; quantity: number; item_name: string | null; responsavel_member_id: number | null }>(
-      `select o.status, o.member_id, o.item_id, o.quantity, i.name as item_name, o.responsavel_member_id
-       from orders o
-       left join items i on i.id = o.item_id
-       where o.id = $1`,
+    const order = await pgOne<{ status: string; member_id: number | null; item_id: number | null; quantity: number; batch_id: string | null }>(
+      `select status, member_id, item_id, quantity, batch_id from orders where id=$1`,
       [data.id],
     );
-    if (!current) throw new Error("Encomenda não encontrada");
-    if (!current.responsavel_member_id) throw new Error("Encomenda sem responsável — corrige nos Dados antes de alterar estados.");
-    if (!me.is_superadmin && current.responsavel_member_id !== me.id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
-    if (TERMINAL_STATUSES.has(current.status)) throw new Error("Esta encomenda já está fechada.");
-    if (!(ALLOWED_TRANSITIONS[current.status] ?? []).includes(data.to)) throw new Error("Transição inválida para esta encomenda.");
+    if (!order) throw new Error("Encomenda não encontrada");
+    if (TERMINAL_STATUSES.has(order.status as OrderStatus)) throw new Error("Encomenda já fechada");
+    if (!ALLOWED_TRANSITIONS[order.status]?.includes(data.to)) throw new Error("Transição inválida");
 
-    if (data.to === "fulfilled" && current.item_id) {
+    await pgQuery(
+      `update orders set status=$2, updated_at=now(), updated_by=$3, delivered_at = case when $2='fulfilled' then now() else delivered_at end where id=$1`,
+      [data.id, data.to, `web:${context.userId}`],
+    );
+    await insertOrderHistory(data.id, order.status, data.to, `web:${context.userId}`);
+
+    if (data.to === "fulfilled" && order.item_id && order.member_id) {
       await pgQuery(
-        `insert into inventory_movements (movement_type, item_id, quantity, member_id, location, notes, created_by, created_at)
-         values ('venda_bairrista', $1, $2, $3, 'armazem', $4, $5, now())`,
-        [current.item_id, -Math.abs(Number(current.quantity)), current.member_id, `order:${data.id}`, `web:${context.userId}`],
+        `insert into inventory_movements (item_id, member_id, movement_type, quantity, notes, created_by, created_at)
+         values ($1, $2, 'venda_bairrista', $3, $4, $5, now())`,
+        [order.item_id, order.member_id, -Math.abs(order.quantity), `order:${data.id}`, `web:${context.userId}`],
       );
     }
 
-    await pgQuery(
-      `update orders set
-         status = $2,
-         updated_at = now(),
-         updated_by = $3,
-         delivered_at = case when $2 = 'fulfilled' then now() else delivered_at end,
-         resolved_at = case when $2 in ('fulfilled','denied','cancelled') then now() else resolved_at end,
-         approved_by = case when $2 = 'approved' and approved_by is null then $3 else approved_by end,
-         fulfilled_by = case when $2 = 'fulfilled' then $3 else fulfilled_by end
-       where id = $1`,
-      [data.id, data.to, `web:${context.userId}`],
-    );
-    await insertOrderHistory(data.id, current.status, data.to, `web:${context.userId}`, data.notes ?? null);
-
-    const actionMap: Record<string, string> = { approved: "order_approved", denied: "order_denied", fulfilled: "order_fulfilled", cancelled: "order_cancelled", ready: "order_updated", in_progress: "order_updated" };
     await logAdminAction(context.supabase, {
-      action: actionMap[data.to] ?? "order_updated",
+      action: "order_status_changed",
       actorId: context.userId,
       actorName: me.display_name ?? "Direção",
       targetType: "order",
       targetId: data.id,
-      details: `Encomenda #${data.id} (${current.item_name ?? "?"} × ${current.quantity}) alterada de "${current.status}" para "${data.to}"`,
-      afterState: { old_status: current.status, new_status: data.to },
+      details: `Encomenda ${data.id}: ${order.status} → ${data.to}`,
     });
-
-    return { ok: true as const };
-  });
-
-type OrderCommentRow = { id: number; order_id: number; author_name: string | null; content: string; created_at: string };
-
-export const listOrderComments = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { order_id: number }) => {
-    const id = Number(d.order_id);
-    if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
-    return { order_id: id };
-  })
-  .handler(async ({ data, context }) => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me) throw new Error("Não tens conta de membro associada.");
-    const order = await pgOne<{ member_id: number; responsavel_member_id: number | null }>(
-      `select member_id, responsavel_member_id from orders where id = $1`,
-      [data.order_id],
-    );
-    if (!order) throw new Error("Encomenda não encontrada");
-    const canRead = order.member_id === me.id || order.responsavel_member_id === me.id || me.is_manager;
-    if (!canRead) throw new Error("Sem permissão para ver comentários desta encomenda.");
-    return pgQuery<OrderCommentRow>(`select id, order_id, author_name, content, created_at from order_comments where order_id = $1 order by created_at asc limit 200`, [data.order_id]);
-  });
-
-export const addOrderComment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { order_id: number; content: string }) => {
-    const id = Number(d.order_id);
-    if (!Number.isFinite(id) || id <= 0) throw new Error("ID inválido");
-    const content = d.content?.trim();
-    if (!content) throw new Error("Comentário vazio");
-    if (content.length > 1000) throw new Error("Comentário demasiado longo (máx 1000 chars)");
-    return { order_id: id, content };
-  })
-  .handler(async ({ data, context }) => {
-    const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me) throw new Error("Não tens conta de membro associada.");
-    const order = await pgOne<{ member_id: number; responsavel_member_id: number | null; status: string }>(`select member_id, responsavel_member_id, status from orders where id = $1`, [data.order_id]);
-    if (!order) throw new Error("Encomenda não encontrada");
-    if (order.member_id !== me.id && order.responsavel_member_id !== me.id && !me.is_manager) throw new Error("Sem permissão para comentar nesta encomenda.");
-    return pgOne<OrderCommentRow>(
-      `insert into order_comments (order_id, author_id, author_name, content, created_at)
-       values ($1, $2, $3, $4, now())
-       returning id, order_id, author_name, content, created_at`,
-      [data.order_id, me.id, me.display_name ?? "Membro", data.content],
-    );
+    return { ok: true };
   });
 
 export const cancelOwnOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { ids?: number[]; id?: number }) => {
-    const ids = Array.isArray(d.ids) && d.ids.length > 0 ? d.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : d.id != null ? [Number(d.id)] : [];
-    if (ids.length === 0) throw new Error("ID inválido");
-    return { ids };
+  .inputValidator((d: { ids: number[] }) => {
+    if (!Array.isArray(d.ids) || d.ids.length === 0) throw new Error("IDs inválidos");
+    for (const id of d.ids) IdSchema.parse(id);
+    return { ids: d.ids };
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
-    if (!me) throw new Error("Não tens conta de membro associada.");
-    const beforeRows = await pgQuery<{ id: number; status: OrderStatus; member_id: number }>(`select o.id, o.status, o.member_id from orders o where o.id = ANY($1::int[])`, [data.ids]);
-    if (beforeRows.length === 0) throw new Error("Encomenda(s) não encontrada(s)");
-    if (beforeRows.some((r) => r.member_id !== me.id)) throw new Error("Não podes cancelar encomendas de outrem.");
-    const cancelable = beforeRows.filter((r) => !TERMINAL_STATUSES.has(r.status)).map((r) => r.id);
-    if (cancelable.length === 0) return { ok: true as const, cancelled: 0 };
-
+    if (!me) throw new Error("Membro não encontrado");
     await pgQuery(
-      `update orders set status = 'cancelled', updated_at = now(), updated_by = $2, resolved_at = now()
-       where id = any($1::int[]) and status not in ('fulfilled','denied','cancelled')`,
-      [cancelable, `web:${context.userId}`],
+      `update orders set status='cancelled', updated_at=now(), updated_by=$2 where id = any($1::int[]) and member_id = $3 and status = 'pending'`,
+      [data.ids, `web:${context.userId}`, me.id],
     );
-    await Promise.all(beforeRows.filter((r) => cancelable.includes(r.id)).map((r) => insertOrderHistory(r.id, r.status, "cancelled", `web:${context.userId}`, "Cancelado pelo utilizador")));
-    return { ok: true as const, cancelled: cancelable.length };
+    await Promise.all(data.ids.map((id) => insertOrderHistory(id, "pending", "cancelled", `web:${context.userId}`, "Cancelada pelo membro")));
+    return { ok: true };
+  });
+
+export const listOrderComments = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { order_id: number }) => {
+    return { order_id: IdSchema.parse(d.order_id) };
+  })
+  .handler(async ({ data }) => {
+    return pgQuery<{ id: number; body: string; created_at: string; author_name: string | null }>(
+      `select c.id, c.body, c.created_at, coalesce(m.display_name, p.display_name) as author_name
+       from order_comments c
+       left join profiles p on p.user_id = c.author_id
+       left join members m on m.discord_id = p.discord_id
+       where c.order_id=$1
+       order by c.created_at asc`,
+      [data.order_id],
+    );
+  });
+
+export const addOrderComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { order_id: number; body: string }) => {
+    return { order_id: IdSchema.parse(d.order_id), body: NotesSchema.parse(d.body) };
+  })
+  .handler(async ({ data, context }) => {
+    await pgQuery(
+      `insert into order_comments (order_id, author_id, body) values ($1, $2, $3)`,
+      [data.order_id, context.userId, data.body],
+    );
+    return { ok: true };
   });
