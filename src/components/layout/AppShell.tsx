@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { Sparkles } from "lucide-react";
+import { Bell, Sparkles } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
-import { ViewAsSwitcher } from "./ViewAsSwitcher";
 import { Reveal } from "./Reveal";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -49,7 +48,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
 
               <div className="liquid-content min-w-0 justify-self-stretch lg:justify-self-end">
-                <ViewAsSwitcher />
+                <button
+                  type="button"
+                  title="Notificações"
+                  className="relative grid h-10 w-10 place-items-center rounded-xl border border-primary/25 bg-background/45 text-primary backdrop-blur-xl transition-colors hover:bg-primary/12"
+                >
+                  <Bell className="h-4 w-4" />
+                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_80%,transparent)]" />
+                  <span className="sr-only">Notificações</span>
+                </button>
               </div>
             </div>
           </header>
