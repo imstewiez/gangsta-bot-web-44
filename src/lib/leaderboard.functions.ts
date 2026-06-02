@@ -33,6 +33,8 @@ const SORT_COLS: Record<LeaderboardSortBy, string> = {
   wins: "wins",
 };
 
+const ACTIVE_ORG_TIERS = `('young_blood','o_gunao','gangster_fodido','patrao_di_zona','real_gangster','og','kingpin','manda_chuva')`;
+
 function periodBoundsSql(period: LeaderboardPeriod): { start: string; end: string } {
   if (period === "week") {
     return {
@@ -72,6 +74,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
               from members
              where deleted_at is null
                and coalesce(lifecycle_state::text, status, 'active') in ('active','ativo','promoted')
+               and tier in ${ACTIVE_ORG_TIERS}
          ),
          delivery_movements as (
             select im.*,
@@ -121,6 +124,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
                    count(*) filter (where p.died = false)::int as survived
               from operation_participants p
               join operations o on o.id = p.operation_id and o.deleted_at is null
+              join active_members am on am.id = p.member_id
               cross join bounds
              where o.status = 'concluida'
                and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
@@ -130,6 +134,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
          kills_logs_agg as (
             select killer_id as member_id, count(*)::int as kills
               from kill_logs
+              join active_members am on am.id = killer_id
               cross join bounds
              where killer_id is not null
                and date >= bounds.dstart
@@ -140,6 +145,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
             select p.member_id, sum(p.kills)::int as kills
               from operation_participants p
               join operations o on o.id = p.operation_id and o.deleted_at is null
+              join active_members am on am.id = p.member_id
               cross join bounds
              where o.status = 'concluida'
                and coalesce(o.end_time, o.start_time, o.date::timestamp) >= bounds.dstart
