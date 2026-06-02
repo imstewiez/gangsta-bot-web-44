@@ -12,6 +12,7 @@ import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useAuth } from "@/lib/auth";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { getHomeKpis } from "@/lib/dashboard.functions";
+import { getOperationalKpis } from "@/lib/operational-kpis.functions";
 import { fmtNum, TIER_LABELS, TIER_ORDER } from "@/lib/domain";
 import { getMyAllTimeStats } from "@/lib/members.functions";
 import { getCurrentMember } from "@/lib/pricing.functions";
@@ -24,7 +25,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({ component: D
 type RankRow = { display_name?: string | null; nick?: string | null; score?: number | null; ops?: number | null; kills_count?: number | null; wins_count?: number | null; };
 type DashboardAny = {
   newMembersWeek?: number; totalKillsWeek?: number; totalOpsWeek?: number; winRate?: number; avgKillsPerSaida?: number;
-  allTimeKills?: number; allTimeDeaths?: number; allTimeWins?: number; allTimeSaidas?: number; allTimeKda?: number; allTimeWinRate?: number;
   topOpsParticipants?: { display_name?: string | null; tier?: string | null; ops?: number | null }[];
   lastSaida?: { tipo?: string | null; spot?: string | null; scheduled_at?: string | null; was_profitable?: boolean | null; our_kills?: number | null; survivors?: number | null; mvp_name?: string | null; } | null;
   byTier?: { tier: string; count: number }[]; topByTier?: { tier: string; name?: string | null; score?: number | null }[];
@@ -32,46 +32,50 @@ type DashboardAny = {
   prize?: { winner_name?: string | null; winner_tier?: string | null; score?: number | null; prize_description?: string | null; status?: string | null; } | null;
 };
 
+type OperationalKpis = { kills: number; deaths: number; wins: number; saidas: number; kda: number; winRate: number };
 type Metric = { icon: LucideIcon; label: string; value: string; sub: string; tone?: "primary" | "success" | "warning" | "info" };
 
 function Dashboard() {
   useRealtimeSync([
     { table: "inventory_movements", queryKeys: [["my-xp"], ["home-kpis"]] },
     { table: "members", queryKeys: [["me"], ["home-kpis"]] },
-    { table: "operations", queryKeys: [["home-kpis"]] },
+    { table: "operations", queryKeys: [["home-kpis"], ["operational-kpis"]] },
+    { table: "operation_participants", queryKeys: [["home-kpis"], ["operational-kpis"]] },
     { table: "weekly_rankings", queryKeys: [["home-kpis"], ["leaderboard"]] },
-    { table: "all_time_stats", queryKeys: [["home-kpis"], ["leaderboard"]] },
     { table: "weekly_prizes", queryKeys: [["home-kpis"]] },
-    { table: "kill_logs", queryKeys: [["home-kpis"], ["leaderboard"]] },
+    { table: "kill_logs", queryKeys: [["home-kpis"], ["leaderboard"], ["operational-kpis"]] },
   ]);
 
   const homeFn = useAuthedServerFn(getHomeKpis);
+  const opFn = useAuthedServerFn(getOperationalKpis);
   const xpFn = useAuthedServerFn(getCurrentMemberXP);
   const statsFn = useAuthedServerFn(getMyAllTimeStats);
   const meFn = useAuthedServerFn(getCurrentMember);
   const { profile } = useAuth();
   const home = useQuery({ queryKey: ["home-kpis"], queryFn: () => homeFn() });
+  const operational = useQuery({ queryKey: ["operational-kpis"], queryFn: () => opFn(), staleTime: 5_000 });
   const myXP = useQuery({ queryKey: ["my-xp"], queryFn: () => xpFn(), staleTime: 5_000 });
   const myStats = useQuery({ queryKey: ["my-stats"], queryFn: () => statsFn(), staleTime: 5_000 });
   const me = useQuery({ queryKey: ["me"], queryFn: () => meFn(), staleTime: 5_000 });
 
   const data = home.data as DashboardAny | undefined;
+  const ops = (operational.data ?? { kills: 0, deaths: 0, wins: 0, saidas: 0, kda: 0, winRate: 0 }) as OperationalKpis;
   const h = new Date().getHours();
   const saud = h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 19 ? "Boa tarde" : "Boa noite";
   const nome = profile?.display_name?.split(" ")[0] ?? "membro";
   const totalMembers = (data?.byTier ?? []).reduce((sum, row) => sum + Number(row.count || 0), 0);
 
   const metrics: Metric[] = [
-    { icon: Target, label: "KDA geral", value: String(data?.allTimeKda ?? 0), sub: `${fmtNum(data?.allTimeKills ?? 0)} / ${fmtNum(data?.allTimeDeaths ?? 0)}`, tone: "success" },
-    { icon: Trophy, label: "Winrate geral", value: `${data?.allTimeWinRate ?? 0}%`, sub: `${fmtNum(data?.allTimeWins ?? 0)} vitórias`, tone: "warning" },
-    { icon: Activity, label: "Atividade", value: fmtNum(data?.allTimeSaidas ?? 0), sub: "saídas totais", tone: "primary" },
+    { icon: Target, label: "KDA real", value: String(ops.kda), sub: `${fmtNum(ops.kills)} / ${fmtNum(ops.deaths)}`, tone: "success" },
+    { icon: Trophy, label: "Winrate real", value: `${ops.winRate}%`, sub: `${fmtNum(ops.wins)} vitórias`, tone: "warning" },
+    { icon: Activity, label: "Saídas válidas", value: fmtNum(ops.saidas), sub: "com resultado", tone: "primary" },
     { icon: Crosshair, label: "Semana", value: fmtNum(data?.totalKillsWeek ?? 0), sub: `${data?.avgKillsPerSaida ?? 0} abates/saída`, tone: "info" },
   ];
 
   return <>
     <PageHeader eyebrow="Início" title={`${saud}, ${nome}.`} icon={HomeIcon} />
     {home.error && <Panel className="mb-5 border-destructive/40 bg-destructive/10"><div className="flex flex-wrap items-center gap-3 text-sm"><span className="text-destructive">{(home.error as Error).message || "Erro ao carregar dados"}</span><Button onClick={() => home.refetch()} variant="outline" size="sm" className="ml-auto">Tentar novamente</Button></div></Panel>}
-    {home.isLoading && <Panel className="mb-5 flex items-center gap-3 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin text-primary" />{LOADING.dashboard}</Panel>}
+    {(home.isLoading || operational.isLoading) && <Panel className="mb-5 flex items-center gap-3 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin text-primary" />{LOADING.dashboard}</Panel>}
     <Reveal direction="up"><CommandPanel metrics={metrics} prize={data?.prize ?? null} totalMembers={totalMembers} /></Reveal>
     <div className="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_400px]"><div className="space-y-7"><ProfileCard member={me.data ?? null} xp={myXP.data ?? null} stats={myStats.data ?? null} /><LeaderboardPanel data={data} /></div><div className="space-y-7 xl:sticky xl:top-6 xl:self-start"><OperationPanel data={data} /><HierarchyPanel rows={data?.byTier ?? []} total={totalMembers} topByTier={data?.topByTier ?? []} /></div></div>
   </>;
