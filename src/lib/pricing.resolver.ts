@@ -10,9 +10,84 @@ export type ResolvedPrices = {
   tier_price_without_material: number | null;
 };
 
+const PRICE_TIER_ALIASES: Record<string, string> = {
+  young_blood: "young_blood",
+  youngblood: "young_blood",
+  bairrista: "young_blood",
+  morador: "young_blood",
+  nivel_1: "young_blood",
+  nível_1: "young_blood",
+  level_1: "young_blood",
+  tier_1: "young_blood",
+  bairrista_1: "young_blood",
+  bairrista1: "young_blood",
+  b1: "young_blood",
+
+  o_gunao: "o_gunao",
+  o_gunão: "o_gunao",
+  gunao: "o_gunao",
+  gunão: "o_gunao",
+  nivel_2: "o_gunao",
+  nível_2: "o_gunao",
+  level_2: "o_gunao",
+  tier_2: "o_gunao",
+  bairrista_2: "o_gunao",
+  bairrista2: "o_gunao",
+  b2: "o_gunao",
+
+  gangster_fodido: "gangster_fodido",
+  gangster: "gangster_fodido",
+  nivel_3: "gangster_fodido",
+  nível_3: "gangster_fodido",
+  level_3: "gangster_fodido",
+  tier_3: "gangster_fodido",
+  bairrista_3: "gangster_fodido",
+  bairrista3: "gangster_fodido",
+  b3: "gangster_fodido",
+
+  patrao_di_zona: "patrao_di_zona",
+  patrão_di_zona: "patrao_di_zona",
+  real_gangster: "real_gangster",
+  og: "og",
+  kingpin: "kingpin",
+  manda_chuva: "manda_chuva",
+};
+
+function cleanKey(value: unknown): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+export function normalizePriceTier(value: string | null | undefined): string | null {
+  const key = cleanKey(value);
+  if (!key) return null;
+  return PRICE_TIER_ALIASES[key] ?? key;
+}
+
 function money(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function overrideKeys(memberTier: string | null | undefined): string[] {
+  const raw = cleanKey(memberTier);
+  const normalized = normalizePriceTier(memberTier);
+  const aliases = Object.entries(PRICE_TIER_ALIASES)
+    .filter(([, canonical]) => canonical === normalized)
+    .map(([alias]) => alias);
+  return Array.from(new Set([normalized, raw, ...(aliases ?? [])].filter(Boolean) as string[]));
+}
+
+function findOverride(memberTier: string | null | undefined, itemSurcharges?: Map<string, ItemTierSurcharge | number> | null): ItemTierSurcharge | number | null {
+  if (!memberTier || !itemSurcharges) return null;
+  for (const key of overrideKeys(memberTier)) {
+    if (itemSurcharges.has(key)) return itemSurcharges.get(key) ?? null;
+  }
+  return null;
 }
 
 function resolveTierOverride(base: number | null, override?: ItemTierSurcharge | number | null, mode: "with" | "without" = "with"): number | null {
@@ -55,7 +130,7 @@ export function resolveItemPrices(
   const estimated_value = money(db?.estimated_value);
   const morador_purchase_price = money(db?.morador_purchase_price);
 
-  const override = memberTier && itemSurcharges?.has(memberTier) ? itemSurcharges.get(memberTier) : null;
+  const override = findOverride(memberTier, itemSurcharges);
   const tier_price_with_material = resolveTierOverride(min_sale_price, override, "with");
   const tier_price_without_material = resolveTierOverride(purchase_price, override, "without");
   const tier_price = tier_price_with_material;
