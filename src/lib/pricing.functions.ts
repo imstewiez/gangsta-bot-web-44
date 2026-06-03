@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveCurrentMember } from "./pricing.server";
 import { pgQuery } from "./pg.server";
 import type { CurrentMember, CatalogItem } from "./pricing.shared";
-import { resolveItemPrices } from "./pricing.resolver";
+import { resolveItemPrices, resolveMemberPriceTier } from "./pricing.resolver";
 import { getSurchargesForItems } from "./tier-pricing.functions";
 
 export const getCurrentMember = createServerFn({ method: "GET" })
@@ -61,6 +61,7 @@ export const getCatalog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CatalogItem[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
+    const priceTier = resolveMemberPriceTier(me?.tier ?? null, me?.role_label ?? null);
     const dbItems = await getDbCatalogRows();
     const surchargeMap = await getSurchargesForItems(dbItems.map((d) => d.id));
 
@@ -68,7 +69,7 @@ export const getCatalog = createServerFn({ method: "GET" })
       .map((db) => {
         const side = (db.side ?? "venda") as "venda" | "compra" | "ambos";
         if (side !== "venda" && side !== "ambos") return null;
-        const prices = resolveItemPrices(db, null, me?.tier ?? null, surchargeMap.get(db.id) ?? null);
+        const prices = resolveItemPrices(db, null, priceTier, surchargeMap.get(db.id) ?? null);
         return toCatalogItem(db, side, prices);
       })
       .filter((item): item is CatalogItem => Boolean(item))
