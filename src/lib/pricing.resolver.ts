@@ -104,12 +104,15 @@ function findOverride(memberTier: string | null | undefined, itemSurcharges?: Ma
   return null;
 }
 
+function explicitOverrideValue(override: ItemTierSurcharge | number | null | undefined, mode: "with" | "without"): number | null {
+  if (override == null || typeof override === "number") return null;
+  return mode === "with" ? money(override.price_with_material) : money(override.price_without_material);
+}
+
 function resolveTierOverride(base: number | null, override?: ItemTierSurcharge | number | null, mode: "with" | "without" = "with"): number | null {
   if (override == null) return base;
-  if (typeof override !== "number") {
-    const explicit = mode === "with" ? money(override.price_with_material) : money(override.price_without_material);
-    if (explicit != null) return explicit;
-  }
+  const explicit = explicitOverrideValue(override, mode);
+  if (explicit != null) return explicit;
   if (base == null) return null;
   if (typeof override === "number") {
     const final = base + override;
@@ -138,9 +141,21 @@ export function resolveItemPrices(
   const estimated_value = money(db?.estimated_value);
   const morador_purchase_price = money(db?.morador_purchase_price);
   const override = findOverride(memberTier, itemSurcharges);
-  const tier_price_without_material = resolveTierOverride(purchase_price, override, "without");
+
+  const explicitWithMaterial = explicitOverrideValue(override, "with");
+  const explicitWithoutMaterial = explicitOverrideValue(override, "without");
+
   const resolvedWithMaterial = resolveTierOverride(min_sale_price, override, "with");
-  const tier_price_with_material = resolvedWithMaterial ?? tier_price_without_material;
+  const tier_price_with_material = resolvedWithMaterial ?? purchase_price;
+
+  // Se existe preço Bairrista com material mas o campo sem material ficou vazio,
+  // não voltamos para o preço standard/oficial. Usamos o preço Bairrista disponível.
+  const tier_price_without_material =
+    explicitWithoutMaterial ??
+    explicitWithMaterial ??
+    resolveTierOverride(purchase_price, override, "without") ??
+    tier_price_with_material;
+
   const tier_price = tier_price_with_material;
   return { purchase_price, min_sale_price, estimated_value, morador_purchase_price, tier_price, tier_price_with_material, tier_price_without_material };
 }
