@@ -13,32 +13,54 @@ export type ItemTierSurcharge = {
   price_without_material: number | null;
 };
 
+let ensureTierPriceColumnsPromise: Promise<void> | null = null;
+
+async function ensureTierPriceColumns() {
+  ensureTierPriceColumnsPromise ??= (async () => {
+    await pgQuery(`alter table public.item_tier_surcharges add column if not exists price_with_material numeric`);
+    await pgQuery(`alter table public.item_tier_surcharges add column if not exists price_without_material numeric`);
+  })();
+  return ensureTierPriceColumnsPromise;
+}
+
+function normalizeTierKey(value: unknown): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 export async function getSurchargesForItems(itemIds: number[]): Promise<Map<number, Map<string, ItemTierSurcharge>>> {
   if (itemIds.length === 0) return new Map();
-  try {
-    const rows = await pgQuery<ItemTierSurcharge>(
-      `select id, item_id, tier,
-              coalesce(surcharge, 0)::float as surcharge,
-              price_with_material::float as price_with_material,
-              price_without_material::float as price_without_material
-         from item_tier_surcharges
-        where item_id = any($1::int[])`,
-      [itemIds]
-    );
-    const map = new Map<number, Map<string, ItemTierSurcharge>>();
-    for (const row of rows) {
-      if (!map.has(row.item_id)) map.set(row.item_id, new Map());
-      map.get(row.item_id)!.set(row.tier, {
-        ...row,
-        surcharge: Number(row.surcharge) || 0,
-        price_with_material: row.price_with_material == null ? null : Number(row.price_with_material),
-        price_without_material: row.price_without_material == null ? null : Number(row.price_without_material),
-      });
-    }
-    return map;
-  } catch {
-    return new Map();
+  await ensureTierPriceColumns();
+
+  const rows = await pgQuery<ItemTierSurcharge>(
+    `select id, item_id, tier,
+            coalesce(surcharge, 0)::float as surcharge,
+            price_with_material::float as price_with_material,
+            price_without_material::float as price_without_material
+       from item_tier_surcharges
+      where item_id = any($1::int[])`,
+    [itemIds],
+  );
+
+  const map = new Map<number, Map<string, ItemTierSurcharge>>();
+  for (const row of rows) {
+    if (!map.has(row.item_id)) map.set(row.item_id, new Map());
+    const cleanTier = normalizeTierKey(row.tier);
+    const cleanRow = {
+      ...row,
+      tier: cleanTier || row.tier,
+      surcharge: Number(row.surcharge) || 0,
+      price_with_material: row.price_with_material == null ? null : Number(row.price_with_material),
+      price_without_material: row.price_without_material == null ? null : Number(row.price_without_material),
+    };
+    map.get(row.item_id)!.set(cleanRow.tier, cleanRow);
+    if (row.tier !== cleanRow.tier) map.get(row.item_id)!.set(row.tier, cleanRow);
   }
+  return map;
 }
 
 export async function getSurchargeForItem(itemId: number): Promise<Map<string, ItemTierSurcharge>> {
@@ -51,13 +73,14 @@ export const listItemTierSurcharges = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<ItemTierSurcharge[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) return [];
+    await ensureTierPriceColumns();
     return pgQuery<ItemTierSurcharge>(
       `select id, item_id, tier,
               coalesce(surcharge, 0)::float as surcharge,
               price_with_material::float as price_with_material,
               price_without_material::float as price_without_material
          from item_tier_surcharges
-        order by item_id, tier`
+        order by item_id, tier`,
     );
   });
 
@@ -77,7 +100,7 @@ export const upsertItemTierSurcharge = createServerFn({ method: "POST" })
     if (!Number.isFinite(surcharge)) throw new Error("acréscimo inválido");
     return {
       item_id: Number(d.item_id),
-      tier: d.tier.trim(),
+      tier: normalizeTierKey(d.tier.trim()),
       surcharge,
       price_with_material: cleanNullableMoney(d.price_with_material),
       price_without_material: cleanNullableMoney(d.price_without_material),
@@ -86,47 +109,27 @@ export const upsertItemTierSurcharge = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
+    await ensureTierPriceColumns();
 
     const { item_id, tier, surcharge, price_with_material, price_without_material } = data;
     const isEmpty = surcharge === 0 && price_with_material == null && price_without_material == null;
 
     if (isEmpty) {
-      await pgQuery(
-        `delete from item_tier_surcharges where item_id = $1 and tier = $2`,
-        [item_id, tier],
-      );
+      await pgQuery(`delete from item_tier_surcharges where item_id = $1 and tier = $2`, [item_id, tier]);
       return { id: null, deleted: true };
     }
 
-    const existing = await pgOne<{ id: number }>(
-      `select id from item_tier_surcharges where item_id = $1 and tier = $2 order by id asc limit 1`,
-      [item_id, tier],
+    const result = await pgOne<{ id: number }>(
+      `insert into item_tier_surcharges (item_id, tier, surcharge, price_with_material, price_without_material)
+       values ($1, $2, $3, $4, $5)
+       on conflict (item_id, tier) do update set
+         surcharge = excluded.surcharge,
+         price_with_material = excluded.price_with_material,
+         price_without_material = excluded.price_without_material,
+         updated_at = now()
+       returning id`,
+      [item_id, tier, surcharge, price_with_material, price_without_material],
     );
-
-    let result: { id: number } | null = null;
-    if (existing) {
-      result = await pgOne<{ id: number }>(
-        `update item_tier_surcharges
-            set surcharge = $3,
-                price_with_material = $4,
-                price_without_material = $5,
-                updated_at = now()
-          where id = $1
-          returning id`,
-        [existing.id, tier, surcharge, price_with_material, price_without_material],
-      );
-      void pgQuery(
-        `delete from item_tier_surcharges where item_id = $1 and tier = $2 and id <> $3`,
-        [item_id, tier, existing.id],
-      ).catch(() => undefined);
-    } else {
-      result = await pgOne<{ id: number }>(
-        `insert into item_tier_surcharges (item_id, tier, surcharge, price_with_material, price_without_material)
-         values ($1, $2, $3, $4, $5)
-         returning id`,
-        [item_id, tier, surcharge, price_with_material, price_without_material],
-      );
-    }
 
     void logAdminAction(context.supabase, {
       action: "update_tier_prices",
@@ -145,26 +148,21 @@ export const deleteItemTierSurcharge = createServerFn({ method: "POST" })
   .inputValidator((d: { item_id: number; tier: string }) => {
     if (!Number.isFinite(d.item_id) || d.item_id <= 0) throw new Error("item_id inválido");
     if (!d.tier) throw new Error("tier obrigatório");
-    return d;
+    return { item_id: d.item_id, tier: normalizeTierKey(d.tier) };
   })
   .handler(async ({ data, context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à chefia.");
-
-    const { item_id, tier } = data;
-
-    await pgQuery(
-      `delete from item_tier_surcharges where item_id = $1 and tier = $2`,
-      [item_id, tier]
-    );
+    await ensureTierPriceColumns();
+    await pgQuery(`delete from item_tier_surcharges where item_id = $1 and tier = $2`, [data.item_id, data.tier]);
 
     void logAdminAction(context.supabase, {
       action: "delete_tier_prices",
       actorId: context.userId,
       actorName: me.display_name ?? "Direção",
       targetType: "item",
-      targetId: item_id,
-      details: `Removidos preços ${tier}`,
+      targetId: data.item_id,
+      details: `Removidos preços ${data.tier}`,
     }).catch(() => undefined);
 
     return { success: true };
