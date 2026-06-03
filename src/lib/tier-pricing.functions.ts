@@ -98,17 +98,35 @@ export const upsertItemTierSurcharge = createServerFn({ method: "POST" })
       return { id: null, deleted: true };
     }
 
-    const result = await pgOne<{ id: number }>(
-      `insert into item_tier_surcharges (item_id, tier, surcharge, price_with_material, price_without_material)
-       values ($1, $2, $3, $4, $5)
-       on conflict (item_id, tier) do update set
-         surcharge = excluded.surcharge,
-         price_with_material = excluded.price_with_material,
-         price_without_material = excluded.price_without_material,
-         updated_at = now()
-       returning id`,
-      [item_id, tier, surcharge, price_with_material, price_without_material],
+    const existing = await pgOne<{ id: number }>(
+      `select id from item_tier_surcharges where item_id = $1 and tier = $2 order by id asc limit 1`,
+      [item_id, tier],
     );
+
+    let result: { id: number } | null = null;
+    if (existing) {
+      result = await pgOne<{ id: number }>(
+        `update item_tier_surcharges
+            set surcharge = $3,
+                price_with_material = $4,
+                price_without_material = $5,
+                updated_at = now()
+          where id = $1
+          returning id`,
+        [existing.id, tier, surcharge, price_with_material, price_without_material],
+      );
+      void pgQuery(
+        `delete from item_tier_surcharges where item_id = $1 and tier = $2 and id <> $3`,
+        [item_id, tier, existing.id],
+      ).catch(() => undefined);
+    } else {
+      result = await pgOne<{ id: number }>(
+        `insert into item_tier_surcharges (item_id, tier, surcharge, price_with_material, price_without_material)
+         values ($1, $2, $3, $4, $5)
+         returning id`,
+        [item_id, tier, surcharge, price_with_material, price_without_material],
+      );
+    }
 
     void logAdminAction(context.supabase, {
       action: "update_tier_prices",
