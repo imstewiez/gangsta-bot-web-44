@@ -15,6 +15,8 @@ const PRICE_TIER_ALIASES: Record<string, string> = {
   youngblood: "young_blood",
   bairrista: "young_blood",
   morador: "young_blood",
+  standard: "young_blood",
+  oficial: "young_blood",
   nivel_1: "young_blood",
   nível_1: "young_blood",
   level_1: "young_blood",
@@ -68,6 +70,13 @@ export function normalizePriceTier(value: string | null | undefined): string | n
   return PRICE_TIER_ALIASES[key] ?? key;
 }
 
+export function resolveMemberPriceTier(tier: string | null | undefined, role: string | null | undefined): string | null {
+  const normalizedTier = normalizePriceTier(tier);
+  const normalizedRole = normalizePriceTier(role);
+  if (!normalizedTier || normalizedTier === "young_blood") return normalizedRole ?? normalizedTier;
+  return normalizedTier;
+}
+
 function money(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -92,19 +101,15 @@ function findOverride(memberTier: string | null | undefined, itemSurcharges?: Ma
 
 function resolveTierOverride(base: number | null, override?: ItemTierSurcharge | number | null, mode: "with" | "without" = "with"): number | null {
   if (override == null) return base;
-
   if (typeof override !== "number") {
     const explicit = mode === "with" ? money(override.price_with_material) : money(override.price_without_material);
     if (explicit != null) return explicit;
   }
-
   if (base == null) return null;
-
   if (typeof override === "number") {
     const final = base + override;
     return Number.isFinite(final) && final > 0 ? final : null;
   }
-
   if (mode === "with" && Number.isFinite(Number(override.surcharge)) && Number(override.surcharge) !== 0) {
     const final = base + Number(override.surcharge);
     return Number.isFinite(final) && final > 0 ? final : null;
@@ -123,25 +128,13 @@ export function resolveItemPrices(
   memberTier: string | null = null,
   itemSurcharges?: Map<string, ItemTierSurcharge | number> | null,
 ): ResolvedPrices {
-  // Gestão de Materiais / tabela items é a fonte de verdade.
-  // Config legacy nunca deve inventar preço, custo ou receita visível ao utilizador.
   const purchase_price = money(db?.purchase_price);
   const min_sale_price = money(db?.min_sale_price);
   const estimated_value = money(db?.estimated_value);
   const morador_purchase_price = money(db?.morador_purchase_price);
-
   const override = findOverride(memberTier, itemSurcharges);
   const tier_price_with_material = resolveTierOverride(min_sale_price, override, "with");
   const tier_price_without_material = resolveTierOverride(purchase_price, override, "without");
   const tier_price = tier_price_with_material;
-
-  return {
-    purchase_price,
-    min_sale_price,
-    estimated_value,
-    morador_purchase_price,
-    tier_price,
-    tier_price_with_material,
-    tier_price_without_material,
-  };
+  return { purchase_price, min_sale_price, estimated_value, morador_purchase_price, tier_price, tier_price_with_material, tier_price_without_material };
 }
