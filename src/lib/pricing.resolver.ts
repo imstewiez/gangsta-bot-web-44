@@ -138,8 +138,9 @@ export function resolveItemPrices(
   const estimated_value = money(db?.estimated_value);
   const morador_purchase_price = money(db?.morador_purchase_price);
   const override = findOverride(memberTier, itemSurcharges);
-  const tier_price_with_material = resolveTierOverride(min_sale_price, override, "with");
   const tier_price_without_material = resolveTierOverride(purchase_price, override, "without");
+  const resolvedWithMaterial = resolveTierOverride(min_sale_price, override, "with");
+  const tier_price_with_material = resolvedWithMaterial ?? tier_price_without_material;
   const tier_price = tier_price_with_material;
   return { purchase_price, min_sale_price, estimated_value, morador_purchase_price, tier_price, tier_price_with_material, tier_price_without_material };
 }
