@@ -24,7 +24,6 @@ const PRICE_TIER_ALIASES: Record<string, string> = {
   bairrista_1: "young_blood",
   bairrista1: "young_blood",
   b1: "young_blood",
-
   o_gunao: "o_gunao",
   o_gunão: "o_gunao",
   gunao: "o_gunao",
@@ -36,7 +35,6 @@ const PRICE_TIER_ALIASES: Record<string, string> = {
   bairrista_2: "o_gunao",
   bairrista2: "o_gunao",
   b2: "o_gunao",
-
   gangster_fodido: "gangster_fodido",
   gangster: "gangster_fodido",
   nivel_3: "gangster_fodido",
@@ -46,7 +44,6 @@ const PRICE_TIER_ALIASES: Record<string, string> = {
   bairrista_3: "gangster_fodido",
   bairrista3: "gangster_fodido",
   b3: "gangster_fodido",
-
   patrao_di_zona: "patrao_di_zona",
   patrão_di_zona: "patrao_di_zona",
   real_gangster: "real_gangster",
@@ -93,9 +90,17 @@ function overrideKeys(memberTier: string | null | undefined): string[] {
 
 function findOverride(memberTier: string | null | undefined, itemSurcharges?: Map<string, ItemTierSurcharge | number> | null): ItemTierSurcharge | number | null {
   if (!memberTier || !itemSurcharges) return null;
+  const allowed = new Set(overrideKeys(memberTier).map((key) => normalizePriceTier(key) ?? cleanKey(key)));
+
   for (const key of overrideKeys(memberTier)) {
     if (itemSurcharges.has(key)) return itemSurcharges.get(key) ?? null;
   }
+
+  for (const [storedKey, override] of itemSurcharges.entries()) {
+    const normalizedStoredKey = normalizePriceTier(storedKey) ?? cleanKey(storedKey);
+    if (allowed.has(normalizedStoredKey)) return override;
+  }
+
   return null;
 }
 
