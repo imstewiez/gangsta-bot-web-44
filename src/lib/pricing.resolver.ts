@@ -16,14 +16,20 @@ function money(value: unknown): number | null {
 }
 
 function resolveTierOverride(base: number | null, override?: ItemTierSurcharge | number | null, mode: "with" | "without" = "with"): number | null {
-  if (base == null) return null;
   if (override == null) return base;
+
+  if (typeof override !== "number") {
+    const explicit = mode === "with" ? money(override.price_with_material) : money(override.price_without_material);
+    if (explicit != null) return explicit;
+  }
+
+  if (base == null) return null;
+
   if (typeof override === "number") {
     const final = base + override;
     return Number.isFinite(final) && final > 0 ? final : null;
   }
-  const explicit = mode === "with" ? money(override.price_with_material) : money(override.price_without_material);
-  if (explicit != null) return explicit;
+
   if (mode === "with" && Number.isFinite(Number(override.surcharge)) && Number(override.surcharge) !== 0) {
     const final = base + Number(override.surcharge);
     return Number.isFinite(final) && final > 0 ? final : null;
