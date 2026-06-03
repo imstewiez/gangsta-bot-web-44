@@ -98,44 +98,26 @@ export const upsertItemTierSurcharge = createServerFn({ method: "POST" })
       return { id: null, deleted: true };
     }
 
-    const existing = await pgOne<{ id: number }>(
-      `select id from item_tier_surcharges where item_id = $1 and tier = $2 order by id asc limit 1`,
-      [item_id, tier],
+    const result = await pgOne<{ id: number }>(
+      `insert into item_tier_surcharges (item_id, tier, surcharge, price_with_material, price_without_material)
+       values ($1, $2, $3, $4, $5)
+       on conflict (item_id, tier) do update set
+         surcharge = excluded.surcharge,
+         price_with_material = excluded.price_with_material,
+         price_without_material = excluded.price_without_material,
+         updated_at = now()
+       returning id`,
+      [item_id, tier, surcharge, price_with_material, price_without_material],
     );
 
-    let result: { id: number } | null = null;
-    if (existing) {
-      result = await pgOne<{ id: number }>(
-        `update item_tier_surcharges
-            set surcharge = $3,
-                price_with_material = $4,
-                price_without_material = $5,
-                updated_at = now()
-          where id = $1
-          returning id`,
-        [existing.id, tier, surcharge, price_with_material, price_without_material],
-      );
-      await pgQuery(
-        `delete from item_tier_surcharges where item_id = $1 and tier = $2 and id <> $3`,
-        [item_id, tier, existing.id],
-      );
-    } else {
-      result = await pgOne<{ id: number }>(
-        `insert into item_tier_surcharges (item_id, tier, surcharge, price_with_material, price_without_material)
-         values ($1, $2, $3, $4, $5)
-         returning id`,
-        [item_id, tier, surcharge, price_with_material, price_without_material],
-      );
-    }
-
-    await logAdminAction(context.supabase, {
+    void logAdminAction(context.supabase, {
       action: "update_tier_prices",
       actorId: context.userId,
       actorName: me.display_name ?? "Direção",
       targetType: "item",
       targetId: item_id,
       details: `Preços ${tier}: com material ${price_with_material ?? "base"}€, sem material ${price_without_material ?? "base"}€`,
-    });
+    }).catch(() => undefined);
 
     return result;
   });
@@ -158,14 +140,14 @@ export const deleteItemTierSurcharge = createServerFn({ method: "POST" })
       [item_id, tier]
     );
 
-    await logAdminAction(context.supabase, {
+    void logAdminAction(context.supabase, {
       action: "delete_tier_prices",
       actorId: context.userId,
       actorName: me.display_name ?? "Direção",
       targetType: "item",
       targetId: item_id,
       details: `Removidos preços ${tier}`,
-    });
+    }).catch(() => undefined);
 
     return { success: true };
   });
