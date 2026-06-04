@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { DEFAULT_HEADER_TICKER_MESSAGES, getHeaderTickerMessages } from "@/lib/header-ticker.functions";
 
-const PX_PER_SECOND = 82;
-const EDGE_PADDING = 42;
+const PX_PER_SECOND = 145;
+const EDGE_PADDING = 8;
 
 export function HeaderTicker() {
   const fn = useAuthedServerFn(getHeaderTickerMessages);
@@ -21,7 +21,7 @@ export function HeaderTicker() {
   const timeoutRef = useRef<number | null>(null);
 
   const [index, setIndex] = useState(0);
-  const [motion, setMotion] = useState({ x: -260, duration: 0, moving: false });
+  const [motion, setMotion] = useState({ x: -180, duration: 0, moving: false });
   const message = messages[index % Math.max(messages.length, 1)] ?? DEFAULT_HEADER_TICKER_MESSAGES[0];
 
   useEffect(() => {
@@ -38,10 +38,10 @@ export function HeaderTicker() {
 
     const containerWidth = wrapper.offsetWidth || 900;
     const itemWidth = item.offsetWidth || Math.max(180, message.length * 9);
-    const startX = -itemWidth - EDGE_PADDING;
+    const startX = -Math.min(itemWidth, 180) - EDGE_PADDING;
     const endX = containerWidth + EDGE_PADDING;
     const distance = endX - startX;
-    const duration = Math.max(10, Math.min(24, distance / PX_PER_SECOND));
+    const duration = Math.max(6.5, Math.min(15, distance / PX_PER_SECOND));
 
     setMotion({ x: startX, duration: 0, moving: false });
 
@@ -53,7 +53,7 @@ export function HeaderTicker() {
 
     timeoutRef.current = window.setTimeout(() => {
       setIndex((current) => (messages.length ? (current + 1) % messages.length : 0));
-    }, duration * 1000 + 120);
+    }, duration * 1000 + 20);
 
     return () => {
       if (rafRef.current != null) window.cancelAnimationFrame(rafRef.current);
