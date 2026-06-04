@@ -160,7 +160,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<DeliveryRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const params: unknown[] = [];
-    let where = "where r.tipo in ('entrega','venda')";
+    let where = "where coalesce(r.tipo, 'entrega') in ('entrega','venda')";
     if (data.scope === "mine") {
       if (!me) return [];
       params.push(me.id);
@@ -171,9 +171,13 @@ export const listDeliveries = createServerFn({ method: "GET" })
 
     const rows = await pgQuery<Omit<DeliveryRow, "lines"> & { lines: unknown }>(
       `select r.id, r.requester_member_id, m.display_name as requester_name,
-              r.status, coalesce(r.tipo, 'entrega') as tipo, r.lines, r.notes,
-              r.total_qty, r.total_value::float as total_value,
-              r.created_at, r.decided_at, r.decision_reason,
+              coalesce(r.status, 'pending') as status,
+              coalesce(r.tipo, 'entrega') as tipo,
+              coalesce(r.lines, '[]'::jsonb) as lines,
+              coalesce(r.notes, '') as notes,
+              coalesce(r.total_qty, 0)::float as total_qty,
+              coalesce(r.total_value, 0)::float as total_value,
+              r.created_at, r.decided_at, coalesce(r.decision_reason, '') as decision_reason,
               r.responsavel_member_id,
               coalesce(mr.display_name, mr.nickname) as responsavel_name
        from inventory_delivery_requests r
@@ -244,7 +248,7 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (!me?.is_manager) throw new Error("Sem permissão");
 
     const before = await pgOne<{ requester_member_id: number; requester_discord_id: string; tipo: string; lines: unknown; status: string; responsavel_member_id: number | null }>(
-      `select requester_member_id, requester_discord_id, tipo, lines, status, responsavel_member_id
+      `select requester_member_id, requester_discord_id, coalesce(tipo, 'entrega') as tipo, lines, coalesce(status, 'pending') as status, responsavel_member_id
        from inventory_delivery_requests
        where id = $1`,
       [data.id],
