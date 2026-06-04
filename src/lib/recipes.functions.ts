@@ -53,6 +53,16 @@ type MergedRecipe = {
   inputs: RecipeInput[];
 };
 
+type RecipeSqlRow = {
+  output_item_id: number;
+  output_name: string;
+  ingredient_item_id: number | null;
+  ingredient_name: string | null;
+  quantity: number | null;
+  ingredient_category: string | null;
+  ingredient_subcategory: string | null;
+};
+
 function internalCost(value: number | null | undefined): number {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
@@ -100,11 +110,8 @@ async function getDbItemsByIds(ids: number[]): Promise<Map<number, DbPriceRow>> 
   return new Map(rows.map((r) => [r.id, r]));
 }
 
-async function getDbRecipesForItemIds(itemIds: number[], memberTier: string | null = null): Promise<Map<number, MergedRecipe>> {
-  const unique = Array.from(new Set(itemIds.filter((id) => Number.isFinite(id) && id > 0)));
-  if (unique.length === 0) return new Map();
-
-  const params: unknown[] = [unique];
+async function queryRecipeRows(itemIds: number[], memberTier: string | null): Promise<RecipeSqlRow[]> {
+  const params: unknown[] = [itemIds];
   const overrideJoin = memberTier
     ? `left join recipe_ingredient_tier_overrides o
           on o.recipe_id = cr.id
@@ -113,15 +120,7 @@ async function getDbRecipesForItemIds(itemIds: number[], memberTier: string | nu
     : "";
   if (memberTier) params.push(memberTier);
 
-  const rows = await pgQuery<{
-    output_item_id: number;
-    output_name: string;
-    ingredient_item_id: number | null;
-    ingredient_name: string | null;
-    quantity: number | null;
-    ingredient_category: string | null;
-    ingredient_subcategory: string | null;
-  }>(
+  return pgQuery<RecipeSqlRow>(
     `select cr.item_id as output_item_id,
             out_i.name as output_name,
             ri.ingredient_item_id,
@@ -140,6 +139,18 @@ async function getDbRecipesForItemIds(itemIds: number[], memberTier: string | nu
      order by out_i.name, ing_i.name`,
     params,
   );
+}
+
+async function getDbRecipesForItemIds(itemIds: number[], memberTier: string | null = null): Promise<Map<number, MergedRecipe>> {
+  const unique = Array.from(new Set(itemIds.filter((id) => Number.isFinite(id) && id > 0)));
+  if (unique.length === 0) return new Map();
+
+  const rows = memberTier
+    ? await queryRecipeRows(unique, memberTier).catch((error) => {
+        logger.warn("recipe_tier_override_query_fallback", { error: error instanceof Error ? error.message : String(error), memberTier });
+        return queryRecipeRows(unique, null);
+      })
+    : await queryRecipeRows(unique, null);
 
   const map = new Map<number, MergedRecipe>();
   for (const row of rows) {
