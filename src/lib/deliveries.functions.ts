@@ -118,9 +118,6 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
     const qty = asPositiveNumber(line.qty ?? line.quantity ?? line.amount);
     const item = (rawId ? byId.get(rawId) : undefined) ?? (rawName ? byName.get(normalizeText(rawName)) : undefined);
     const side = item?.side ?? "compra";
-
-    // Entregas e vendas usam o mesmo universo de itens entregáveis.
-    // A diferença entre entrega/venda é apenas o tratamento de valor/stock.
     const allowed = item && (side === "compra" || side === "ambos");
 
     if (!qty || !item || !allowed) {
@@ -168,12 +165,8 @@ export const listDeliveries = createServerFn({ method: "GET" })
       if (!me) return [];
       params.push(me.id);
       where += ` and r.requester_member_id = $${params.length}`;
-    } else {
-      if (!me?.is_manager) return [];
-      if (!me.is_superadmin) {
-        params.push(me.id);
-        where += ` and r.responsavel_member_id = $${params.length}`;
-      }
+    } else if (!me?.is_manager) {
+      return [];
     }
 
     const rows = await pgQuery<Omit<DeliveryRow, "lines"> & { lines: unknown }>(
