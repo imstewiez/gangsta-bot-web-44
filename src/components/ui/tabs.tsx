@@ -5,6 +5,20 @@ import { cn } from "@/lib/utils";
 
 const Tabs = TabsPrimitive.Root;
 
+const TAB_LABELS: Record<string, string> = {
+  "As minhas": "Minhas",
+  "Para tratar": "Gestão",
+  "Para conferir": "Gestão",
+  "A decorrer": "Ativas",
+  "Histórico": "Arquivo",
+  "Arquivo de Encomendas": "Arquivo",
+};
+
+function normalizeTabChildren(children: React.ReactNode) {
+  if (typeof children !== "string") return children;
+  return TAB_LABELS[children] ?? children;
+}
+
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
@@ -12,7 +26,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center rounded-xl border border-border/40 bg-card/60 p-1 backdrop-blur-sm shadow-inner",
+      "inline-flex h-auto max-w-full flex-wrap items-center justify-start gap-1 rounded-2xl border border-primary/15 bg-card/45 p-1.5 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
       className,
     )}
     {...props}
@@ -23,18 +37,19 @@ TabsList.displayName = TabsPrimitive.List.displayName;
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "relative inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-1.5 text-sm font-medium transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-      "text-muted-foreground hover:text-foreground",
-      "data-[state=active]:text-white data-[state=active]:shadow-[0_0_12px_-2px_rgba(147,51,234,0.45)]",
-      "data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-fuchsia-500",
+      "relative inline-flex min-h-10 min-w-[112px] cursor-pointer items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-display text-[11px] font-black uppercase tracking-[0.12em] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      "text-muted-foreground/80 hover:bg-primary/8 hover:text-foreground",
+      "data-[state=active]:border data-[state=active]:border-primary/35 data-[state=active]:bg-primary/18 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_18px_-10px_color-mix(in_oklab,var(--primary)_95%,transparent)]",
       className,
     )}
     {...props}
-  />
+  >
+    {normalizeTabChildren(children)}
+  </TabsPrimitive.Trigger>
 ));
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
@@ -45,7 +60,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "mt-3 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       className,
     )}
     {...props}
