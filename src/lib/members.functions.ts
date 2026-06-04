@@ -5,6 +5,7 @@ import { resolveCurrentMember } from "./pricing.server";
 import { IdSchema, NicknameSchema } from "./security";
 import { logger } from "./logger.server";
 import { notifyBot } from "./discord.server";
+import type { CurrentMember } from "./pricing.shared";
 
 export type MemberRow = {
   id: number;
@@ -55,6 +56,13 @@ const ACTIVE_ORG_TIER_LIST = [
   "manda_chuva",
 ];
 
+const BAIRRISTA_VISIBLE_TIER_LIST = [
+  "young_blood",
+  "o_gunao",
+  "gangster_fodido",
+  "patrao_di_zona",
+];
+
 const RESPONSIBLE_TIER_LIST = ["patrao_di_zona", "kingpin", "manda_chuva"];
 
 const ACTIVE_MEMBER_WHERE = `
@@ -62,6 +70,14 @@ const ACTIVE_MEMBER_WHERE = `
   and coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
   and m.tier = any($1::text[])
 `;
+
+function visibleMemberTiersFor(me: CurrentMember | null): string[] {
+  return me?.is_manager ? ACTIVE_ORG_TIER_LIST : BAIRRISTA_VISIBLE_TIER_LIST;
+}
+
+function emptyMemberDetail(): MemberDetail {
+  return { member: null, contributions: [], recentMovements: [], kills: 0, deaths: 0, saidas: 0, deliveries: 0, vendas: 0, orders: 0 };
+}
 
 function memberSelect(isManager: boolean): string {
   return `m.id,
@@ -93,13 +109,14 @@ export const listMembers = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<MemberRow[]> => {
     try {
       const me = await resolveCurrentMember(context.supabase, context.userId);
+      const visibleTiers = visibleMemberTiersFor(me);
       const rows = await pgQuery<MemberRow>(
         `select ${memberSelect(me?.is_manager ?? false)}
          from members m
          where ${ACTIVE_MEMBER_WHERE}
          order by ${MEMBER_ORDER}
          limit 500`,
-        [ACTIVE_ORG_TIER_LIST],
+        [visibleTiers],
       );
       return rows;
     } catch (err) {
@@ -134,6 +151,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<MemberWithStats[]> => {
     try {
       const me = await resolveCurrentMember(context.supabase, context.userId);
+      const visibleTiers = visibleMemberTiersFor(me);
       const rows = await pgQuery<MemberWithStats>(
         `select ${memberSelect(me?.is_manager ?? false)},
                 coalesce(ats.kills_total,0)::int as kills,
@@ -146,7 +164,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
          where ${ACTIVE_MEMBER_WHERE}
          order by ${MEMBER_ORDER}
          limit 500`,
-        [ACTIVE_ORG_TIER_LIST],
+        [visibleTiers],
       );
       return rows;
     } catch (err) {
@@ -165,15 +183,14 @@ export const getMember = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<MemberDetail> => {
     try {
       const me = await resolveCurrentMember(context.supabase, context.userId);
+      const visibleTiers = visibleMemberTiersFor(me);
       const member = await pgOne<MemberRow>(
         `select ${memberSelect(me?.is_manager ?? false)}
          from members m
          where m.id = $2 and ${ACTIVE_MEMBER_WHERE}`,
-        [ACTIVE_ORG_TIER_LIST, data.id],
+        [visibleTiers, data.id],
       );
-      if (!member) {
-        return { member: null, contributions: [], recentMovements: [], kills: 0, deaths: 0, saidas: 0, deliveries: 0, vendas: 0, orders: 0 };
-      }
+      if (!member) return emptyMemberDetail();
 
       const [contrib, movs, statsRow] = await Promise.all([
         pgQuery<{ type: string; total: string }>(
@@ -258,7 +275,8 @@ export const getMyAllTimeStats = createServerFn({ method: "GET" })
               coalesce(orders,0)::int as orders,
               coalesce(wins,0)::int as wins,
               coalesce(losses,0)::int as losses
-       from all_time_stats where member_id = $1`,
+       from all_time_stats
+       where member_id = $1`,
       [me.id],
     );
     const kills = row?.kills_total ?? 0;
