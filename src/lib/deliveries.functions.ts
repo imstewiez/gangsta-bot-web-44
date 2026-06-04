@@ -117,8 +117,11 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
     const rawName = line.item_name ?? line.itemName;
     const qty = asPositiveNumber(line.qty ?? line.quantity ?? line.amount);
     const item = (rawId ? byId.get(rawId) : undefined) ?? (rawName ? byName.get(normalizeText(rawName)) : undefined);
-    const side = item?.side ?? (tipo === "entrega" ? "compra" : "venda");
-    const allowed = item && (tipo === "entrega" ? side === "compra" || side === "ambos" : side === "venda" || side === "ambos");
+    const side = item?.side ?? "compra";
+
+    // Entregas e vendas usam o mesmo universo de itens entregáveis.
+    // A diferença entre entrega/venda é apenas o tratamento de valor/stock.
+    const allowed = item && (side === "compra" || side === "ambos");
 
     if (!qty || !item || !allowed) {
       if (strict) throw new Error(`Linha inválida: ${JSON.stringify(line)}`);
@@ -167,7 +170,6 @@ export const listDeliveries = createServerFn({ method: "GET" })
       where += ` and r.requester_member_id = $${params.length}`;
     } else {
       if (!me?.is_manager) return [];
-      where += ` and r.status = 'pending'`;
       if (!me.is_superadmin) {
         params.push(me.id);
         where += ` and r.responsavel_member_id = $${params.length}`;
@@ -186,7 +188,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
        left join members mr on mr.id = r.responsavel_member_id
        ${where}
        order by r.created_at desc
-       limit 200`,
+       limit 500`,
       params,
     );
 
@@ -259,37 +261,47 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (!me.is_superadmin && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
     if (before.status !== "pending") throw new Error("Já decidido");
 
-    if (data.approve) {
-      const tipo = before.tipo === "venda" ? "venda" : "entrega";
-      const normalizedLines = await normalizeDeliveryLines(before.lines, true, tipo);
-      const { totalQty, totalValue } = deliveryTotals(normalizedLines);
-      await pgQuery(
-        `update inventory_delivery_requests
-         set lines = $2::jsonb, total_qty = $3, total_value = $4, updated_at = now()
-         where id = $1 and status = 'pending'`,
-        [data.id, JSON.stringify(normalizedLines), totalQty, tipo === "entrega" ? 0 : totalValue],
-      );
-      await pgQuery(`SELECT public.sp_approve_delivery($1, $2, $3)`, [data.id, `web:${context.userId}`, me.discord_id]);
-    } else {
-      const rejected = await pgOne<{ id: string }>(
-        `update inventory_delivery_requests set
-           status = 'rejected', decision_by = $2, decision_reason = $3,
-           decided_at = now(), updated_at = now(),
-           approver_discord_id = coalesce(approver_discord_id, $4)
-         where id = $1 and status = 'pending'
-         returning id`,
-        [data.id, `web:${context.userId}`, data.reason ?? "", me.discord_id],
-      );
-      if (!rejected) throw new Error("Já decidido");
+    const tipo = before.tipo === "venda" ? "venda" : "entrega";
+    const lines = await normalizeDeliveryLines(before.lines, false, tipo);
+    const totals = deliveryTotals(lines);
+    const nextStatus = data.approve ? "approved" : "rejected";
+
+    await pgQuery(
+      `update inventory_delivery_requests
+       set status = $2,
+           decided_by = $3,
+           decided_at = now(),
+           decision_reason = $4
+       where id = $1`,
+      [data.id, nextStatus, context.userId, data.reason ?? ""],
+    );
+
+    if (data.approve && lines.length) {
+      for (const line of lines) {
+        await pgQuery(
+          `insert into inventory_movements (item_id, quantity, movement_type, member_id, notes, unit_value, total_value, created_by)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            line.item_id,
+            tipo === "venda" ? -line.qty : line.qty,
+            tipo === "venda" ? "venda_bairrista" : "entrega_bairrista",
+            before.requester_member_id,
+            `delivery:${data.id}`,
+            line.unit_value ?? 0,
+            tipo === "venda" ? line.qty * (line.unit_value ?? 0) : 0,
+            `web:${context.userId}`,
+          ],
+        );
+      }
     }
 
     await logAdminAction(context.supabase, {
-      action: data.approve ? "delivery_approved" : "delivery_rejected",
+      action: tipo === "venda" ? "delivery_request_decided" : "delivery_decided",
       actorId: context.userId,
-      actorName: me.display_name ?? "Direção",
+      actorName: me.display_name ?? "Gestor",
       targetType: "delivery",
       targetId: data.id,
-      details: `${data.approve ? "Aprovada" : "Recusada"} ${before.tipo === "venda" ? "venda" : "entrega"} de ${before.requester_member_id}${data.reason ? " (" + data.reason + ")" : ""}`,
+      details: `${tipo === "venda" ? "Venda" : "Entrega"} ${data.approve ? "aprovada" : "recusada"}: ${totals.totalQty} itens`,
     });
 
     return { ok: true };
