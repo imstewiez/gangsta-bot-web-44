@@ -1,12 +1,8 @@
-/* Compact header message ticker: continuous marquee, no JS-driven motion. */
-
-@keyframes header-ticker-marquee {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-33.333%, 0, 0);
-  }
+@keyframes header-ticker-single-sweep {
+  0% { transform: translate3d(1rem, -50%, 0); opacity: 0; }
+  5% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translate3d(72vw, -50%, 0); opacity: 0; }
 }
 
 .header-ticker {
@@ -18,9 +14,7 @@
   overflow: hidden;
   border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--primary) 16%, transparent);
-  background:
-    radial-gradient(circle at 14% 50%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 32%),
-    linear-gradient(90deg, color-mix(in oklab, var(--primary) 11%, transparent), color-mix(in oklab, var(--background) 45%, transparent) 42%, color-mix(in oklab, var(--primary) 8%, transparent));
+  background: radial-gradient(circle at 14% 50%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 32%), linear-gradient(90deg, color-mix(in oklab, var(--primary) 11%, transparent), color-mix(in oklab, var(--background) 45%, transparent) 42%, color-mix(in oklab, var(--primary) 8%, transparent));
   mask-image: linear-gradient(90deg, transparent, black 2.5%, black 97.5%, transparent);
   -webkit-mask-image: linear-gradient(90deg, transparent, black 2.5%, black 97.5%, transparent);
 }
@@ -33,23 +27,18 @@
   opacity: 0.65;
 }
 
-.header-ticker-track {
+.header-ticker-single-wrap {
   position: absolute;
-  inset-block: 0;
-  left: 0;
-  display: flex;
-  width: max-content;
-  min-width: 300%;
-  align-items: center;
-  gap: clamp(2.6rem, 6vw, 5.5rem);
-  padding-inline: 1.15rem;
-  animation: header-ticker-marquee 18s linear infinite;
-  will-change: transform;
+  inset: 0;
+  overflow: hidden;
 }
 
-.header-ticker-item {
+.header-ticker-single {
+  position: absolute;
+  left: 0;
+  top: 50%;
   display: inline-flex;
-  flex: 0 0 auto;
+  max-width: none;
   align-items: center;
   justify-content: flex-start;
   gap: 0.45rem;
@@ -61,6 +50,8 @@
   line-height: 1;
   text-transform: uppercase;
   text-shadow: 0 0 14px color-mix(in oklab, var(--primary) 30%, transparent);
+  animation: header-ticker-single-sweep 7s linear both;
+  will-change: transform, opacity;
 }
 
 .header-ticker-dot {
@@ -72,12 +63,8 @@
   box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 76%, transparent);
 }
 
-.header-ticker:hover .header-ticker-track {
-  animation-play-state: paused;
-}
+.header-ticker:hover .header-ticker-single { animation-play-state: paused; }
 
 @media (min-width: 768px) {
-  .header-ticker {
-    display: block;
-  }
+  .header-ticker { display: block; }
 }
