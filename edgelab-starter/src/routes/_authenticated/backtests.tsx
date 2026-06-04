@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FlaskConical } from "lucide-react";
 
-import { PageHeader } from "../../components/layout/AppShell";
+import { EdgeLabPageHeader } from "../../components/layout/EdgeLabShell";
 import { BacktestLabPanel } from "../../components/trading/BacktestLabPanel";
 
 export const Route = createFileRoute("/_authenticated/backtests")({
@@ -11,7 +11,12 @@ export const Route = createFileRoute("/_authenticated/backtests")({
 function BacktestsRoute() {
   return (
     <>
-      <PageHeader eyebrow="Backtest lab" title="Backtests" icon={FlaskConical} />
+      <EdgeLabPageHeader
+        eyebrow="Backtest lab"
+        title="Backtests"
+        description="Run deterministic simulations and inspect the result before saving full reports."
+        icon={FlaskConical}
+      />
 
       <div className="mb-6 rounded-3xl border border-primary/20 bg-primary/8 p-5 text-sm text-muted-foreground">
         <p>
