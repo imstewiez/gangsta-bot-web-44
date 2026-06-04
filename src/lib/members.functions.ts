@@ -26,6 +26,17 @@ type MemberWithStats = MemberRow & {
   sales: number;
 };
 
+type MemberStats = {
+  kills: number;
+  deaths: number;
+  saidas: number;
+  deliveries: number;
+  sales: number;
+  orders: number;
+  wins: number;
+  losses: number;
+};
+
 type MemberDetail = {
   member: MemberRow | null;
   contributions: { type: string; total: number }[];
@@ -71,6 +82,17 @@ const ACTIVE_MEMBER_WHERE = `
   and m.tier = any($1::text[])
 `;
 
+const EMPTY_MEMBER_STATS: MemberStats = {
+  kills: 0,
+  deaths: 0,
+  saidas: 0,
+  deliveries: 0,
+  sales: 0,
+  orders: 0,
+  wins: 0,
+  losses: 0,
+};
+
 function visibleMemberTiersFor(me: CurrentMember | null): string[] {
   return me?.is_manager ? ACTIVE_ORG_TIER_LIST : BAIRRISTA_VISIBLE_TIER_LIST;
 }
@@ -103,6 +125,118 @@ const MEMBER_ORDER = `
     else 9 end,
   m.display_name nulls last
 `;
+
+const STATS_AGG_CTES = `
+  kill_logs_agg as (
+    select killer_id as member_id, count(*)::int as kills
+    from kill_logs
+    where killer_id is not null
+    group by killer_id
+  ),
+  kills_ops_agg as (
+    select p.member_id, coalesce(sum(greatest(coalesce(p.kills, 0), 0)), 0)::int as kills
+    from operation_participants p
+    join operations o on o.id = p.operation_id and o.deleted_at is null
+    where p.member_id is not null
+      and o.status = 'concluida'
+    group by p.member_id
+  ),
+  ops_agg as (
+    select p.member_id,
+           count(*)::int as saidas,
+           count(*) filter (where coalesce(p.died, false) = true or coalesce(p.deaths_count, 0) > 0)::int as deaths,
+           count(*) filter (where o.was_profitable = true)::int as wins,
+           count(*) filter (where o.was_profitable = false)::int as losses
+    from operation_participants p
+    join operations o on o.id = p.operation_id and o.deleted_at is null
+    where p.member_id is not null
+      and o.status = 'concluida'
+    group by p.member_id
+  ),
+  delivery_movements as (
+    select im.*,
+           case
+             when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(im.notes, '^delivery:', '')
+             else null
+           end as source_id
+    from inventory_movements im
+    where im.member_id is not null
+      and im.movement_type in ('entrega_bairrista', 'entrega_oficial')
+      and im.quantity > 0
+  ),
+  deliveries_agg as (
+    select dm.member_id,
+           count(distinct coalesce(nullif(dm.source_id, ''), dm.id::text))::int as deliveries
+    from delivery_movements dm
+    group by dm.member_id
+  ),
+  sales_movements as (
+    select im.*,
+           case
+             when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(im.notes, '^delivery:', '')
+             when coalesce(im.notes, '') ~ '^order:' then regexp_replace(im.notes, '^order:', '')
+             else null
+           end as source_id
+    from inventory_movements im
+    where im.member_id is not null
+      and im.movement_type = 'venda_bairrista'
+      and im.quantity < 0
+  ),
+  sales_agg as (
+    select sm.member_id,
+           count(distinct coalesce(nullif(sm.source_id, ''), sm.id::text))::int as sales
+    from sales_movements sm
+    group by sm.member_id
+  ),
+  orders_agg as (
+    select o.member_id,
+           count(distinct coalesce(nullif(o.batch_id, ''), o.id::text))::int as orders
+    from orders o
+    where o.member_id is not null
+    group by o.member_id
+  )
+`;
+
+function nonNegativeInt(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
+
+async function computeMemberStats(memberId: number): Promise<MemberStats> {
+  const row = await pgOne<MemberStats>(
+    `with ${STATS_AGG_CTES}
+     select (coalesce(kl.kills, 0) + coalesce(ko.kills, 0))::int as kills,
+            coalesce(o.deaths, 0)::int as deaths,
+            coalesce(o.saidas, 0)::int as saidas,
+            coalesce(d.deliveries, 0)::int as deliveries,
+            coalesce(s.sales, 0)::int as sales,
+            coalesce(ord.orders, 0)::int as orders,
+            coalesce(o.wins, 0)::int as wins,
+            coalesce(o.losses, 0)::int as losses
+     from (select $1::int as member_id) target
+     left join kill_logs_agg kl on kl.member_id = target.member_id
+     left join kills_ops_agg ko on ko.member_id = target.member_id
+     left join ops_agg o on o.member_id = target.member_id
+     left join deliveries_agg d on d.member_id = target.member_id
+     left join sales_agg s on s.member_id = target.member_id
+     left join orders_agg ord on ord.member_id = target.member_id`,
+    [memberId],
+  ).catch((err) => {
+    logger.error("computeMemberStats_failed", { error: err instanceof Error ? err.message : String(err), memberId });
+    return null;
+  });
+
+  return {
+    kills: nonNegativeInt(row?.kills),
+    deaths: nonNegativeInt(row?.deaths),
+    saidas: nonNegativeInt(row?.saidas),
+    deliveries: nonNegativeInt(row?.deliveries),
+    sales: nonNegativeInt(row?.sales),
+    orders: nonNegativeInt(row?.orders),
+    wins: nonNegativeInt(row?.wins),
+    losses: nonNegativeInt(row?.losses),
+  };
+}
 
 export const listMembers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -153,20 +287,32 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
       const me = await resolveCurrentMember(context.supabase, context.userId);
       const visibleTiers = visibleMemberTiersFor(me);
       const rows = await pgQuery<MemberWithStats>(
-        `select ${memberSelect(me?.is_manager ?? false)},
-                coalesce(ats.kills_total,0)::int as kills,
-                coalesce(ats.deaths_total,0)::int as deaths,
-                coalesce(ats.saidas_total,0)::int as saidas,
-                coalesce(ats.deliveries,0)::int as deliveries,
-                coalesce(ats.sales,0)::int as sales
+        `with ${STATS_AGG_CTES}
+         select ${memberSelect(me?.is_manager ?? false)},
+                (coalesce(kl.kills, 0) + coalesce(ko.kills, 0))::int as kills,
+                coalesce(o.deaths, 0)::int as deaths,
+                coalesce(o.saidas, 0)::int as saidas,
+                coalesce(d.deliveries, 0)::int as deliveries,
+                coalesce(s.sales, 0)::int as sales
          from members m
-         left join all_time_stats ats on ats.member_id = m.id
+         left join kill_logs_agg kl on kl.member_id = m.id
+         left join kills_ops_agg ko on ko.member_id = m.id
+         left join ops_agg o on o.member_id = m.id
+         left join deliveries_agg d on d.member_id = m.id
+         left join sales_agg s on s.member_id = m.id
          where ${ACTIVE_MEMBER_WHERE}
          order by ${MEMBER_ORDER}
          limit 500`,
         [visibleTiers],
       );
-      return rows;
+      return rows.map((row) => ({
+        ...row,
+        kills: nonNegativeInt(row.kills),
+        deaths: nonNegativeInt(row.deaths),
+        saidas: nonNegativeInt(row.saidas),
+        deliveries: nonNegativeInt(row.deliveries),
+        sales: nonNegativeInt(row.sales),
+      }));
     } catch (err) {
       logger.error("listMembersWithStats_failed", { error: err instanceof Error ? err.message : String(err) });
       throw new Error(err instanceof Error ? err.message : "DB error");
@@ -192,7 +338,7 @@ export const getMember = createServerFn({ method: "GET" })
       );
       if (!member) return emptyMemberDetail();
 
-      const [contrib, movs, statsRow] = await Promise.all([
+      const [contrib, movs, stats] = await Promise.all([
         pgQuery<{ type: string; total: string }>(
           `select movement_type as type, sum(quantity)::text as total
            from inventory_movements
@@ -210,30 +356,19 @@ export const getMember = createServerFn({ method: "GET" })
            limit 20`,
           [data.id],
         ),
-        pgOne<{ kills: number; deaths: number; saidas: number; deliveries: number; vendas: number; orders: number }>(
-          `select coalesce(ats.kills_total,0)::int as kills,
-                  coalesce(ats.deaths_total,0)::int as deaths,
-                  coalesce(ats.saidas_total,0)::int as saidas,
-                  coalesce(ats.deliveries,0)::int as deliveries,
-                  coalesce(ats.sales,0)::int as vendas,
-                  (select count(*)::int from orders o where o.member_id = $1) as orders
-           from members m
-           left join all_time_stats ats on ats.member_id = m.id
-           where m.id = $1`,
-          [data.id],
-        ),
+        computeMemberStats(data.id),
       ]);
 
       return {
         member,
         contributions: contrib.map((r) => ({ type: r.type, total: Number(r.total) })),
         recentMovements: movs,
-        kills: Number(statsRow?.kills ?? 0),
-        deaths: Number(statsRow?.deaths ?? 0),
-        saidas: Number(statsRow?.saidas ?? 0),
-        deliveries: Number(statsRow?.deliveries ?? 0),
-        vendas: Number(statsRow?.vendas ?? 0),
-        orders: Number(statsRow?.orders ?? 0),
+        kills: stats.kills,
+        deaths: stats.deaths,
+        saidas: stats.saidas,
+        deliveries: stats.deliveries,
+        vendas: stats.sales,
+        orders: stats.orders,
       };
     } catch (err) {
       logger.error("getMember_failed", { error: err instanceof Error ? err.message : String(err), memberId: data.id });
@@ -257,43 +392,18 @@ export const getMyAllTimeStats = createServerFn({ method: "GET" })
   }> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me) throw new Error("Membro não encontrado");
-    const row = await pgOne<{
-      kills_total: number;
-      deaths_total: number;
-      saidas_total: number;
-      deliveries: number;
-      sales: number;
-      orders: number;
-      wins: number;
-      losses: number;
-    }>(
-      `select coalesce(kills_total,0)::int as kills_total,
-              coalesce(deaths_total,0)::int as deaths_total,
-              coalesce(saidas_total,0)::int as saidas_total,
-              coalesce(deliveries,0)::int as deliveries,
-              coalesce(sales,0)::int as sales,
-              coalesce(orders,0)::int as orders,
-              coalesce(wins,0)::int as wins,
-              coalesce(losses,0)::int as losses
-       from all_time_stats
-       where member_id = $1`,
-      [me.id],
-    );
-    const kills = row?.kills_total ?? 0;
-    const deaths = row?.deaths_total ?? 0;
-    const wins = row?.wins ?? 0;
-    const saidas = row?.saidas_total ?? 0;
+    const stats = await computeMemberStats(me.id);
     return {
-      kills,
-      deaths,
-      saidas,
-      deliveries: row?.deliveries ?? 0,
-      sales: row?.sales ?? 0,
-      orders: row?.orders ?? 0,
-      wins,
-      losses: row?.losses ?? 0,
-      kd: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(0),
-      winRate: saidas > 0 ? ((wins / saidas) * 100).toFixed(0) : "0",
+      kills: stats.kills,
+      deaths: stats.deaths,
+      saidas: stats.saidas,
+      deliveries: stats.deliveries,
+      sales: stats.sales,
+      orders: stats.orders,
+      wins: stats.wins,
+      losses: stats.losses,
+      kd: stats.deaths > 0 ? (stats.kills / stats.deaths).toFixed(2) : stats.kills.toFixed(0),
+      winRate: stats.saidas > 0 ? ((stats.wins / stats.saidas) * 100).toFixed(0) : "0",
     };
   });
 
