@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DatabaseZap } from "lucide-react";
 
-import { PageHeader } from "../../components/layout/AppShell";
+import { EdgeLabPageHeader } from "../../components/layout/EdgeLabShell";
 import { DataImportPanel } from "../../components/trading/DataImportPanel";
 
 export const Route = createFileRoute("/_authenticated/data-import")({
@@ -11,9 +11,10 @@ export const Route = createFileRoute("/_authenticated/data-import")({
 function DataImportRoute() {
   return (
     <>
-      <PageHeader
+      <EdgeLabPageHeader
         eyebrow="Market data"
         title="Data Import"
+        description="Import and validate historical OHLC candle data before running strategies."
         icon={DatabaseZap}
       />
 
