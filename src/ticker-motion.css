@@ -1,21 +1,4 @@
-/* Compact header message ticker. */
-
-@keyframes header-message-sweep {
-  0% {
-    transform: translate3d(var(--ticker-start, 16px), -50%, 0);
-    opacity: 0;
-  }
-  4% {
-    opacity: 1;
-  }
-  96% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(var(--ticker-end, 620px), -50%, 0);
-    opacity: 0;
-  }
-}
+/* Compact header message ticker. Movement is driven by HeaderTicker.tsx via requestAnimationFrame. */
 
 .header-ticker {
   position: relative;
@@ -64,7 +47,6 @@
   line-height: 1;
   text-transform: uppercase;
   text-shadow: 0 0 14px color-mix(in oklab, var(--primary) 30%, transparent);
-  animation: header-message-sweep var(--ticker-duration, 5.8s) linear both;
   will-change: transform, opacity;
 }
 
@@ -77,10 +59,6 @@
   box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 76%, transparent);
 }
 
-.header-ticker:hover .header-ticker-item {
-  animation-play-state: paused;
-}
-
 @media (min-width: 768px) {
   .header-ticker {
     display: block;
@@ -91,7 +69,6 @@
   .header-ticker-item {
     left: 50%;
     transform: translate3d(-50%, -50%, 0) !important;
-    animation: none !important;
     opacity: 1 !important;
   }
 }
