@@ -1,21 +1,21 @@
-/* Header message ticker: one message sweeping across the lane at a time. */
+/* Header message ticker: one message crosses the full lane, then the next one starts. */
 
 @keyframes header-message-run {
   0% {
-    transform: translate3d(-115%, -50%, 0);
+    transform: translate3d(-100%, -50%, 0);
     opacity: 0;
     filter: blur(2px);
   }
-  8% {
+  7% {
     opacity: 1;
     filter: blur(0);
   }
-  92% {
+  93% {
     opacity: 1;
     filter: blur(0);
   }
   100% {
-    transform: translate3d(115%, -50%, 0);
+    transform: translate3d(100vw, -50%, 0);
     opacity: 0;
     filter: blur(2px);
   }
@@ -37,20 +37,16 @@
 
 .header-ticker-runner {
   position: absolute;
-  left: 0;
-  top: 50%;
-  display: inline-flex;
-  width: 100%;
-  min-width: 100%;
-  align-items: center;
-  justify-content: center;
-  animation: header-message-run 13s linear both;
-  will-change: transform, opacity, filter;
+  inset: 0;
+  overflow: hidden;
 }
 
 .header-ticker-item {
+  position: absolute;
+  left: 0;
+  top: 50%;
   display: inline-flex;
-  max-width: min(86vw, 980px);
+  max-width: none;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
@@ -60,10 +56,11 @@
   font-weight: 800;
   letter-spacing: 0.14em;
   line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
   text-transform: uppercase;
   text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 34%, transparent);
+  transform: translate3d(-100%, -50%, 0);
+  animation: header-message-run var(--ticker-duration, 13s) linear both;
+  will-change: transform, opacity, filter;
 }
 
 .header-ticker-dot {
@@ -75,7 +72,7 @@
   box-shadow: 0 0 14px color-mix(in oklab, var(--primary) 80%, transparent);
 }
 
-.header-ticker:hover .header-ticker-runner {
+.header-ticker:hover .header-ticker-item {
   animation-play-state: paused;
 }
 
@@ -86,9 +83,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .header-ticker-runner {
+  .header-ticker-item {
     animation: none !important;
-    transform: translate3d(0, -50%, 0);
+    left: 50%;
+    transform: translate3d(-50%, -50%, 0);
     opacity: 1;
     filter: none;
   }
