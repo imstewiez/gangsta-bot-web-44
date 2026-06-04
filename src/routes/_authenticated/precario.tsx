@@ -30,8 +30,10 @@ function withoutMaterial(item: CatalogItem) {
 
 function Page() {
   useRealtimeSync([
-    { table: "items", queryKeys: [["catalog"], ["buyCatalog"]] },
-    { table: "item_tier_surcharges", queryKeys: [["catalog"]] },
+    { table: "items", queryKeys: [["catalog"], ["buyCatalog"], ["recipes"]] },
+    { table: "item_tier_surcharges", queryKeys: [["catalog"], ["recipes"]] },
+    { table: "recipe_ingredients", queryKeys: [["recipes"]] },
+    { table: "recipe_ingredient_tier_overrides", queryKeys: [["recipes"]] },
   ]);
   const [tab, setTab] = useState("compra");
   const catFn = useAuthedServerFn(getCatalog);
