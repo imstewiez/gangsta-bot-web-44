@@ -20,6 +20,7 @@ type RawDeliveryLine = Partial<DeliveryLine> & {
   amount?: number | string;
   unitValue?: number | string;
   unitPrice?: number | string | null;
+  unit_price?: number | string | null;
   effectivePrice?: number | string;
   basePrice?: number | string;
   lineValue?: number | string;
@@ -59,6 +60,12 @@ function asPositiveNumber(value: unknown): number | null {
 function asOptionalNumber(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
+}
+function normalizeStatus(status: unknown): string {
+  const value = normalizeText(status);
+  if (["approved", "aprovado", "aprovada", "received", "recebido", "recebida", "comprado", "comprada", "done", "closed", "completed", "concluido", "concluida"].includes(value)) return "approved";
+  if (["rejected", "recusado", "recusada", "declined", "cancelled", "canceled", "cancelado", "cancelada"].includes(value)) return "rejected";
+  return "pending";
 }
 
 async function assertResponsibleExists(memberId: number) {
@@ -129,12 +136,12 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
         item_id: rawId ?? 0,
         item_name: rawName ?? "Item inválido",
         qty: qty ?? 0,
-        unit_value: tipo === "entrega" ? 0 : (asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.effectivePrice ?? line.basePrice) ?? 0),
+        unit_value: tipo === "entrega" ? 0 : (asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.unit_price ?? line.effectivePrice ?? line.basePrice) ?? 0),
       });
       continue;
     }
 
-    const explicitUnit = asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.effectivePrice ?? line.basePrice);
+    const explicitUnit = asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.unit_price ?? line.effectivePrice ?? line.basePrice);
     const lineValue = asOptionalNumber(line.lineValue);
     const unit = tipo === "entrega" ? 0 : (explicitUnit ?? (lineValue != null ? lineValue / qty : null) ?? item.morador_purchase_price ?? item.purchase_price ?? 0);
     normalized.push({ item_id: item.id, item_name: item.name, qty, unit_value: unit });
@@ -161,7 +168,7 @@ async function hydrateDeliveryRow(row: RawDeliveryRow): Promise<DeliveryRow> {
   const totals = deliveryTotals(lines);
   return {
     ...row,
-    status: row.status || "pending",
+    status: normalizeStatus(row.status),
     tipo,
     lines,
     total_qty: row.total_qty || totals.totalQty,
@@ -177,7 +184,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<DeliveryRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const params: unknown[] = [];
-    let where = "where coalesce(r.tipo, 'entrega') in ('entrega','venda')";
+    let where = "where true";
     if (data.scope === "mine") {
       if (!me) return [];
       params.push(me.id);
@@ -204,7 +211,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
        order by r.created_at desc
        limit 500`,
       params,
-    );
+    ).catch(() => []);
 
     const requestIds = new Set(requestRows.map((row) => row.id));
     const movementParams: unknown[] = [];
@@ -218,8 +225,9 @@ export const listDeliveries = createServerFn({ method: "GET" })
     const movementRows = await pgQuery<MovementDeliveryRow>(
       `with movement_base as (
          select im.id, im.member_id, im.item_id, im.quantity, im.movement_type,
-                im.notes, im.unit_value, im.total_value, im.created_at,
+                im.notes, im.unit_price as unit_value, im.created_at,
                 i.name as item_name,
+                coalesce(i.morador_purchase_price, i.purchase_price, 0)::float as fallback_unit_price,
                 coalesce(m.display_name, m.nickname) as requester_name,
                 case
                   when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(coalesce(im.notes, ''), '^delivery:', '')
@@ -227,29 +235,36 @@ export const listDeliveries = createServerFn({ method: "GET" })
                 end as source_request_id,
                 case
                   when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(coalesce(im.notes, ''), '^delivery:', '')
+                  when coalesce(im.notes, '') ~ '^order:' then regexp_replace(coalesce(im.notes, ''), '^order:', '')
                   else 'movement:' || im.id::text
                 end as source_group
          from inventory_movements im
          left join items i on i.id = im.item_id
          left join members m on m.id = im.member_id
          where im.member_id is not null
-           and im.movement_type in ('entrega_bairrista','entrega_oficial','venda_bairrista')
+           and (
+             im.movement_type in ('entrega_bairrista','entrega_oficial','venda_bairrista')
+             or im.movement_type ilike '%entreg%'
+             or im.movement_type ilike '%venda%'
+             or im.movement_type ilike '%delivery%'
+             or im.movement_type ilike '%sale%'
+           )
            ${movementMemberFilter}
        )
        select ('movement:' || min(id)::text) as id,
               member_id as requester_member_id,
               requester_name,
               'approved' as status,
-              case when movement_type = 'venda_bairrista' then 'venda' else 'entrega' end as tipo,
+              case when movement_type ilike '%venda%' or movement_type ilike '%sale%' then 'venda' else 'entrega' end as tipo,
               jsonb_agg(jsonb_build_object(
                 'item_id', item_id,
                 'item_name', item_name,
                 'qty', abs(quantity),
-                'unit_value', coalesce(unit_value, 0)
+                'unit_value', coalesce(unit_value, fallback_unit_price, 0)
               ) order by item_name) as lines,
               coalesce(max(notes), '') as notes,
               sum(abs(quantity))::float as total_qty,
-              sum(coalesce(total_value, abs(quantity) * coalesce(unit_value, 0), 0))::float as total_value,
+              sum(abs(quantity) * coalesce(unit_value, fallback_unit_price, 0))::float as total_value,
               min(created_at) as created_at,
               max(created_at) as decided_at,
               'Registo confirmado no inventário' as decision_reason,
@@ -261,7 +276,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
        order by max(created_at) desc
        limit 500`,
       movementParams,
-    );
+    ).catch(() => []);
 
     const fallbackRows = movementRows.filter((row) => !row.source_request_id || !requestIds.has(row.source_request_id));
     const combined = [...requestRows, ...fallbackRows].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -327,7 +342,7 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (!before) throw new Error("Pedido não encontrado");
     if (!before.responsavel_member_id) throw new Error("Pedido sem responsável. Define um responsável antes de tratar.");
     if (!me.is_superadmin && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
-    if (before.status !== "pending") throw new Error("Já decidido");
+    if (normalizeStatus(before.status) !== "pending") throw new Error("Já decidido");
 
     const tipo = before.tipo === "venda" ? "venda" : "entrega";
     const lines = await normalizeDeliveryLines(before.lines, false, tipo);
@@ -347,8 +362,8 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (data.approve && lines.length) {
       for (const line of lines) {
         await pgQuery(
-          `insert into inventory_movements (item_id, quantity, movement_type, member_id, notes, unit_value, total_value, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          `insert into inventory_movements (item_id, quantity, movement_type, member_id, notes, unit_price, created_by)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
           [
             line.item_id,
             tipo === "venda" ? -line.qty : line.qty,
@@ -356,7 +371,6 @@ export const decideDelivery = createServerFn({ method: "POST" })
             before.requester_member_id,
             `delivery:${data.id}`,
             line.unit_value ?? 0,
-            tipo === "venda" ? line.qty * (line.unit_value ?? 0) : 0,
             `web:${context.userId}`,
           ],
         );
