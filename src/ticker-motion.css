@@ -1,4 +1,13 @@
-/* Compact header message ticker. Movement is driven by HeaderTicker.tsx via requestAnimationFrame. */
+/* Compact header message ticker: continuous marquee, no JS-driven motion. */
+
+@keyframes header-ticker-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-33.333%, 0, 0);
+  }
+}
 
 .header-ticker {
   position: relative;
@@ -24,18 +33,23 @@
   opacity: 0.65;
 }
 
-.header-ticker-runner {
+.header-ticker-track {
   position: absolute;
-  inset: 0;
-  overflow: hidden;
+  inset-block: 0;
+  left: 0;
+  display: flex;
+  width: max-content;
+  min-width: 300%;
+  align-items: center;
+  gap: clamp(2.6rem, 6vw, 5.5rem);
+  padding-inline: 1.15rem;
+  animation: header-ticker-marquee 18s linear infinite;
+  will-change: transform;
 }
 
 .header-ticker-item {
-  position: absolute;
-  left: 0;
-  top: 50%;
   display: inline-flex;
-  max-width: none;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: flex-start;
   gap: 0.45rem;
@@ -47,7 +61,6 @@
   line-height: 1;
   text-transform: uppercase;
   text-shadow: 0 0 14px color-mix(in oklab, var(--primary) 30%, transparent);
-  will-change: transform, opacity;
 }
 
 .header-ticker-dot {
@@ -57,6 +70,10 @@
   border-radius: 999px;
   background: var(--primary);
   box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 76%, transparent);
+}
+
+.header-ticker:hover .header-ticker-track {
+  animation-play-state: paused;
 }
 
 @media (min-width: 768px) {
