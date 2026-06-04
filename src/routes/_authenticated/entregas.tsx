@@ -57,7 +57,7 @@ function lineQty(line: DeliveryLineInput) {
 function Page() {
   useRealtimeSync([
     { table: "inventory_delivery_requests", queryKeys: [["deliveries"], ["chefia-kpis"]] },
-    { table: "inventory_movements", queryKeys: [["stock"], ["ledger"], ["my-xp"], ["home-kpis"]] },
+    { table: "inventory_movements", queryKeys: [["deliveries"], ["stock"], ["ledger"], ["my-xp"], ["home-kpis"]] },
     { table: "inventory_balance", queryKeys: [["stock"], ["chefia-kpis"]] },
   ]);
 
@@ -66,7 +66,7 @@ function Page() {
   const isManager = me.data?.is_manager ?? false;
   const [tab, setTab] = useState("mine");
   const [mineSub, setMineSub] = useState<DeliveryStatusFilter>("active");
-  const [manageSub, setManageSub] = useState<DeliveryStatusFilter>("active");
+  const [manageSub, setManageSub] = useState<DeliveryStatusFilter>("archived");
 
   return (
     <>
@@ -111,11 +111,8 @@ function DelList({ scope, canDecide, statusFilter }: { scope: "mine" | "manage";
   const fn = useAuthedServerFn(listDeliveries);
   const decFn = useAuthedServerFn(decideDelivery);
   const qc = useQueryClient();
-  const list = useQuery({ queryKey: ["deliveries", scope, statusFilter], queryFn: () => fn({ data: { scope } }) });
-  const rows = useMemo(() => {
-    const data = list.data ?? [];
-    return data.filter((d) => statusFilter === "active" ? d.status === "pending" : d.status !== "pending");
-  }, [list.data, statusFilter]);
+  const list = useQuery({ queryKey: ["deliveries", scope, statusFilter], queryFn: () => fn({ data: { scope, statusFilter } }) });
+  const rows = list.data ?? [];
 
   const m = useMutation({
     mutationFn: (v: { id: string; approve: boolean }) => decFn({ data: v }),
@@ -133,6 +130,10 @@ function DelList({ scope, canDecide, statusFilter }: { scope: "mine" | "manage";
 
   if (list.isLoading) {
     return <div className="flex h-64 flex-col items-center justify-center gap-3"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /><p className="text-sm text-muted-foreground">{LOADING.deliveries}</p></div>;
+  }
+
+  if (list.error) {
+    return <Card className="interactive-card p-6 text-sm text-destructive">{beautifyError(list.error)}</Card>;
   }
 
   if (!rows.length) {
