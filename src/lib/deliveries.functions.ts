@@ -203,11 +203,11 @@ export const listDeliveries = createServerFn({ method: "GET" })
                   'item_id', im.item_id,
                   'item_name', coalesce(i.name, 'Item #' || im.item_id::text),
                   'qty', abs(im.quantity),
-                  'unit_price', coalesce(im.unit_price, i.morador_purchase_price, i.purchase_price, 0)
+                  'unit_price', coalesce(i.morador_purchase_price, i.purchase_price, 0)
                 )) as lines,
                 coalesce(im.notes, '') as notes,
                 abs(im.quantity)::float as total_qty,
-                abs(im.quantity * coalesce(im.unit_price, i.morador_purchase_price, i.purchase_price, 0))::float as total_value,
+                abs(im.quantity * coalesce(i.morador_purchase_price, i.purchase_price, 0))::float as total_value,
                 im.created_at,
                 im.created_at as decided_at,
                 'Registo confirmado no inventário' as decision_reason,
@@ -342,15 +342,14 @@ export const decideDelivery = createServerFn({ method: "POST" })
     if (data.approve && lines.length) {
       for (const line of lines) {
         await pgQuery(
-          `insert into inventory_movements (item_id, quantity, movement_type, member_id, notes, unit_price, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
+          `insert into inventory_movements (item_id, quantity, movement_type, member_id, notes, created_by)
+           values ($1, $2, $3, $4, $5, $6)`,
           [
             line.item_id,
             tipo === "venda" ? -line.qty : line.qty,
             tipo === "venda" ? "venda_bairrista" : "entrega_bairrista",
             before.requester_member_id,
             `delivery:${data.id}`,
-            line.unit_value ?? 0,
             `web:${context.userId}`,
           ],
         );
