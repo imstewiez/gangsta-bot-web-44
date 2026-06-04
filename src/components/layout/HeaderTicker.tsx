@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
@@ -13,6 +13,7 @@ export function HeaderTicker() {
   }, [ticker.data?.messages]);
   const [index, setIndex] = useState(0);
   const message = messages[index % Math.max(messages.length, 1)] ?? DEFAULT_HEADER_TICKER_MESSAGES[0];
+  const duration = Math.max(11, Math.min(22, 8 + message.length * 0.11));
 
   useEffect(() => {
     setIndex(0);
@@ -20,12 +21,11 @@ export function HeaderTicker() {
 
   return (
     <div className="header-ticker" aria-label="Mensagens do header">
-      <div
-        className="header-ticker-runner"
-        key={`${index}-${message}`}
-        onAnimationEnd={() => setIndex((current) => (messages.length ? (current + 1) % messages.length : 0))}
-      >
-        <span className="header-ticker-item">
+      <div className="header-ticker-runner" key={`${index}-${message}`} style={{ "--ticker-duration": `${duration}s` } as CSSProperties}>
+        <span
+          className="header-ticker-item"
+          onAnimationEnd={() => setIndex((current) => (messages.length ? (current + 1) % messages.length : 0))}
+        >
           <span className="header-ticker-dot" />
           <span>{message}</span>
         </span>
