@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveCurrentMember } from "./pricing.server";
 import { logger } from "./logger.server";
 import { pgQuery } from "./pg.server";
-import { resolveItemPrices } from "./pricing.resolver";
+import { resolveItemPrices, resolveMemberPriceTier } from "./pricing.resolver";
 import { getSurchargesForItems } from "./tier-pricing.functions";
 
 export type RecipeRow = {
@@ -100,9 +100,19 @@ async function getDbItemsByIds(ids: number[]): Promise<Map<number, DbPriceRow>> 
   return new Map(rows.map((r) => [r.id, r]));
 }
 
-async function getDbRecipesForItemIds(itemIds: number[]): Promise<Map<number, MergedRecipe>> {
+async function getDbRecipesForItemIds(itemIds: number[], memberTier: string | null = null): Promise<Map<number, MergedRecipe>> {
   const unique = Array.from(new Set(itemIds.filter((id) => Number.isFinite(id) && id > 0)));
   if (unique.length === 0) return new Map();
+
+  const params: unknown[] = [unique];
+  const overrideJoin = memberTier
+    ? `left join recipe_ingredient_tier_overrides o
+          on o.recipe_id = cr.id
+         and o.ingredient_item_id = ri.ingredient_item_id
+         and o.tier = $2`
+    : "";
+  if (memberTier) params.push(memberTier);
+
   const rows = await pgQuery<{
     output_item_id: number;
     output_name: string;
@@ -116,18 +126,19 @@ async function getDbRecipesForItemIds(itemIds: number[]): Promise<Map<number, Me
             out_i.name as output_name,
             ri.ingredient_item_id,
             ing_i.name as ingredient_name,
-            ri.quantity::float as quantity,
+            ${memberTier ? "coalesce(o.quantity, ri.quantity)" : "ri.quantity"}::float as quantity,
             ing_i.category as ingredient_category,
             ing_i.subcategory as ingredient_subcategory
      from craft_recipes cr
      join items out_i on out_i.id = cr.item_id
      left join recipe_ingredients ri on ri.recipe_id = cr.id
+     ${overrideJoin}
      left join items ing_i on ing_i.id = ri.ingredient_item_id
      where cr.item_id = any($1::int[])
        and coalesce(out_i.active, true) = true
        and out_i.deleted_at is null
      order by out_i.name, ing_i.name`,
-    [unique],
+    params,
   );
 
   const map = new Map<number, MergedRecipe>();
@@ -151,7 +162,7 @@ async function getDbRecipesForItemIds(itemIds: number[]): Promise<Map<number, Me
   return map;
 }
 
-export async function getMergedRecipes(): Promise<Record<string, MergedRecipe>> {
+export async function getMergedRecipes(memberTier: string | null = null): Promise<Record<string, MergedRecipe>> {
   const rows = await pgQuery<{ item_id: number }>(
     `select distinct cr.item_id
      from craft_recipes cr
@@ -164,26 +175,27 @@ export async function getMergedRecipes(): Promise<Record<string, MergedRecipe>> 
        and ing_i.deleted_at is null
        and coalesce(ri.quantity, 0) > 0`,
   );
-  const map = await getDbRecipesForItemIds(rows.map((r) => r.item_id));
+  const map = await getDbRecipesForItemIds(rows.map((r) => r.item_id), memberTier);
   return Object.fromEntries(Array.from(map.entries()).map(([itemId, recipe]) => [String(itemId), recipe]));
 }
 
-export async function getMergedRecipeForItemName(itemName: string): Promise<MergedRecipe | null> {
+export async function getMergedRecipeForItemName(itemName: string, memberTier: string | null = null): Promise<MergedRecipe | null> {
   const row = await pgQuery<{ id: number }>(
     `select id from items where name = $1 and coalesce(active, true) = true and deleted_at is null limit 1`,
     [itemName],
   );
   const id = row[0]?.id;
   if (!id) return null;
-  return (await getDbRecipesForItemIds([id])).get(id) ?? null;
+  return (await getDbRecipesForItemIds([id], memberTier)).get(id) ?? null;
 }
 
 export const listRecipes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<RecipeRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
+    const priceTier = resolveMemberPriceTier(me?.tier ?? null, me?.role_label ?? null);
     const canSeeCosts = me?.is_manager ?? false;
-    const recipes = Object.values(await getMergedRecipes());
+    const recipes = Object.values(await getMergedRecipes(priceTier));
     const result: RecipeRow[] = [];
     const outputIds = recipes.map((r) => r.output_item_id);
     const ingredientIds = recipes.flatMap((r) => r.inputs.map((i) => i.item_id));
@@ -193,7 +205,7 @@ export const listRecipes = createServerFn({ method: "GET" })
     for (const recipe of recipes) {
       const output = dbItems.get(recipe.output_item_id);
       if (!output) continue;
-      const outPrices = resolveItemPrices(output, null, me?.tier ?? null, surchargeMap.get(output.id) ?? null);
+      const outPrices = resolveItemPrices(output, null, priceTier, surchargeMap.get(output.id) ?? null);
       const officialCost = internalCost(outPrices.estimated_value);
       const ingredients: RecipeRow["ingredients"] = [];
 
@@ -262,14 +274,15 @@ export const computeCraftFeasibility = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<CraftFeasibility> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
+    const priceTier = resolveMemberPriceTier(me?.tier ?? null, me?.role_label ?? null);
     const canSeeCosts = me?.is_manager ?? false;
-    const recipe = (await getDbRecipesForItemIds([data.recipe_id])).get(data.recipe_id);
+    const recipe = (await getDbRecipesForItemIds([data.recipe_id], priceTier)).get(data.recipe_id);
     if (!recipe) throw new Error("Receita não encontrada na Gestão de Materiais");
     const dbItems = await getDbItemsByIds([data.recipe_id, ...recipe.inputs.map((i) => i.item_id)]);
     const output = dbItems.get(data.recipe_id);
     if (!output) throw new Error("Item da receita não encontrado");
     const surchargeMap = await getSurchargesForItems([output.id]);
-    const headPrices = resolveItemPrices(output, null, me?.tier ?? null, surchargeMap.get(output.id) ?? null);
+    const headPrices = resolveItemPrices(output, null, priceTier, surchargeMap.get(output.id) ?? null);
     const ingredients: CraftFeasibility["ingredients"] = [];
 
     for (const input of paymentInputsForOrder(output, recipe.inputs)) {
@@ -323,9 +336,10 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<CraftFeasibilityBatch> => {
     try {
       const me = await resolveCurrentMember(context.supabase, context.userId);
+      const priceTier = resolveMemberPriceTier(me?.tier ?? null, me?.role_label ?? null);
       const canSeeCosts = me?.is_manager ?? false;
       const dbItems = await getDbItemsByIds(data.lines.map((l) => l.item_id));
-      const recipeMap = await getDbRecipesForItemIds(data.lines.map((l) => l.item_id));
+      const recipeMap = await getDbRecipesForItemIds(data.lines.map((l) => l.item_id), priceTier);
       const ingredientIds = Array.from(new Set(Array.from(recipeMap.values()).flatMap((r) => r.inputs.map((i) => i.item_id))));
       const ingredientItems = await getDbItemsByIds(ingredientIds);
       const allIngredients = new Map<string, { name: string; needed: number; qty_per_recipe: number; unit_cost: number; line_cost: number }>();
@@ -338,7 +352,7 @@ export const computeCraftFeasibilityBatch = createServerFn({ method: "POST" })
         const recipe = recipeMap.get(line.item_id);
         if (!recipe) continue;
         items.push({ item_name: item.name, requested_qty: line.quantity });
-        const itemPrices = resolveItemPrices(item, null);
+        const itemPrices = resolveItemPrices(item, null, priceTier);
         hiddenCost += internalCost(itemPrices.estimated_value) * line.quantity;
 
         for (const input of paymentInputsForOrder(item, recipe.inputs)) {
