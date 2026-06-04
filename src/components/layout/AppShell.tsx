@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Sparkles } from "lucide-react";
+import { Activity, Sparkles } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
@@ -23,12 +23,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="app-shell-topbar mx-auto grid w-full max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 md:px-4 lg:grid-cols-[minmax(150px,auto)_minmax(220px,1fr)_auto]">
               <div className="liquid-content flex min-w-0 items-center gap-2 sm:gap-3">
                 <MobileSidebarButton />
-                <span className="shell-liquid-mark hidden shrink-0 sm:grid">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </span>
-                <div className="min-w-0">
-                  <div className="text-display truncate text-[10px] tracking-[0.22em] text-primary sm:tracking-[0.28em]">Ballas Gang</div>
-                  <div className="hidden truncate text-xs text-muted-foreground/70 sm:block">Painel interno</div>
+                <div className="hidden min-w-0 sm:block">
+                  <div className="text-display truncate text-[10px] tracking-[0.22em] text-primary sm:tracking-[0.28em]">Centro de operações</div>
+                  <div className="hidden truncate text-xs text-muted-foreground/70 sm:block">Atividade, encomendas e gestão do bairro</div>
                 </div>
               </div>
 
@@ -60,7 +57,7 @@ export function PageHeader({
   eyebrow,
   title,
   action,
-  icon: Icon = Sparkles,
+  icon: Icon = Activity,
 }: {
   eyebrow?: string;
   title: string;
