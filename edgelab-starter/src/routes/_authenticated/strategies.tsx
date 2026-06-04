@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BrainCircuit } from "lucide-react";
 
-import { PageHeader } from "../../components/layout/AppShell";
+import { EdgeLabPageHeader } from "../../components/layout/EdgeLabShell";
 import { StrategyDraftForm } from "../../components/trading/StrategyDraftForm";
 
 export const Route = createFileRoute("/_authenticated/strategies")({
@@ -11,7 +11,12 @@ export const Route = createFileRoute("/_authenticated/strategies")({
 function StrategiesRoute() {
   return (
     <>
-      <PageHeader eyebrow="Strategy lab" title="Strategies" icon={BrainCircuit} />
+      <EdgeLabPageHeader
+        eyebrow="Strategy lab"
+        title="Strategies"
+        description="Create deterministic strategy rules before running a backtest."
+        icon={BrainCircuit}
+      />
 
       <div className="mb-6 rounded-3xl border border-primary/20 bg-primary/8 p-5 text-sm text-muted-foreground">
         <p>
