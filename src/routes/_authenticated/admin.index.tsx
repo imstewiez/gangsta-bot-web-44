@@ -1,16 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
 import { listAppUsers, setUserRole, checkSuperAdminAccess } from "@/lib/admin.functions";
+import { getHeaderTickerMessages, updateHeaderTickerMessages } from "@/lib/header-ticker.functions";
 
 import { PageHeader } from "@/components/layout/AppShell";
+import { Button } from "@/components/ui/button";
 import { ButtonLoading } from "@/components/ui/ButtonLoading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { fmtDate } from "@/lib/domain";
 import { toast } from "sonner";
-import { Shield, ShieldOff, Crown, Loader2, Users } from "lucide-react";
-import { PageSkeleton } from "@/components/layout/PageSkeleton";
-import { EmptyState } from "@/components/layout/EmptyState";
+import { Shield, ShieldOff, Crown, Loader2, Users, MessageSquareText, RotateCcw } from "lucide-react";
 import { PageErrorBoundary } from "@/components/layout/PageErrorBoundary";
 import { Reveal } from "@/components/layout/Reveal";
 import { ROLE_LABELS, EMPTY_STATE, LOADING, beautifyError } from "@/lib/messages";
@@ -28,10 +30,18 @@ function AdminIndexPage() {
   const superCheck = useQuery({ queryKey: ["superAdminCheck"], queryFn: () => superFn() });
   const listFn = useAuthedServerFn(listAppUsers);
   const setFn = useAuthedServerFn(setUserRole);
+  const tickerFn = useAuthedServerFn(getHeaderTickerMessages);
+  const updateTickerFn = useAuthedServerFn(updateHeaderTickerMessages);
   const qc = useQueryClient();
   const users = useQuery({ queryKey: ["appUsers"], queryFn: () => listFn() });
+  const ticker = useQuery({ queryKey: ["headerTickerMessages"], queryFn: () => tickerFn() });
 
   const isCallerSuper = superCheck.data?.is_superadmin ?? false;
+  const [tickerDraft, setTickerDraft] = useState("");
+
+  useEffect(() => {
+    if (ticker.data?.messages) setTickerDraft(ticker.data.messages.join("\n"));
+  }, [ticker.data?.messages]);
 
   const m = useMutation({
     mutationFn: (v: {
@@ -66,6 +76,22 @@ function AdminIndexPage() {
     },
   });
 
+  const tickerMutation = useMutation({
+    mutationFn: () => {
+      const messages = tickerDraft
+        .split("\n")
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+      return updateTickerFn({ data: { messages } });
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["headerTickerMessages"] });
+      setTickerDraft(result.messages.join("\n"));
+      toast.success("Frases do header atualizadas");
+    },
+    onError: (e: Error) => toast.error(beautifyError(e)),
+  });
+
   if (superCheck.isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
   return (
@@ -75,6 +101,55 @@ function AdminIndexPage() {
         title="Definições"
         description="Gerir permissões e sincronizar dados"
       />
+
+      {isCallerSuper && (
+        <Reveal direction="up" delay={80}>
+          <Card className="interactive-card mb-5 border-primary/25 bg-primary/[0.03]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-display text-sm">
+                <MessageSquareText className="h-4 w-4 text-primary" />
+                Frases do header
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Uma frase por linha. Estas mensagens aparecem no ticker do topo da app e passam em movimento contínuo.
+              </p>
+              <Textarea
+                value={tickerDraft}
+                onChange={(event) => setTickerDraft(event.target.value)}
+                rows={6}
+                maxLength={2200}
+                placeholder="Escreve uma frase por linha..."
+                className="font-medium"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                <span>Máximo recomendado: 12 frases · 160 caracteres por frase.</span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTickerDraft((ticker.data?.defaults ?? []).join("\n"))}
+                  >
+                    <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                    Repor base
+                  </Button>
+                  <ButtonLoading
+                    size="sm"
+                    loading={tickerMutation.isPending}
+                    disabled={tickerMutation.isPending || !tickerDraft.trim()}
+                    onClick={() => tickerMutation.mutate()}
+                  >
+                    Guardar frases
+                  </ButtonLoading>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Reveal>
+      )}
+
       <Reveal direction="up" delay={150}>
         <Card className="interactive-card">
           <CardHeader>
