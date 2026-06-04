@@ -66,6 +66,7 @@ function Page() {
   const isManager = me.data?.is_manager ?? false;
   const [tab, setTab] = useState("mine");
   const [mineSub, setMineSub] = useState<DeliveryStatusFilter>("active");
+  const [manageSub, setManageSub] = useState<DeliveryStatusFilter>("active");
 
   return (
     <>
@@ -87,7 +88,18 @@ function Page() {
                 <TabsContent value="archived"><DelList scope="mine" canDecide={false} statusFilter="archived" /></TabsContent>
               </Tabs>
             </TabsContent>
-            {isManager && <TabsContent value="manage" className="mt-4"><DelList scope="manage" canDecide statusFilter="active" /></TabsContent>}
+            {isManager && (
+              <TabsContent value="manage" className="mt-4">
+                <Tabs value={manageSub} onValueChange={(v) => setManageSub(v as DeliveryStatusFilter)}>
+                  <TabsList className="mb-3">
+                    <TabsTrigger value="active" className="interactive-tab">A decorrer</TabsTrigger>
+                    <TabsTrigger value="archived" className="interactive-tab">Histórico</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="active"><DelList scope="manage" canDecide statusFilter="active" /></TabsContent>
+                  <TabsContent value="archived"><DelList scope="manage" canDecide statusFilter="archived" /></TabsContent>
+                </Tabs>
+              </TabsContent>
+            )}
           </Tabs>
         </FadeIn>
       </Reveal>
@@ -99,12 +111,11 @@ function DelList({ scope, canDecide, statusFilter }: { scope: "mine" | "manage";
   const fn = useAuthedServerFn(listDeliveries);
   const decFn = useAuthedServerFn(decideDelivery);
   const qc = useQueryClient();
-  const list = useQuery({ queryKey: ["deliveries", scope], queryFn: () => fn({ data: { scope } }) });
+  const list = useQuery({ queryKey: ["deliveries", scope, statusFilter], queryFn: () => fn({ data: { scope } }) });
   const rows = useMemo(() => {
     const data = list.data ?? [];
-    if (scope === "manage") return data;
     return data.filter((d) => statusFilter === "active" ? d.status === "pending" : d.status !== "pending");
-  }, [list.data, scope, statusFilter]);
+  }, [list.data, statusFilter]);
 
   const m = useMutation({
     mutationFn: (v: { id: string; approve: boolean }) => decFn({ data: v }),
@@ -128,8 +139,8 @@ function DelList({ scope, canDecide, statusFilter }: { scope: "mine" | "manage";
     return (
       <Card className="interactive-card p-10 text-center">
         <PackageOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-        <p className="text-sm font-medium text-foreground">{scope === "mine" ? (statusFilter === "active" ? EMPTY_STATE.deliveries.title : EMPTY_STATE.deliveriesHistory?.title ?? "Sem histórico") : EMPTY_STATE.deliveriesPending.title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{scope === "mine" ? (statusFilter === "active" ? EMPTY_STATE.deliveries.description : EMPTY_STATE.deliveriesHistory?.description ?? "Ainda não há entregas fechadas.") : EMPTY_STATE.deliveriesPending.description}</p>
+        <p className="text-sm font-medium text-foreground">{scope === "mine" ? (statusFilter === "active" ? EMPTY_STATE.deliveries.title : EMPTY_STATE.deliveriesHistory?.title ?? "Sem histórico") : statusFilter === "active" ? EMPTY_STATE.deliveriesPending.title : EMPTY_STATE.deliveriesHistory?.title ?? "Sem arquivo"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{scope === "mine" ? (statusFilter === "active" ? EMPTY_STATE.deliveries.description : EMPTY_STATE.deliveriesHistory?.description ?? "Ainda não há entregas fechadas.") : statusFilter === "active" ? EMPTY_STATE.deliveriesPending.description : EMPTY_STATE.deliveriesHistory?.description ?? "Ainda não há entregas arquivadas."}</p>
       </Card>
     );
   }
@@ -215,7 +226,7 @@ function NewDelivery() {
     return Array.from(map.values());
   }, [cat.data, buyCat.data]);
 
-  const items = useMemo(() => allItems.filter((i) => tipo === "entrega" ? i.side === "compra" || i.side === "ambos" : i.side === "venda" || i.side === "ambos"), [allItems, tipo]);
+  const items = useMemo(() => allItems.filter((i) => i.side === "compra" || i.side === "ambos"), [allItems]);
   const validLines = lines.filter((line) => line.item_id && lineQty(line) > 0);
   const hasResponsible = Boolean(responsavel);
   const hasManagers = (managers.data ?? []).length > 0;
