@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, Sparkles } from "lucide-react";
+import { Activity } from "lucide-react";
 
 import { CinematicBackdrop } from "./CinematicBackdrop";
 import { AppSidebar } from "./AppSidebar";
