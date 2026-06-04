@@ -24,7 +24,6 @@ type RawDeliveryLine = Partial<DeliveryLine> & {
   effectivePrice?: number | string;
   basePrice?: number | string;
   lineValue?: number | string;
-  category?: string;
 };
 
 type DeliveryRow = {
@@ -45,7 +44,6 @@ type DeliveryRow = {
 };
 
 type RawDeliveryRow = Omit<DeliveryRow, "lines"> & { lines: unknown };
-type MovementDeliveryRow = RawDeliveryRow & { source_request_id: string | null };
 
 const SQL_NORMALIZED_NAME = "translate(lower(name), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')";
 const RESPONSIBLE_TIERS = ["patrao_di_zona", "kingpin", "manda_chuva"];
@@ -63,8 +61,8 @@ function asOptionalNumber(value: unknown): number | null {
 }
 function normalizeStatus(status: unknown): string {
   const value = normalizeText(status);
-  if (["approved", "aprovado", "aprovada", "received", "recebido", "recebida", "comprado", "comprada", "done", "closed", "completed", "concluido", "concluida"].includes(value)) return "approved";
-  if (["rejected", "recusado", "recusada", "declined", "cancelled", "canceled", "cancelado", "cancelada"].includes(value)) return "rejected";
+  if (["approved", "aprovado", "aprovada", "received", "recebido", "recebida", "comprado", "comprada", "done", "closed", "completed", "concluido", "concluida", "fulfilled", "ready"].includes(value)) return "approved";
+  if (["rejected", "recusado", "recusada", "declined", "denied", "cancelled", "canceled", "cancelado", "cancelada"].includes(value)) return "rejected";
   return "pending";
 }
 
@@ -178,19 +176,68 @@ async function hydrateDeliveryRow(row: RawDeliveryRow): Promise<DeliveryRow> {
 
 export const listDeliveries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { scope?: "mine" | "manage" }) => ({
+  .inputValidator((d: { scope?: "mine" | "manage"; statusFilter?: "active" | "archived" }) => ({
     scope: DeliveryScopeSchema.optional().parse(d?.scope) ?? "mine",
+    statusFilter: z.enum(["active", "archived"]).optional().parse(d?.statusFilter) ?? "active",
   }))
   .handler(async ({ data, context }): Promise<DeliveryRow[]> => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
+    if (data.scope === "mine" && !me) return [];
+    if (data.scope === "manage" && !me?.is_manager) return [];
+
+    if (data.statusFilter === "archived") {
+      const params: unknown[] = [];
+      let memberFilter = "";
+      if (data.scope === "mine") {
+        params.push(me!.id);
+        memberFilter = `and im.member_id = $${params.length}`;
+      }
+
+      const movementRows = await pgQuery<RawDeliveryRow>(
+        `select ('movement:' || im.id::text) as id,
+                im.member_id as requester_member_id,
+                coalesce(m.display_name, m.nickname) as requester_name,
+                'approved' as status,
+                case when im.movement_type ilike '%venda%' or im.movement_type ilike '%sale%' then 'venda' else 'entrega' end as tipo,
+                jsonb_build_array(jsonb_build_object(
+                  'item_id', im.item_id,
+                  'item_name', coalesce(i.name, 'Item #' || im.item_id::text),
+                  'qty', abs(im.quantity),
+                  'unit_price', coalesce(im.unit_price, i.morador_purchase_price, i.purchase_price, 0)
+                )) as lines,
+                coalesce(im.notes, '') as notes,
+                abs(im.quantity)::float as total_qty,
+                abs(im.quantity * coalesce(im.unit_price, i.morador_purchase_price, i.purchase_price, 0))::float as total_value,
+                im.created_at,
+                im.created_at as decided_at,
+                'Registo confirmado no inventário' as decision_reason,
+                null::int as responsavel_member_id,
+                null::text as responsavel_name
+         from inventory_movements im
+         left join items i on i.id = im.item_id
+         left join members m on m.id = im.member_id
+         where im.member_id is not null
+           and im.item_id is not null
+           and (
+             im.movement_type in ('entrega_bairrista','entrega_oficial','venda_bairrista')
+             or im.movement_type ilike '%entreg%'
+             or im.movement_type ilike '%venda%'
+             or im.movement_type ilike '%delivery%'
+             or im.movement_type ilike '%sale%'
+           )
+           ${memberFilter}
+         order by im.created_at desc
+         limit 500`,
+        params,
+      );
+      return Promise.all(movementRows.map((row) => hydrateDeliveryRow(row)));
+    }
+
     const params: unknown[] = [];
-    let where = "where true";
+    let where = "where coalesce(r.status, 'pending') in ('pending','pendente','open','aberto','em_aberto')";
     if (data.scope === "mine") {
-      if (!me) return [];
-      params.push(me.id);
+      params.push(me!.id);
       where += ` and r.requester_member_id = $${params.length}`;
-    } else if (!me?.is_manager) {
-      return [];
     }
 
     const requestRows = await pgQuery<RawDeliveryRow>(
@@ -213,74 +260,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
       params,
     ).catch(() => []);
 
-    const requestIds = new Set(requestRows.map((row) => row.id));
-    const movementParams: unknown[] = [];
-    let movementMemberFilter = "";
-    if (data.scope === "mine") {
-      if (!me) return [];
-      movementParams.push(me.id);
-      movementMemberFilter = `and im.member_id = $${movementParams.length}`;
-    }
-
-    const movementRows = await pgQuery<MovementDeliveryRow>(
-      `with movement_base as (
-         select im.id, im.member_id, im.item_id, im.quantity, im.movement_type,
-                im.notes, im.unit_price as unit_value, im.created_at,
-                i.name as item_name,
-                coalesce(i.morador_purchase_price, i.purchase_price, 0)::float as fallback_unit_price,
-                coalesce(m.display_name, m.nickname) as requester_name,
-                case
-                  when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(coalesce(im.notes, ''), '^delivery:', '')
-                  else null
-                end as source_request_id,
-                case
-                  when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(coalesce(im.notes, ''), '^delivery:', '')
-                  when coalesce(im.notes, '') ~ '^order:' then regexp_replace(coalesce(im.notes, ''), '^order:', '')
-                  else 'movement:' || im.id::text
-                end as source_group
-         from inventory_movements im
-         left join items i on i.id = im.item_id
-         left join members m on m.id = im.member_id
-         where im.member_id is not null
-           and (
-             im.movement_type in ('entrega_bairrista','entrega_oficial','venda_bairrista')
-             or im.movement_type ilike '%entreg%'
-             or im.movement_type ilike '%venda%'
-             or im.movement_type ilike '%delivery%'
-             or im.movement_type ilike '%sale%'
-           )
-           ${movementMemberFilter}
-       )
-       select ('movement:' || min(id)::text) as id,
-              member_id as requester_member_id,
-              requester_name,
-              'approved' as status,
-              case when movement_type ilike '%venda%' or movement_type ilike '%sale%' then 'venda' else 'entrega' end as tipo,
-              jsonb_agg(jsonb_build_object(
-                'item_id', item_id,
-                'item_name', item_name,
-                'qty', abs(quantity),
-                'unit_value', coalesce(unit_value, fallback_unit_price, 0)
-              ) order by item_name) as lines,
-              coalesce(max(notes), '') as notes,
-              sum(abs(quantity))::float as total_qty,
-              sum(abs(quantity) * coalesce(unit_value, fallback_unit_price, 0))::float as total_value,
-              min(created_at) as created_at,
-              max(created_at) as decided_at,
-              'Registo confirmado no inventário' as decision_reason,
-              null::int as responsavel_member_id,
-              null::text as responsavel_name,
-              source_request_id
-       from movement_base
-       group by source_group, source_request_id, member_id, requester_name, movement_type
-       order by max(created_at) desc
-       limit 500`,
-      movementParams,
-    ).catch(() => []);
-
-    const fallbackRows = movementRows.filter((row) => !row.source_request_id || !requestIds.has(row.source_request_id));
-    const combined = [...requestRows, ...fallbackRows].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-    return Promise.all(combined.map((row) => hydrateDeliveryRow(row)));
+    return Promise.all(requestRows.map((row) => hydrateDeliveryRow(row)));
   });
 
 export const createDelivery = createServerFn({ method: "POST" })
