@@ -43,6 +43,9 @@ type DeliveryRow = {
   responsavel_name: string | null;
 };
 
+type RawDeliveryRow = Omit<DeliveryRow, "lines"> & { lines: unknown };
+type MovementDeliveryRow = RawDeliveryRow & { source_request_id: string | null };
+
 const SQL_NORMALIZED_NAME = "translate(lower(name), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')";
 const RESPONSIBLE_TIERS = ["patrao_di_zona", "kingpin", "manda_chuva"];
 
@@ -152,6 +155,20 @@ function deliveryTotals(lines: DeliveryLine[]) {
   );
 }
 
+async function hydrateDeliveryRow(row: RawDeliveryRow): Promise<DeliveryRow> {
+  const tipo = row.tipo === "venda" ? "venda" : "entrega";
+  const lines = await normalizeDeliveryLines(row.lines, false, tipo);
+  const totals = deliveryTotals(lines);
+  return {
+    ...row,
+    status: row.status || "pending",
+    tipo,
+    lines,
+    total_qty: row.total_qty || totals.totalQty,
+    total_value: tipo === "entrega" ? 0 : (row.total_value || totals.totalValue),
+  };
+}
+
 export const listDeliveries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { scope?: "mine" | "manage" }) => ({
@@ -169,7 +186,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
       return [];
     }
 
-    const rows = await pgQuery<Omit<DeliveryRow, "lines"> & { lines: unknown }>(
+    const requestRows = await pgQuery<RawDeliveryRow>(
       `select r.id, r.requester_member_id, m.display_name as requester_name,
               coalesce(r.status, 'pending') as status,
               coalesce(r.tipo, 'entrega') as tipo,
@@ -189,12 +206,66 @@ export const listDeliveries = createServerFn({ method: "GET" })
       params,
     );
 
-    return Promise.all(rows.map(async (row) => {
-      const tipo = row.tipo === "venda" ? "venda" : "entrega";
-      const lines = await normalizeDeliveryLines(row.lines, false, tipo);
-      const totals = deliveryTotals(lines);
-      return { ...row, lines, total_qty: row.total_qty || totals.totalQty, total_value: tipo === "entrega" ? 0 : (row.total_value || totals.totalValue) };
-    }));
+    const requestIds = new Set(requestRows.map((row) => row.id));
+    const movementParams: unknown[] = [];
+    let movementMemberFilter = "";
+    if (data.scope === "mine") {
+      if (!me) return [];
+      movementParams.push(me.id);
+      movementMemberFilter = `and im.member_id = $${movementParams.length}`;
+    }
+
+    const movementRows = await pgQuery<MovementDeliveryRow>(
+      `with movement_base as (
+         select im.id, im.member_id, im.item_id, im.quantity, im.movement_type,
+                im.notes, im.unit_value, im.total_value, im.created_at,
+                i.name as item_name,
+                coalesce(m.display_name, m.nickname) as requester_name,
+                case
+                  when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(coalesce(im.notes, ''), '^delivery:', '')
+                  else null
+                end as source_request_id,
+                case
+                  when coalesce(im.notes, '') ~ '^delivery:' then regexp_replace(coalesce(im.notes, ''), '^delivery:', '')
+                  else 'movement:' || im.id::text
+                end as source_group
+         from inventory_movements im
+         left join items i on i.id = im.item_id
+         left join members m on m.id = im.member_id
+         where im.member_id is not null
+           and im.movement_type in ('entrega_bairrista','entrega_oficial','venda_bairrista')
+           ${movementMemberFilter}
+       )
+       select ('movement:' || min(id)::text) as id,
+              member_id as requester_member_id,
+              requester_name,
+              'approved' as status,
+              case when movement_type = 'venda_bairrista' then 'venda' else 'entrega' end as tipo,
+              jsonb_agg(jsonb_build_object(
+                'item_id', item_id,
+                'item_name', item_name,
+                'qty', abs(quantity),
+                'unit_value', coalesce(unit_value, 0)
+              ) order by item_name) as lines,
+              coalesce(max(notes), '') as notes,
+              sum(abs(quantity))::float as total_qty,
+              sum(coalesce(total_value, abs(quantity) * coalesce(unit_value, 0), 0))::float as total_value,
+              min(created_at) as created_at,
+              max(created_at) as decided_at,
+              'Registo confirmado no inventário' as decision_reason,
+              null::int as responsavel_member_id,
+              null::text as responsavel_name,
+              source_request_id
+       from movement_base
+       group by source_group, source_request_id, member_id, requester_name, movement_type
+       order by max(created_at) desc
+       limit 500`,
+      movementParams,
+    );
+
+    const fallbackRows = movementRows.filter((row) => !row.source_request_id || !requestIds.has(row.source_request_id));
+    const combined = [...requestRows, ...fallbackRows].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    return Promise.all(combined.map((row) => hydrateDeliveryRow(row)));
   });
 
 export const createDelivery = createServerFn({ method: "POST" })
