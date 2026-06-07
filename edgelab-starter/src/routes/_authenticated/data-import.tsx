@@ -3,6 +3,7 @@ import { DatabaseZap } from "lucide-react";
 
 import { EdgeLabPageHeader } from "../../components/layout/EdgeLabShell";
 import { DataImportPanel } from "../../components/trading/DataImportPanel";
+import { DatasetListPanel } from "../../components/trading/DatasetListPanel";
 
 export const Route = createFileRoute("/_authenticated/data-import")({
   component: DataImportRoute,
@@ -14,7 +15,7 @@ function DataImportRoute() {
       <EdgeLabPageHeader
         eyebrow="Market data"
         title="Data Import"
-        description="Import and validate historical OHLC candle data before running strategies."
+        description="Import, validate and save historical OHLC candle data before running strategies."
         icon={DatabaseZap}
       />
 
@@ -24,7 +25,10 @@ function DataImportRoute() {
         </p>
       </div>
 
-      <DataImportPanel />
+      <div className="grid gap-6">
+        <DataImportPanel />
+        <DatasetListPanel />
+      </div>
     </>
   );
 }
