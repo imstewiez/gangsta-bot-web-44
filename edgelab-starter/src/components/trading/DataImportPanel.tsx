@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Upload, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Upload, CheckCircle2, AlertTriangle, Save } from "lucide-react";
 
 import { getCsvHeaders } from "../../lib/trading/simple-csv";
 import { importMarketData, type MarketColumnMap } from "../../lib/trading/import-market-data";
 import type { MarketCandle } from "../../lib/trading/market-data";
+import { saveDataset } from "../../lib/trading/datasets.client";
 
 type ImportState = {
   fileName: string;
@@ -25,8 +26,15 @@ export function DataImportPanel() {
   const [map, setMap] = useState<MarketColumnMap>(defaultMap);
   const [candles, setCandles] = useState<MarketCandle[]>([]);
   const [issues, setIssues] = useState<Array<{ row: number; message: string }>>([]);
+  const [datasetName, setDatasetName] = useState("");
+  const [symbol, setSymbol] = useState("XAUUSD");
+  const [timeframe, setTimeframe] = useState("1H");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const canValidate = Boolean(importState?.raw && map.time && map.open && map.high && map.low && map.close);
+  const canSave = candles.length > 0 && datasetName.trim().length > 0 && symbol.trim().length > 0 && timeframe.trim().length > 0 && !saving;
 
   const summary = useMemo(() => {
     if (!candles.length) return null;
@@ -44,8 +52,11 @@ export function DataImportPanel() {
     const smartMap = guessColumnMap(headers);
     setImportState({ fileName: file.name, raw, headers });
     setMap(smartMap);
+    setDatasetName(file.name.replace(/\.csv$/i, ""));
     setCandles([]);
     setIssues([]);
+    setSaveMessage(null);
+    setSaveError(null);
   }
 
   function validate() {
@@ -53,6 +64,29 @@ export function DataImportPanel() {
     const result = importMarketData(importState.raw, map);
     setCandles(result.candles);
     setIssues(result.issues);
+    setSaveMessage(null);
+    setSaveError(null);
+  }
+
+  async function saveValidatedDataset() {
+    if (!canSave) return;
+    setSaving(true);
+    setSaveMessage(null);
+    setSaveError(null);
+
+    try {
+      const saved = await saveDataset({
+        name: datasetName.trim(),
+        symbol: symbol.trim().toUpperCase(),
+        timeframe: timeframe.trim().toUpperCase(),
+        candles,
+      });
+      setSaveMessage(`Saved dataset ${saved.name} with ${saved.row_count} candles.`);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save dataset");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -82,6 +116,23 @@ export function DataImportPanel() {
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Selected file</p>
             <p className="mt-1 truncate font-semibold">{importState.fileName}</p>
             <p className="mt-2 text-sm text-muted-foreground">Detected {importState.headers.length} columns.</p>
+          </div>
+        )}
+
+        {candles.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-border/40 bg-background/30 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Save dataset</p>
+            <div className="mt-3 grid gap-3">
+              <input value={datasetName} onChange={(event) => setDatasetName(event.target.value)} placeholder="Dataset name" className="rounded-2xl border border-border/50 bg-background/60 px-3 py-2 text-sm outline-none focus:border-primary" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="Symbol" className="rounded-2xl border border-border/50 bg-background/60 px-3 py-2 text-sm uppercase outline-none focus:border-primary" />
+                <input value={timeframe} onChange={(event) => setTimeframe(event.target.value)} placeholder="Timeframe" className="rounded-2xl border border-border/50 bg-background/60 px-3 py-2 text-sm uppercase outline-none focus:border-primary" />
+              </div>
+              <button disabled={!canSave} onClick={saveValidatedDataset} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40">
+                <Save className="h-4 w-4" />
+                {saving ? "Saving..." : "Save dataset"}
+              </button>
+            </div>
           </div>
         )}
       </section>
@@ -134,6 +185,9 @@ export function DataImportPanel() {
             </div>
           </div>
         )}
+
+        {saveMessage && <div className="mt-5 rounded-2xl border border-success/30 bg-success/10 p-4 text-sm text-success">{saveMessage}</div>}
+        {saveError && <div className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{saveError}</div>}
       </section>
     </div>
   );
