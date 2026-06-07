@@ -5,24 +5,16 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "preview": "wrangler dev",
-    "deploy": "vite build && wrangler deploy --config wrangler.jsonc"
+    "preview": "wrangler dev --config wrangler.preview.jsonc",
+    "deploy:preview": "vite build && wrangler deploy --config wrangler.preview.jsonc"
   },
   "dependencies": {
-    "@cloudflare/vite-plugin": "^1.25.5",
-    "@supabase/supabase-js": "^2.105.4",
-    "@tailwindcss/vite": "^4.2.1",
-    "@tanstack/react-query": "^5.83.0",
-    "@tanstack/react-router": "^1.168.25",
-    "@tanstack/react-start": "^1.167.50",
     "@vitejs/plugin-react": "^5.0.4",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwindcss": "^4.2.1",
     "vite": "^7.3.1",
-    "wrangler": "^4.14.0",
-    "zod": "^3.24.2"
+    "wrangler": "^4.14.0"
   },
   "devDependencies": {
     "@types/node": "^22.16.5",
