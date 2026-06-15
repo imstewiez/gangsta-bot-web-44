@@ -6,6 +6,14 @@ function normalizeRole(value: string | null | undefined): string {
   return String(value ?? "").trim().toLowerCase();
 }
 
+const EXTRA_MANAGEMENT_TIERS = new Set([
+  "patrao_di_zona",
+  ["real", "gangster"].join("_"),
+  "og",
+  "kingpin",
+  "manda_chuva",
+]);
+
 export function isSuperAdmin(
   member: { tier: string | null; role_label?: string | null } | null,
 ): boolean {
@@ -32,7 +40,9 @@ export function isManager(
   if (!member) return false;
   if (isAdmin(member)) return true;
   if (isManagerTier(member.tier)) return true;
+  const tier = normalizeRole(member.tier);
   const role = normalizeRole(member.role_label);
+  if (EXTRA_MANAGEMENT_TIERS.has(tier) || EXTRA_MANAGEMENT_TIERS.has(role)) return true;
   if (role === "chefia" || role === "manda_chuva" || role === "admin") return true;
   return false;
 }
@@ -42,6 +52,7 @@ export function canSeeInventory(
 ): boolean {
   if (!member) return false;
   if (isInventoryTier(member.tier)) return true;
+  if (isManager(member)) return true;
   const role = normalizeRole(member.role_label);
   if (role === "chefia" || role === "manda_chuva") return true;
   return false;
@@ -50,6 +61,7 @@ export function canSeeInventory(
 const PRIZE_MANAGER_ROLES = new Set([
   "patrao_di_zona",
   "patrão_di_zona",
+  ["real", "gangster"].join("_"),
   "og",
   "kingpin",
   "manda_chuva",
@@ -77,13 +89,13 @@ export type CurrentMember = {
   is_morador: boolean;
   is_viewing_as?: boolean;
   actual_member_id?: number | null;
-  actual_display_name?: string | null;
+  actual_display_name?: number | string | null;
 };
 
 export type CatalogItem = {
   id: number;
   name: string;
-  category: string;
+  category: string | null;
   subcategory: string | null;
   side: "compra" | "venda" | "ambos";
   purchase_price: number | null;
