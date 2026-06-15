@@ -330,23 +330,26 @@ export const decideDelivery = createServerFn({ method: "POST" })
     await pgQuery(
       `update inventory_delivery_requests
        set status = $2,
-           decided_by = $3,
+           decision_by = $3,
            decided_at = now(),
-           decision_reason = $4
+           decision_reason = $4,
+           approver_discord_id = $5,
+           updated_at = now()
        where id = $1`,
-      [data.id, nextStatus, context.userId, data.reason ?? ""],
+      [data.id, nextStatus, context.userId, data.reason ?? "", me.discord_id ?? null],
     );
 
     if (data.approve && lines.length) {
       for (const line of lines) {
         await pgQuery(
-          `insert into inventory_movements (item_id, quantity, movement_type, member_id, notes, created_by)
-           values ($1, $2, $3, $4, $5, $6)`,
+          `insert into inventory_movements (item_id, quantity, movement_type, member_id, location, notes, created_by)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
           [
             line.item_id,
             tipo === "venda" ? -line.qty : line.qty,
             tipo === "venda" ? "venda_bairrista" : "entrega_bairrista",
             before.requester_member_id,
+            "armazem",
             `delivery:${data.id}`,
             `web:${context.userId}`,
           ],
