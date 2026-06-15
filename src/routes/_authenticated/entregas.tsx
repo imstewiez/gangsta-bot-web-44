@@ -66,7 +66,7 @@ function Page() {
   const isManager = me.data?.is_manager ?? false;
   const [tab, setTab] = useState("mine");
   const [mineSub, setMineSub] = useState<DeliveryStatusFilter>("active");
-  const [manageSub, setManageSub] = useState<DeliveryStatusFilter>("archived");
+  const [manageSub, setManageSub] = useState<DeliveryStatusFilter>("active");
 
   return (
     <>
@@ -96,7 +96,7 @@ function Page() {
                     <TabsTrigger value="archived" className="interactive-tab">Histórico</TabsTrigger>
                   </TabsList>
                   <TabsContent value="active"><DelList scope="manage" canDecide statusFilter="active" /></TabsContent>
-                  <TabsContent value="archived"><DelList scope="manage" canDecide statusFilter="archived" /></TabsContent>
+                  <TabsContent value="archived"><DelList scope="manage" canDecide={false} statusFilter="archived" /></TabsContent>
                 </Tabs>
               </TabsContent>
             )}
@@ -229,105 +229,81 @@ function NewDelivery() {
 
   const items = useMemo(() => allItems.filter((i) => i.side === "compra" || i.side === "ambos"), [allItems]);
   const validLines = lines.filter((line) => line.item_id && lineQty(line) > 0);
-  const hasResponsible = Boolean(responsavel);
-  const hasManagers = (managers.data ?? []).length > 0;
-  const canSubmit = hasResponsible && hasManagers && validLines.length > 0 && !mIsBusy(cat.isLoading, buyCat.isLoading, managers.isLoading);
+  const selectedValue = validLines.reduce((acc, line) => {
+    const item = allItems.find((i) => String(i.id) === line.item_id);
+    return acc + lineQty(line) * (item?.morador_purchase_price ?? item?.purchase_price ?? 0);
+  }, 0);
 
-  const deliveryOptions = useMemo(() => {
-    const groups = new Map<string, CatalogItem[]>();
-    for (const i of items) {
-      const catKey = filterItemForDisplay(i.name, i.category, i.subcategory);
-      if (!catKey) continue;
-      if (!groups.has(catKey)) groups.set(catKey, []);
-      groups.get(catKey)!.push(i);
-    }
-    const result: { value: string; label: string; group: string; groupColor?: string }[] = [];
-    for (const catKey of ARMORY_CAT_ORDER) {
-      const list = groups.get(catKey);
-      if (!list) continue;
-      const cfg = ARMORY_CAT_CONFIG[catKey];
-      result.push(...list.map((i) => ({ value: String(i.id), label: `${i.name} · ${cfg?.label ?? fmtCategoryLabel(catKey)}`, group: cfg?.label ?? fmtCategoryLabel(catKey), groupColor: cfg?.headerColor })));
-    }
-    return result;
-  }, [items]);
-
-  function handleClose() {
-    setOpen(false);
-    setLines([{ item_id: "", qty: "1" }]);
-    setNotes("");
-    setTipo("entrega");
-    setResponsavel("");
-  }
-
-  const m = useMutation({
-    mutationFn: () => createFn({ data: { lines: validLines.map((l) => ({ item_id: Number(l.item_id), qty: lineQty(l) })), notes: notes || null, tipo, responsavel_member_id: Number(responsavel) } }),
+  const mutation = useMutation({
+    mutationFn: () => createFn({ data: { lines: validLines.map((l) => ({ item_id: Number(l.item_id), qty: Number(l.qty) })), notes, tipo, responsavel_member_id: Number(responsavel) } }),
     onSuccess: () => {
-      toast.success(tipo === "venda" ? "Venda submetida" : "Entrega submetida");
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       qc.invalidateQueries({ queryKey: ["chefia-kpis"] });
-      handleClose();
+      toast.success(tipo === "venda" ? "Venda enviada" : "Entrega enviada");
+      setOpen(false);
+      setLines([{ item_id: "", qty: "1" }]);
+      setNotes("");
+      setTipo("entrega");
+      setResponsavel("");
     },
     onError: (e: Error) => toast.error(beautifyError(e)),
   });
 
-  function updateLine(index: number, patch: Partial<DeliveryLineInput>) {
-    setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
-  }
-
-  function changeTipo(nextTipo: DeliveryTipo) {
-    setTipo(nextTipo);
-    setLines([{ item_id: "", qty: "1" }]);
-  }
-
   return (
-    <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : handleClose())}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm"><Plus className="mr-1 h-4 w-4" />Nova entrega</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">{tipo === "venda" ? <Coins className="h-5 w-5 text-warning" /> : <Package className="h-5 w-5 text-info" />}{tipo === "venda" ? "Nova venda" : "Nova entrega"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4">
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Registar entrega/venda</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
           <div>
-            <label className="mb-1.5 block text-xs text-muted-foreground">Responsável</label>
-            <Select value={responsavel} onValueChange={setResponsavel}>
-              <SelectTrigger className={!hasResponsible ? "border-destructive/50" : undefined}><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
-              <SelectContent>{(managers.data ?? []).map((mgr) => <SelectItem key={mgr.id} value={String(mgr.id)}>{mgr.display_name ?? mgr.nick ?? `Membro #${mgr.id}`}</SelectItem>)}</SelectContent>
+            <label className="mb-1 block text-xs text-muted-foreground">Tipo</label>
+            <Select value={tipo} onValueChange={(v) => setTipo(v as DeliveryTipo)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="entrega">Entrega à firma</SelectItem>
+                <SelectItem value="venda">Venda ao morador</SelectItem>
+              </SelectContent>
             </Select>
-            {!hasResponsible && <p className="mt-1 text-[11px] text-destructive">Obrigatório.</p>}
-            {!managers.isLoading && !hasManagers && <p className="mt-1 text-[11px] text-destructive">Sem responsáveis disponíveis.</p>}
           </div>
           <div>
-            <label className="mb-1.5 block text-xs text-muted-foreground">Tipo</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => changeTipo("entrega")} className={cn("rounded-xl cursor-pointer border px-3 py-3 text-left text-sm transition-colors", tipo === "entrega" ? "border-info bg-info/15 text-info" : "border-border bg-background/35 hover:bg-primary/8")}>
-                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider"><Package className="h-3 w-3" />Entregar</div>
-                <div className="mt-1 text-xs text-muted-foreground">Entrada em stock</div>
-              </button>
-              <button type="button" onClick={() => changeTipo("venda")} className={cn("rounded-xl cursor-pointer border px-3 py-3 text-left text-sm transition-colors", tipo === "venda" ? "border-warning bg-warning/15 text-warning" : "border-border bg-background/35 hover:bg-primary/8")}>
-                <div className="inline-flex items-center gap-1.5 text-display text-[11px] uppercase tracking-wider"><Coins className="h-3 w-3" />Vender</div>
-                <div className="mt-1 text-xs text-muted-foreground">Venda a conferir</div>
-              </button>
-            </div>
+            <label className="mb-1 block text-xs text-muted-foreground">Responsável por conferir</label>
+            <SearchableSelect
+              value={responsavel}
+              onValueChange={setResponsavel}
+              placeholder="Escolhe um responsável"
+              searchPlaceholder="Pesquisar responsável..."
+              emptyText="Nenhum responsável encontrado"
+              options={(managers.data ?? []).map((m) => ({ value: String(m.id), label: m.display_name ?? `#${m.id}`, description: m.tier ?? undefined }))}
+            />
           </div>
-          {lines.map((line, idx) => (
-            <div key={idx} className="grid grid-cols-[1fr_100px_auto] gap-2">
-              <SearchableSelect value={line.item_id} onChange={(value) => updateLine(idx, { item_id: value })} options={deliveryOptions} placeholder="Material" searchPlaceholder="Procurar item..." emptyText="Nenhum item encontrado." />
-              <Input type="number" min={1} value={line.qty} onChange={(e) => updateLine(idx, { qty: e.target.value })} />
-              <Button size="sm" variant="ghost" onClick={() => setLines((current) => current.filter((_, i) => i !== idx))} disabled={lines.length === 1}><Trash2 className="h-4 w-4" /></Button>
-            </div>
-          ))}
-          <Button size="sm" variant="outline" onClick={() => setLines((current) => [...current, { item_id: "", qty: "1" }])}><Plus className="mr-1 h-4 w-4" />Mais uma linha</Button>
-          <div><label className="mb-1.5 block text-xs text-muted-foreground">Notas</label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Opcional" /></div>
+          <div className="space-y-2">
+            {lines.map((line, idx) => (
+              <div key={idx} className="grid grid-cols-[1fr_100px_36px] gap-2">
+                <SearchableSelect
+                  value={line.item_id}
+                  onValueChange={(value) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, item_id: value } : l)))}
+                  placeholder="Item"
+                  searchPlaceholder="Pesquisar item..."
+                  emptyText="Nenhum item encontrado"
+                  options={items.map((it) => ({ value: String(it.id), label: it.name, description: `${fmtCategoryLabel(it.category)} · ${fmtPrice(it.morador_purchase_price ?? it.purchase_price ?? 0)}` }))}
+                />
+                <Input type="number" min={1} value={line.qty} onChange={(e) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, qty: e.target.value } : l)))} />
+                <Button variant="outline" size="icon" disabled={lines.length === 1} onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => setLines((prev) => [...prev, { item_id: "", qty: "1" }])}>Adicionar linha</Button>
+          </div>
+          <Textarea placeholder="Notas" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+            <div className="flex justify-between"><span>Quantidade total</span><strong>{fmtNum(validLines.reduce((a, l) => a + lineQty(l), 0))}</strong></div>
+            {tipo === "venda" && <div className="flex justify-between"><span>Valor estimado</span><strong>{fmtPrice(selectedValue)}</strong></div>}
+          </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
-          <ButtonLoading loading={m.isPending} disabled={!canSubmit || m.isPending} onClick={() => m.mutate()}>{m.isPending ? "A processar" : "Submeter"}</ButtonLoading>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <ButtonLoading loading={mutation.isPending} onClick={() => mutation.mutate()} disabled={validLines.length === 0 || !responsavel}>Enviar</ButtonLoading>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
-
-function mIsBusy(...values: boolean[]) {
-  return values.some(Boolean);
 }
