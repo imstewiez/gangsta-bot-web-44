@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { pgOne } from "./pg.server";
+import { pgOne, pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { getPromotions, getTierOrder, getTierLabels } from "./config.loader";
 
@@ -20,6 +20,7 @@ function buildItemPointsCase(): string {
 
 // ── Thresholds de promoção ─────────────────────────────────────────────────
 const BAIRRISTA_TIERS = getTierOrder().slice(0, 3);
+const AUTO_PROMOTE_TIERS = new Set(BAIRRISTA_TIERS);
 
 export type MemberXP = {
   totalPoints: number;
@@ -31,7 +32,58 @@ export type MemberXP = {
   remaining: number;
   progress: number;
   maxedOut: boolean;
+  promoted?: boolean;
+  previousTier?: string | null;
 };
+
+async function calculateTotalPoints(memberId: number): Promise<number> {
+  const pointsCase = buildItemPointsCase();
+  const row = await pgOne<{ total_points: string }>(
+    `SELECT COALESCE(SUM(abs(im.quantity) * ${pointsCase}), 0)::text as total_points
+     FROM inventory_movements im
+     JOIN items i ON i.id = im.item_id
+     WHERE im.member_id = $1
+       AND im.movement_type = ANY($2::text[])
+       AND im.quantity > 0`,
+    [memberId, ["entrega_bairrista", "entrega_oficial"]],
+  );
+  return Number(row?.total_points ?? 0);
+}
+
+function resolveTierFromPoints(currentTier: string, totalPoints: number): string {
+  let tier = currentTier;
+  const promotions = getPromotions();
+
+  for (let guard = 0; guard < 10; guard += 1) {
+    if (!AUTO_PROMOTE_TIERS.has(tier)) break;
+    const promo = promotions.find((p) => p.from === tier);
+    if (!promo || !AUTO_PROMOTE_TIERS.has(promo.to)) break;
+    if (totalPoints < promo.threshold) break;
+    tier = promo.to;
+  }
+
+  return tier;
+}
+
+export async function applyMemberTierFromXp(memberId: number): Promise<{ totalPoints: number; previousTier: string; currentTier: string; promoted: boolean }> {
+  const totalPoints = await calculateTotalPoints(memberId);
+  const member = await pgOne<{ tier: string | null }>("SELECT tier FROM members WHERE id = $1", [memberId]);
+  const previousTier = member?.tier ?? "young_blood";
+  const currentTier = resolveTierFromPoints(previousTier, totalPoints);
+
+  if (currentTier !== previousTier) {
+    await pgQuery(
+      `UPDATE members
+       SET tier = $2,
+           role = CASE WHEN coalesce(role, '') IN ('', 'bairrista', $1) THEN 'bairrista' ELSE role END,
+           updated_at = now()
+       WHERE id = $1`,
+      [memberId, currentTier],
+    );
+  }
+
+  return { totalPoints, previousTier, currentTier, promoted: currentTier !== previousTier };
+}
 
 export const getMemberXP = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -41,33 +93,14 @@ export const getMemberXP = createServerFn({ method: "GET" })
     return { member_id: id };
   })
   .handler(async ({ data }): Promise<MemberXP> => {
-    const pointsCase = buildItemPointsCase();
-    const row = await pgOne<{ total_points: string }>(
-      `SELECT COALESCE(SUM(abs(im.quantity) * ${pointsCase}), 0)::text as total_points
-       FROM inventory_movements im
-       JOIN items i ON i.id = im.item_id
-       WHERE im.member_id = $1
-         AND im.movement_type = ANY($2::text[])
-         AND im.quantity > 0`,
-      [
-        data.member_id,
-        ["entrega_bairrista", "entrega_oficial"],
-      ],
-    );
-    const totalPoints = Number(row?.total_points ?? 0);
-
-    const member = await pgOne<{ tier: string | null }>(
-      "SELECT tier FROM members WHERE id = $1",
-      [data.member_id],
-    );
-    const currentTier = member?.tier ?? "young_blood";
-
+    const sync = await applyMemberTierFromXp(data.member_id);
+    const totalPoints = sync.totalPoints;
+    const currentTier = sync.currentTier;
     const tierNames = getTierLabels();
-
     const promotions = getPromotions();
     const promotion = promotions.find((p) => p.from === currentTier);
 
-    if (!promotion || !BAIRRISTA_TIERS.includes(currentTier as any)) {
+    if (!promotion || !BAIRRISTA_TIERS.includes(currentTier as any) || !AUTO_PROMOTE_TIERS.has(promotion.to)) {
       return {
         totalPoints,
         currentTier,
@@ -78,6 +111,8 @@ export const getMemberXP = createServerFn({ method: "GET" })
         remaining: 0,
         progress: 100,
         maxedOut: true,
+        promoted: sync.promoted,
+        previousTier: sync.previousTier,
       };
     }
 
@@ -95,6 +130,8 @@ export const getMemberXP = createServerFn({ method: "GET" })
       remaining,
       progress: Math.round(progress * 10) / 10,
       maxedOut: false,
+      promoted: sync.promoted,
+      previousTier: sync.previousTier,
     };
   });
 
