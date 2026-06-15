@@ -3,10 +3,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 import { isAdminTier, isSuperAdminTier } from "./config.loader";
+import { syncExpiredMemberAbsences } from "./member-absence.server";
 
 export const checkMemberAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    await syncExpiredMemberAbsences();
     const profile = await context.supabase
       .from("profiles")
       .select("discord_id")

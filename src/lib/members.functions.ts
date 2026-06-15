@@ -82,6 +82,17 @@ const ACTIVE_MEMBER_WHERE = `
   and m.tier = any($1::text[])
 `;
 
+function visibleMemberWhere(isManager: boolean): string {
+  return `
+    m.deleted_at is null
+    and (
+      coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
+      ${isManager ? "or coalesce(m.lifecycle_state::text, m.status, 'active') in ('absent','ausente')" : ""}
+    )
+    and m.tier = any($1::text[])
+  `;
+}
+
 const EMPTY_MEMBER_STATS: MemberStats = {
   kills: 0,
   deaths: 0,
@@ -247,7 +258,7 @@ export const listMembers = createServerFn({ method: "GET" })
       const rows = await pgQuery<MemberRow>(
         `select ${memberSelect(me?.is_manager ?? false)}
          from members m
-         where ${ACTIVE_MEMBER_WHERE}
+         where ${visibleMemberWhere(me?.is_manager ?? false)}
          order by ${MEMBER_ORDER}
          limit 500`,
         [visibleTiers],
@@ -300,7 +311,7 @@ export const listMembersWithStats = createServerFn({ method: "GET" })
          left join ops_agg o on o.member_id = m.id
          left join deliveries_agg d on d.member_id = m.id
          left join sales_agg s on s.member_id = m.id
-         where ${ACTIVE_MEMBER_WHERE}
+         where ${visibleMemberWhere(me?.is_manager ?? false)}
          order by ${MEMBER_ORDER}
          limit 500`,
         [visibleTiers],
@@ -333,7 +344,7 @@ export const getMember = createServerFn({ method: "GET" })
       const member = await pgOne<MemberRow>(
         `select ${memberSelect(me?.is_manager ?? false)}
          from members m
-         where m.id = $2 and ${ACTIVE_MEMBER_WHERE}`,
+         where m.id = $2 and ${visibleMemberWhere(me?.is_manager ?? false)}`,
         [visibleTiers, data.id],
       );
       if (!member) return emptyMemberDetail();

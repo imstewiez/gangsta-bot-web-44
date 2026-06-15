@@ -132,11 +132,12 @@ async function queryRecipeRows(itemIds: number[], memberTier: string | null): Pr
      join items out_i on out_i.id = cr.item_id
      left join recipe_ingredients ri on ri.recipe_id = cr.id
      ${overrideJoin}
-     left join items ing_i on ing_i.id = ri.ingredient_item_id
-     where cr.item_id = any($1::int[])
-       and coalesce(out_i.active, true) = true
-       and out_i.deleted_at is null
-     order by out_i.name, ing_i.name`,
+      left join items ing_i on ing_i.id = ri.ingredient_item_id
+      where cr.item_id = any($1::int[])
+        and coalesce(out_i.active, true) = true
+        and out_i.deleted_at is null
+        and (ing_i.id is null or (coalesce(ing_i.active, true) = true and ing_i.deleted_at is null and coalesce(ing_i.org_buy_enabled, true) = true))
+      order by out_i.name, ing_i.name`,
     params,
   );
 }
@@ -181,10 +182,11 @@ export async function getMergedRecipes(memberTier: string | null = null): Promis
      join items out_i on out_i.id = cr.item_id
      join items ing_i on ing_i.id = ri.ingredient_item_id
      where coalesce(out_i.active, true) = true
-       and out_i.deleted_at is null
-       and coalesce(ing_i.active, true) = true
-       and ing_i.deleted_at is null
-       and coalesce(ri.quantity, 0) > 0`,
+        and out_i.deleted_at is null
+        and coalesce(ing_i.active, true) = true
+        and ing_i.deleted_at is null
+        and coalesce(ing_i.org_buy_enabled, true) = true
+        and coalesce(ri.quantity, 0) > 0`,
   );
   const map = await getDbRecipesForItemIds(rows.map((r) => r.item_id), memberTier);
   return Object.fromEntries(Array.from(map.entries()).map(([itemId, recipe]) => [String(itemId), recipe]));

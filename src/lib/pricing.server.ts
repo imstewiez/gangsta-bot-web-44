@@ -1,6 +1,7 @@
 // Server-only helpers (touch DB). Must NEVER be imported from client code.
 import { getRequest } from "@tanstack/react-start/server";
 import { pgOne } from "./pg.server";
+import { syncExpiredMemberAbsences } from "./member-absence.server";
 import {
   isSuperAdmin,
   isAdmin,
@@ -67,6 +68,7 @@ export async function resolveActualMember(
   supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<CurrentMember | null> {
+  await syncExpiredMemberAbsences();
   const { data: profile } = await supabase
     .from("profiles")
     .select("discord_id, display_name")
