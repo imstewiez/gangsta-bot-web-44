@@ -5,6 +5,7 @@ import { resolveCurrentMember } from "./pricing.server";
 import { z } from "zod";
 import { DeliveryScopeSchema, UuidSchema } from "./security";
 import { logAdminAction } from "./logging.functions";
+import { applyMemberTierFromXp } from "./xp.functions";
 
 type DeliveryLine = {
   item_id: number;
@@ -355,6 +356,7 @@ export const decideDelivery = createServerFn({ method: "POST" })
           ],
         );
       }
+      await applyMemberTierFromXp(before.requester_member_id).catch(() => null);
     }
 
     await logAdminAction(context.supabase, {
