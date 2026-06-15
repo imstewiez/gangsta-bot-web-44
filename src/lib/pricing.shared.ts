@@ -89,7 +89,7 @@ export type CurrentMember = {
   is_morador: boolean;
   is_viewing_as?: boolean;
   actual_member_id?: number | null;
-  actual_display_name?: number | string | null;
+  actual_display_name?: string | null;
 };
 
 export type CatalogItem = {
