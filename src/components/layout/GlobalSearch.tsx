@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, Plus, Crosshair, Truck, ShoppingBag, Users, Package } from "lucide-react";
+import { Search, Crosshair, Truck, ShoppingBag, Users, Package } from "lucide-react";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import {
   Command,
@@ -21,7 +21,6 @@ const PAGES = [
   { label: "Casa", path: "/dashboard", icon: null },
   { label: "Inventário", path: "/inventario", icon: Package },
   { label: "Preçário", path: "/precario", icon: ShoppingBag },
-  { label: "Receitas", path: "/receitas", icon: null },
   { label: "Encomendas", path: "/encomendas", icon: ShoppingBag },
   { label: "Entregas", path: "/entregas", icon: Truck },
   { label: "Saídas", path: "/operacoes", icon: Crosshair },
