@@ -28,6 +28,9 @@ function Page() {
   const { id } = Route.useParams();
   useRealtimeSync([
     "members",
+    { table: "member_notes", queryKeys: [["member-admin-records", Number(id)]] },
+    { table: "member_disciplinary_records", queryKeys: [["member-admin-records", Number(id)]] },
+    { table: "member_absences", queryKeys: [["member", id], ["member-admin-records", Number(id)], ["members"]] },
     { table: "inventory_movements", queryKeys: [["member", id], ["member-xp", id]] },
     { table: "all_time_stats", queryKeys: [["member", id]] },
   ]);
@@ -48,6 +51,7 @@ function Page() {
   const myTier = me.data?.tier ?? null;
   const isSuperadmin = me.data?.is_superadmin ?? false;
   const kd = data.deaths > 0 ? (data.kills / data.deaths).toFixed(2) : String(data.kills);
+  const statusLabel = m.status_lifecycle === "absent" || m.status_lifecycle === "ausente" ? "Ausente" : "Ativo";
 
   function tierRank(t: string | null) { return t ? TIER_ORDER.indexOf(t) : -1; }
   const canManage = isChefia && tierRank(myTier) > tierRank(m.tier);
@@ -101,6 +105,7 @@ function Page() {
           <StatCard icon={Truck} label="Entregas" value={data.deliveries} tone="success" />
           <StatCard icon={Coins} label="Vendas" value={data.vendas} tone="warning" />
           <StatCard icon={ShoppingBag} label="Encomendas" value={data.orders} tone="accent" />
+          <InfoCard label="Estado" value={statusLabel} />
           <InfoCard label="Entrou" value={fmtDate(m.joined_at)} />
           <InfoCard label="Discord ID" value={m.discord_id ?? "—"} mono />
         </div>
@@ -113,7 +118,7 @@ function Page() {
         </div>
       </Reveal>
 
-      {isChefia && <Reveal direction="up" delay={200}><div className="mt-6"><MemberAdminPanel member={{ id: m.id, display_name: m.display_name, nick: m.nick, tier: m.tier }} stats={{ kills: data.kills, deaths: data.deaths, saidas: data.saidas, deliveries: data.deliveries, vendas: data.vendas, orders: data.orders }} myTier={myTier} canManage={canManage} /></div></Reveal>}
+      {isChefia && <Reveal direction="up" delay={200}><div className="mt-6"><MemberAdminPanel member={{ id: m.id, display_name: m.display_name, nick: m.nick, tier: m.tier, status_lifecycle: m.status_lifecycle }} stats={{ kills: data.kills, deaths: data.deaths, saidas: data.saidas, deliveries: data.deliveries, vendas: data.vendas, orders: data.orders }} myTier={myTier} canManage={canManage} /></div></Reveal>}
     </>
   );
 }

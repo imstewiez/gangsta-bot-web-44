@@ -122,6 +122,13 @@ function fmtInput(value: unknown) {
 function numInput(value: string) {
   return Number(value || 0);
 }
+function dateTimeInputValue(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
 
 function AdminItemsPage() {
   useRealtimeSync([
@@ -150,7 +157,7 @@ function AdminItemsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [editing, setEditing] = useState<AdminItem | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState<AdminItem>({ name: "", category: "materiais", side: "compra", purchase_price: 0, morador_purchase_price: 0, min_sale_price: 0, estimated_value: 0, xp_points: 0 });
+  const [addForm, setAddForm] = useState<AdminItem>({ name: "", category: "materiais", side: "compra", purchase_price: 0, morador_purchase_price: 0, min_sale_price: 0, estimated_value: 0, xp_points: 0, org_buy_enabled: true, high_demand: false, high_demand_points: null, high_demand_reason: "", high_demand_until: null });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["dbItemsAdmin"] });
@@ -166,7 +173,7 @@ function AdminItemsPage() {
     onSuccess: () => {
       refresh();
       setShowAdd(false);
-      setAddForm({ name: "", category: "materiais", side: "compra", purchase_price: 0, morador_purchase_price: 0, min_sale_price: 0, estimated_value: 0, xp_points: 0 });
+      setAddForm({ name: "", category: "materiais", side: "compra", purchase_price: 0, morador_purchase_price: 0, min_sale_price: 0, estimated_value: 0, xp_points: 0, org_buy_enabled: true, high_demand: false, high_demand_points: null, high_demand_reason: "", high_demand_until: null });
       toast.success("Item criado");
     },
     onError: (e: Error) => toast.error(beautifyError(e)),
@@ -253,9 +260,9 @@ function AdminItemsPage() {
           )}
         </div>
       </Reveal>
-      {showAdd && <NewItemCard form={addForm} setForm={setAddForm} onCreate={() => createM.mutate(addForm)} pending={createM.isPending} />}
+      {showAdd && <NewItemCardV2 form={addForm} setForm={setAddForm} onCreate={() => createM.mutate(addForm)} pending={createM.isPending} />}
       {items.isLoading ? <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : <ItemsGrid items={filtered} selected={selected} toggleSelect={toggleSelect} onEdit={setEditing} surcharges={surcharges.data ?? []} />}
-      {editing && <EditItemDialog item={editing} materials={materials.data ?? []} surchargeRows={surcharges.data ?? []} onClose={() => setEditing(null)} onSave={(data) => updateM.mutate(data)} onRecipe={(data) => recipeM.mutate(data)} pending={updateM.isPending || recipeM.isPending} />}
+      {editing && <EditItemDialogV2 item={editing} materials={materials.data ?? []} surchargeRows={surcharges.data ?? []} onClose={() => setEditing(null)} onSave={(data) => updateM.mutate(data)} onRecipe={(data) => recipeM.mutate(data)} pending={updateM.isPending || recipeM.isPending} />}
     </>
   );
 }
@@ -328,4 +335,346 @@ function EditItemDialog({ item, materials, surchargeRows, onClose, onSave, onRec
   }
 
   return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4 text-primary" />Editar {item.name}</DialogTitle></DialogHeader><Tabs defaultValue="geral"><TabsList className="mb-3"><TabsTrigger value="geral">Geral</TabsTrigger><TabsTrigger value="precos">Preços</TabsTrigger>{showRecipeTab && <TabsTrigger value="receita">Receita ({recipeIngredients.length})</TabsTrigger>}</TabsList><TabsContent value="geral" className="space-y-3"><div><label className="mb-1 block text-xs text-muted-foreground">Nome</label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Categoria</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground">{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">Tipo</label><select value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="compra">Compra</option><option value="venda">Venda</option><option value="ambos">Compra & Venda</option></select></div></div><div><label className="mb-1 block text-xs text-muted-foreground">XP</label><Input type="number" value={form.xp_points} onChange={(e) => setForm({ ...form, xp_points: numInput(e.target.value) })} /></div></TabsContent><TabsContent value="precos" className="space-y-4">{canBuy(form) && <section className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-4"><div className="mb-1 text-[11px] font-black uppercase tracking-wider text-blue-300">Compra pela organização</div><p className="mb-3 text-[11px] text-muted-foreground">Define quanto a organização paga a civis e a moradores por este material.</p><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-muted-foreground">Preço civil</label><Input type="number" value={fmtInput(form.purchase_price)} onChange={(e) => setForm({ ...form, purchase_price: numInput(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Preço moradores</label><Input type="number" value={fmtInput(form.morador_purchase_price)} onChange={(e) => setForm({ ...form, morador_purchase_price: numInput(e.target.value) })} /></div></div></section>}{canSell(form) && <section className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4"><div className="mb-1 text-[11px] font-black uppercase tracking-wider text-emerald-300">Venda pela organização</div><p className="mb-3 text-[11px] text-muted-foreground">Base global + preços finais personalizados para Bairrista-1/2/3 nos dois modos de encomenda.</p><div className="grid gap-3 md:grid-cols-3"><div><label className="mb-1 block text-xs text-muted-foreground">Base com material</label><Input type="number" value={fmtInput(form.min_sale_price)} onChange={(e) => setForm({ ...form, min_sale_price: numInput(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Base sem material</label><Input type="number" value={fmtInput(form.purchase_price)} onChange={(e) => setForm({ ...form, purchase_price: numInput(e.target.value) })} /></div><div><label className="mb-1 block text-xs text-muted-foreground">Custo interno</label><Input type="number" value={fmtInput(form.estimated_value)} onChange={(e) => setForm({ ...form, estimated_value: numInput(e.target.value) })} /></div></div><div className="mt-4 rounded-xl border border-border bg-background/60 p-3"><div className="mb-3 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Preços finais por Bairrista</div><div className="grid gap-3 md:grid-cols-3">{TIER_ORDER.map((tier) => <div key={tier} className="rounded-lg border border-primary/20 bg-primary/5 p-3"><div className="mb-2 text-xs font-bold text-primary">{TIER_LABELS[tier]}</div><label className="mb-1 block text-[10px] text-muted-foreground">Com material</label><Input type="number" value={fmtInput(tierPrices[tier]?.withMaterial)} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: { ...current[tier], withMaterial: numInput(e.target.value) } }))} /><label className="mb-1 mt-2 block text-[10px] text-muted-foreground">Sem material</label><Input type="number" value={fmtInput(tierPrices[tier]?.withoutMaterial)} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: { ...current[tier], withoutMaterial: numInput(e.target.value) } }))} /></div>)}</div></div></section>}</TabsContent>{showRecipeTab && <TabsContent value="receita" className="space-y-3"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="mb-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Materiais necessários</div><p className="mb-3 text-[11px] text-muted-foreground">A quantidade base aplica-se a todos. Os campos Bairrista permitem quantidades diferentes por cargo.</p><div className="flex gap-2"><select value={newMaterialId} onChange={(e) => setNewMaterialId(e.target.value)} className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">Selecionar material...</option>{availableMaterials.map((m) => <option key={m.id} value={m.id}>{m.name} ({getCategoryLabel(m.category)})</option>)}</select><Input type="number" min={1} value={newMaterialQty} onChange={(e) => setNewMaterialQty(e.target.value)} className="w-24" /><Button size="sm" onClick={addMaterial} disabled={!newMaterialId}><Plus className="h-4 w-4" /></Button></div></div>{recipeIngredients.length === 0 ? <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-4 text-center text-sm text-muted-foreground">Sem receita definida. Este item não vai aparecer como compra com materiais.</div> : <div className="space-y-2">{recipeIngredients.map((ing) => { const material = materials.find((m) => m.id === ing.ingredient_item_id); return <div key={ing.ingredient_item_id} className="rounded-xl border border-border bg-card p-3"><div className="mb-3 flex items-center gap-2"><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{material?.name ?? ing.name ?? `Material #${ing.ingredient_item_id}`}</div><div className="text-[11px] text-muted-foreground">{getCategoryLabel(material?.category)}</div></div><button className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" onClick={() => setRecipeIngredients((current) => current.filter((r) => r.ingredient_item_id !== ing.ingredient_item_id))}><Trash2 className="h-3.5 w-3.5" /></button></div><div className="grid gap-2 md:grid-cols-4"><div><label className="mb-1 block text-[10px] text-muted-foreground">Base</label><Input type="number" min={0} value={ing.quantity} onChange={(e) => { const v = numInput(e.target.value); setRecipeIngredients((current) => current.map((r) => r.ingredient_item_id === ing.ingredient_item_id ? { ...r, quantity: v } : r)); }} /></div>{TIER_ORDER.map((tier) => <div key={tier}><label className="mb-1 block text-[10px] text-muted-foreground">{TIER_LABELS[tier]}</label><Input type="number" min={0} value={(ing.tier_quantities?.[tier] ?? ing.quantity) || ""} onChange={(e) => setTierRecipeQty(ing.ingredient_item_id, tier, numInput(e.target.value))} /></div>)}</div></div>; })}</div>}</TabsContent>}</Tabs><DialogFooter className="mt-4"><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={handleSave} disabled={pending}>{pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}Guardar</Button></DialogFooter></DialogContent></Dialog>;
+}
+
+function itemWithSide(form: AdminItem, side: string): AdminItem {
+  const buySide = side === "compra" || side === "ambos";
+  return {
+    ...form,
+    side,
+    org_buy_enabled: buySide ? form.org_buy_enabled !== false : false,
+    high_demand: buySide ? Boolean(form.high_demand) : false,
+  };
+}
+
+function highDemandInput(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function PurchaseAvailabilityControls({ form, setForm }: { form: AdminItem; setForm: (form: AdminItem) => void }) {
+  if (!canBuy(form)) return null;
+  const orgBuyEnabled = form.org_buy_enabled !== false;
+  const highDemand = orgBuyEnabled && Boolean(form.high_demand);
+
+  return (
+    <section className="rounded-xl border border-primary/20 bg-primary/5 p-3 md:col-span-3">
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="inline-flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={orgBuyEnabled}
+            onChange={(e) => {
+              const enabled = e.target.checked;
+              setForm({
+                ...form,
+                org_buy_enabled: enabled,
+                high_demand: enabled ? Boolean(form.high_demand) : false,
+              });
+            }}
+          />
+          Compra pela org ativa
+        </label>
+        <label className={cn("inline-flex items-center gap-2 text-sm font-medium", !orgBuyEnabled && "text-muted-foreground")}>
+          <input
+            type="checkbox"
+            checked={highDemand}
+            disabled={!orgBuyEnabled}
+            onChange={(e) => {
+              const enabled = e.target.checked;
+              setForm({
+                ...form,
+                high_demand: enabled,
+                high_demand_points: enabled ? (form.high_demand_points ?? form.xp_points ?? null) : null,
+                high_demand_reason: enabled ? (form.high_demand_reason ?? "") : "",
+                high_demand_until: enabled ? (form.high_demand_until ?? null) : null,
+              });
+            }}
+          />
+          Material Em Alta
+        </label>
+        {!orgBuyEnabled && <span className="text-xs text-muted-foreground">Este item fica oculto nas compras, entregas e receitas.</span>}
+      </div>
+      {highDemand && (
+        <div className="mt-3 grid gap-3 md:grid-cols-[160px_1fr_220px]">
+          <Input
+            type="number"
+            min={0}
+            placeholder="Pontos em alta"
+            value={form.high_demand_points ?? ""}
+            onChange={(e) => setForm({ ...form, high_demand_points: e.target.value ? numInput(e.target.value) : null })}
+          />
+          <Input
+            placeholder="Motivo, ex: falta cobre"
+            value={form.high_demand_reason ?? ""}
+            onChange={(e) => setForm({ ...form, high_demand_reason: e.target.value })}
+          />
+          <Input
+            type="datetime-local"
+            value={dateTimeInputValue(form.high_demand_until)}
+            onChange={(e) => setForm({ ...form, high_demand_until: highDemandInput(e.target.value) })}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NewItemCardV2({ form, setForm, onCreate, pending }: { form: AdminItem; setForm: (f: AdminItem) => void; onCreate: () => void; pending: boolean }) {
+  return (
+    <Reveal direction="up" delay={50}>
+      <Card className="interactive-card mb-4 border-primary/30">
+        <CardContent className="grid gap-3 p-4 md:grid-cols-3">
+          <Input placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}
+          </select>
+          <select value={form.side} onChange={(e) => setForm(itemWithSide(form, e.target.value))} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            <option value="compra">Compra</option>
+            <option value="venda">Venda</option>
+            <option value="ambos">Compra & Venda</option>
+          </select>
+          {canBuy(form) && (
+            <>
+              <Input type="number" placeholder="Preço civil" value={form.purchase_price ?? ""} onChange={(e) => setForm({ ...form, purchase_price: numInput(e.target.value) })} />
+              <Input type="number" placeholder="Preço moradores" value={form.morador_purchase_price ?? ""} onChange={(e) => setForm({ ...form, morador_purchase_price: numInput(e.target.value) })} />
+            </>
+          )}
+          {canSell(form) && (
+            <>
+              <Input type="number" placeholder="Base com material" value={form.min_sale_price ?? ""} onChange={(e) => setForm({ ...form, min_sale_price: numInput(e.target.value) })} />
+              <Input type="number" placeholder="Base sem material" value={form.purchase_price ?? ""} onChange={(e) => setForm({ ...form, purchase_price: numInput(e.target.value) })} />
+              <Input type="number" placeholder="Custo interno" value={form.estimated_value ?? ""} onChange={(e) => setForm({ ...form, estimated_value: numInput(e.target.value) })} />
+            </>
+          )}
+          <Input type="number" placeholder="XP" value={form.xp_points ?? ""} onChange={(e) => setForm({ ...form, xp_points: numInput(e.target.value) })} />
+          <PurchaseAvailabilityControls form={form} setForm={setForm} />
+          <Button size="sm" onClick={onCreate} disabled={pending || !form.name}>
+            {pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+            Criar
+          </Button>
+        </CardContent>
+      </Card>
+    </Reveal>
+  );
+}
+
+function EditItemDialogV2({ item, materials, surchargeRows, onClose, onSave, onRecipe, pending }: { item: AdminItem; materials: AdminItem[]; surchargeRows: SurchargeRow[]; onClose: () => void; onSave: (data: AdminItem) => void; onRecipe: (data: AdminItem) => void; pending: boolean }) {
+  const upsertSurchargeFn = useAuthedServerFn(upsertItemTierSurcharge);
+  const baseSurcharges = surchargeMapFor(surchargeRows, item.id);
+  const [form, setForm] = useState<AdminItem>({
+    item_id: item.id,
+    name: item.name,
+    category: item.category ?? "outros",
+    side: item.side ?? "venda",
+    purchase_price: item.purchase_price ?? 0,
+    morador_purchase_price: item.morador_purchase_price ?? 0,
+    min_sale_price: item.min_sale_price ?? 0,
+    estimated_value: item.estimated_value ?? 0,
+    xp_points: item.xp_points ?? 0,
+    org_buy_enabled: canBuy(item) ? item.org_buy_enabled !== false : false,
+    high_demand: Boolean(item.high_demand),
+    high_demand_points: item.high_demand_points ?? null,
+    high_demand_reason: item.high_demand_reason ?? "",
+    high_demand_until: item.high_demand_until ?? null,
+  });
+  const [tierPrices, setTierPrices] = useState<TierPriceState>(() => Object.fromEntries(TIER_ORDER.map((tier) => [tier, { withMaterial: tierWithPrice(item, baseSurcharges.get(tier)), withoutMaterial: tierWithoutPrice(item, baseSurcharges.get(tier)) }])) as TierPriceState);
+  const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientState[]>((item.ingredients ?? []).map((ing: any) => ({ ingredient_item_id: ing.ingredient_item_id, quantity: ing.quantity, name: ing.ingredient_name, tier_quantities: ing.tier_quantities ?? {} })));
+  const [newMaterialId, setNewMaterialId] = useState("");
+  const [newMaterialQty, setNewMaterialQty] = useState("1");
+  const availableMaterials = materials.filter((material) => material.id !== item.id && !recipeIngredients.some((r) => r.ingredient_item_id === material.id));
+  const showRecipeTab = canSell(form);
+
+  function addMaterial() {
+    const id = Number(newMaterialId);
+    if (!id) return;
+    const material = materials.find((m) => m.id === id);
+    const qty = Number(newMaterialQty) || 1;
+    setRecipeIngredients((current) => [...current, { ingredient_item_id: id, quantity: qty, name: material?.name, tier_quantities: Object.fromEntries(TIER_ORDER.map((tier) => [tier, qty])) }]);
+    setNewMaterialId("");
+    setNewMaterialQty("1");
+  }
+
+  async function handleSave() {
+    if (canSell(form)) {
+      for (const tier of TIER_ORDER) {
+        await upsertSurchargeFn({
+          data: {
+            item_id: item.id,
+            tier,
+            surcharge: tierDelta(form.min_sale_price, tierPrices[tier].withMaterial),
+            price_with_material: n(tierPrices[tier].withMaterial) || null,
+            price_without_material: n(tierPrices[tier].withoutMaterial) || null,
+          },
+        });
+      }
+    } else {
+      for (const tier of TIER_ORDER) {
+        await upsertSurchargeFn({ data: { item_id: item.id, tier, surcharge: 0, price_with_material: null, price_without_material: null } });
+      }
+    }
+    onSave(form);
+    if (showRecipeTab || (item.ingredients ?? []).length > 0) {
+      onRecipe({ item_id: item.id, ingredients: recipeIngredients.map((ing) => ({ ingredient_item_id: ing.ingredient_item_id, quantity: ing.quantity, tier_quantities: ing.tier_quantities ?? {} })) });
+    }
+  }
+
+  function setTierRecipeQty(ingredientId: number, tier: string, value: number) {
+    setRecipeIngredients((current) => current.map((r) => r.ingredient_item_id === ingredientId ? { ...r, tier_quantities: { ...(r.tier_quantities ?? {}), [tier]: value } } : r));
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-primary" />
+            Editar {item.name}
+          </DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="geral">
+          <TabsList className="mb-3">
+            <TabsTrigger value="geral">Geral</TabsTrigger>
+            <TabsTrigger value="precos">Preços</TabsTrigger>
+            {showRecipeTab && <TabsTrigger value="receita">Receita ({recipeIngredients.length})</TabsTrigger>}
+          </TabsList>
+          <TabsContent value="geral" className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Categoria</label>
+                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                  {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Tipo</label>
+                <select value={form.side} onChange={(e) => setForm(itemWithSide(form, e.target.value))} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                  <option value="compra">Compra</option>
+                  <option value="venda">Venda</option>
+                  <option value="ambos">Compra & Venda</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">XP</label>
+              <Input type="number" value={form.xp_points} onChange={(e) => setForm({ ...form, xp_points: numInput(e.target.value) })} />
+            </div>
+            <PurchaseAvailabilityControls form={form} setForm={setForm} />
+          </TabsContent>
+          <TabsContent value="precos" className="space-y-4">
+            {canBuy(form) && (
+              <section className={cn("rounded-xl border p-4", form.org_buy_enabled === false ? "border-muted bg-muted/20" : "border-blue-500/25 bg-blue-500/5")}>
+                <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-blue-300">Compra pela organização</div>
+                <p className="mb-3 text-[11px] text-muted-foreground">{form.org_buy_enabled === false ? "A compra está desligada; estes valores ficam guardados, mas o item não aparece no Preçário/Entregas." : "Define quanto a organização paga a civis e a moradores por este material."}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Preço civil</label>
+                    <Input type="number" value={fmtInput(form.purchase_price)} onChange={(e) => setForm({ ...form, purchase_price: numInput(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Preço moradores</label>
+                    <Input type="number" value={fmtInput(form.morador_purchase_price)} onChange={(e) => setForm({ ...form, morador_purchase_price: numInput(e.target.value) })} />
+                  </div>
+                </div>
+              </section>
+            )}
+            {canSell(form) && (
+              <section className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
+                <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-emerald-300">Venda pela organização</div>
+                <p className="mb-3 text-[11px] text-muted-foreground">Base global + preços finais personalizados para Bairrista-1/2/3 nos dois modos de encomenda.</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Base com material</label>
+                    <Input type="number" value={fmtInput(form.min_sale_price)} onChange={(e) => setForm({ ...form, min_sale_price: numInput(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Base sem material</label>
+                    <Input type="number" value={fmtInput(form.purchase_price)} onChange={(e) => setForm({ ...form, purchase_price: numInput(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Custo interno</label>
+                    <Input type="number" value={fmtInput(form.estimated_value)} onChange={(e) => setForm({ ...form, estimated_value: numInput(e.target.value) })} />
+                  </div>
+                </div>
+                <div className="mt-4 rounded-xl border border-border bg-background/60 p-3">
+                  <div className="mb-3 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Preços finais por Bairrista</div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {TIER_ORDER.map((tier) => (
+                      <div key={tier} className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                        <div className="mb-2 text-xs font-bold text-primary">{TIER_LABELS[tier]}</div>
+                        <label className="mb-1 block text-[10px] text-muted-foreground">Com material</label>
+                        <Input type="number" value={fmtInput(tierPrices[tier]?.withMaterial)} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: { ...current[tier], withMaterial: numInput(e.target.value) } }))} />
+                        <label className="mb-1 mt-2 block text-[10px] text-muted-foreground">Sem material</label>
+                        <Input type="number" value={fmtInput(tierPrices[tier]?.withoutMaterial)} onChange={(e) => setTierPrices((current) => ({ ...current, [tier]: { ...current[tier], withoutMaterial: numInput(e.target.value) } }))} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+          </TabsContent>
+          {showRecipeTab && (
+            <TabsContent value="receita" className="space-y-3">
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Materiais necessários</div>
+                <p className="mb-3 text-[11px] text-muted-foreground">A quantidade base aplica-se a todos. Os campos Bairrista permitem quantidades diferentes por cargo.</p>
+                <div className="flex gap-2">
+                  <select value={newMaterialId} onChange={(e) => setNewMaterialId(e.target.value)} className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="">Selecionar material...</option>
+                    {availableMaterials.map((m) => <option key={m.id} value={m.id}>{m.name} ({getCategoryLabel(m.category)})</option>)}
+                  </select>
+                  <Input type="number" min={1} value={newMaterialQty} onChange={(e) => setNewMaterialQty(e.target.value)} className="w-24" />
+                  <Button size="sm" onClick={addMaterial} disabled={!newMaterialId}><Plus className="h-4 w-4" /></Button>
+                </div>
+              </div>
+              {recipeIngredients.length === 0 ? (
+                <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-4 text-center text-sm text-muted-foreground">Sem receita definida. Este item não vai aparecer como compra com materiais.</div>
+              ) : (
+                <div className="space-y-2">
+                  {recipeIngredients.map((ing) => {
+                    const material = materials.find((m) => m.id === ing.ingredient_item_id);
+                    return (
+                      <div key={ing.ingredient_item_id} className="rounded-xl border border-border bg-card p-3">
+                        <div className="mb-3 flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">{material?.name ?? ing.name ?? `Material #${ing.ingredient_item_id}`}</div>
+                            <div className="text-[11px] text-muted-foreground">{getCategoryLabel(material?.category)}</div>
+                          </div>
+                          <button className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" onClick={() => setRecipeIngredients((current) => current.filter((r) => r.ingredient_item_id !== ing.ingredient_item_id))}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-4">
+                          <div>
+                            <label className="mb-1 block text-[10px] text-muted-foreground">Base</label>
+                            <Input type="number" min={0} value={ing.quantity} onChange={(e) => { const v = numInput(e.target.value); setRecipeIngredients((current) => current.map((r) => r.ingredient_item_id === ing.ingredient_item_id ? { ...r, quantity: v } : r)); }} />
+                          </div>
+                          {TIER_ORDER.map((tier) => (
+                            <div key={tier}>
+                              <label className="mb-1 block text-[10px] text-muted-foreground">{TIER_LABELS[tier]}</label>
+                              <Input type="number" min={0} value={(ing.tier_quantities?.[tier] ?? ing.quantity) || ""} onChange={(e) => setTierRecipeQty(ing.ingredient_item_id, tier, numInput(e.target.value))} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
+        <DialogFooter className="mt-4">
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={pending}>
+            {pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

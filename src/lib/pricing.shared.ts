@@ -102,6 +102,11 @@ export type CatalogItem = {
   morador_purchase_price: number | null;
   min_sale_price: number | null;
   xp_points: number;
+  org_buy_enabled?: boolean;
+  high_demand?: boolean;
+  high_demand_points?: number | null;
+  high_demand_reason?: string | null;
+  high_demand_until?: string | null;
   tier_price?: number | null;
   tier_price_with_material?: number | null;
   tier_price_without_material?: number | null;

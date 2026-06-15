@@ -52,8 +52,8 @@ const DELIVERY_LINE_PARSE_SQL = `
   ), resolved as (
     select p.*, coalesce(by_id.id, by_name.id) as resolved_item_id
     from parsed p
-    left join items by_id on p.raw_item_id ~ '^\\d+$' and by_id.id = p.raw_item_id::int and ${ACTIVE_ITEM_EXPR.replaceAll("deleted_at", "by_id.deleted_at").replaceAll("active", "by_id.active")}
-    left join items by_name on by_id.id is null and ${NORMALIZED_SQL("by_name.name")} = ${NORMALIZED_SQL("p.raw_item_name")} and ${ACTIVE_ITEM_EXPR.replaceAll("deleted_at", "by_name.deleted_at").replaceAll("active", "by_name.active")}
+    left join items by_id on p.raw_item_id ~ '^\\d+$' and by_id.id = p.raw_item_id::int and ${ACTIVE_ITEM_EXPR.replaceAll("deleted_at", "by_id.deleted_at").replaceAll("active", "by_id.active")} and coalesce(by_id.org_buy_enabled, true) = true
+    left join items by_name on by_id.id is null and ${NORMALIZED_SQL("by_name.name")} = ${NORMALIZED_SQL("p.raw_item_name")} and ${ACTIVE_ITEM_EXPR.replaceAll("deleted_at", "by_name.deleted_at").replaceAll("active", "by_name.active")} and coalesce(by_name.org_buy_enabled, true) = true
   )
 `;
 
@@ -158,7 +158,8 @@ export const repairDeliveryLines = createServerFn({ method: "POST" })
               morador_purchase_price::float as morador_purchase_price,
               min_sale_price::float as min_sale_price
        from items
-       where ${ACTIVE_ITEM_EXPR}`,
+       where ${ACTIVE_ITEM_EXPR}
+         and coalesce(org_buy_enabled, true) = true`,
     );
 
     const byId = new Map(items.map((item) => [item.id, item]));
@@ -426,18 +427,18 @@ export const getDataQualityReport = createServerFn({ method: "GET" })
         where ${ACTIVE_ITEM_EXPR} and (
           coalesce(side, '') not in ('venda','compra','ambos')
           or (side in ('venda','ambos') and coalesce(min_sale_price, purchase_price, 0) <= 0)
-          or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, 0) <= 0)
+          or (side in ('compra','ambos') and coalesce(org_buy_enabled, true) = true and coalesce(purchase_price, morador_purchase_price, 0) <= 0)
         )`,
       examplesSql: `select ('#' || id::text || ' · ' || name || ' · side=' || coalesce(side, '—') || ' · compra=' || coalesce(purchase_price::text, '—') || ' · venda=' || coalesce(min_sale_price::text, '—')) as label
         from items
         where ${ACTIVE_ITEM_EXPR} and (
           coalesce(side, '') not in ('venda','compra','ambos')
           or (side in ('venda','ambos') and coalesce(min_sale_price, purchase_price, 0) <= 0)
-          or (side in ('compra','ambos') and coalesce(purchase_price, morador_purchase_price, 0) <= 0)
+          or (side in ('compra','ambos') and coalesce(org_buy_enabled, true) = true and coalesce(purchase_price, morador_purchase_price, 0) <= 0)
         )
         order by category, name limit 10`,
       summary: (count) => count === 0 ? "Itens ativos têm side/preços mínimos coerentes." : `${count} item(ns) ativo(s) com side ou preço inválido.`,
-      recommendation: "Corrigir no Admin → Materiais, senão preçário/encomendas/entregas ficam incoerentes.",
+      recommendation: "Corrigir no Admin → Materiais; itens com compra pela org desligada não precisam de preço de compra.",
     }));
 
     checks.push(await runCheck({

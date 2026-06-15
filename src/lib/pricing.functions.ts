@@ -23,6 +23,11 @@ type DbCatalogRow = {
   morador_purchase_price: number | null;
   estimated_value: number | null;
   xp_points: number | null;
+  org_buy_enabled: boolean | null;
+  high_demand: boolean | null;
+  high_demand_points: number | null;
+  high_demand_reason: string | null;
+  high_demand_until: string | null;
 };
 
 async function getDbCatalogRows(): Promise<DbCatalogRow[]> {
@@ -32,7 +37,12 @@ async function getDbCatalogRows(): Promise<DbCatalogRow[]> {
             min_sale_price::float as min_sale_price,
             morador_purchase_price::float as morador_purchase_price,
             estimated_value::float as estimated_value,
-            xp_points
+            xp_points,
+            coalesce(org_buy_enabled, true) as org_buy_enabled,
+            (coalesce(high_demand, false) and (high_demand_until is null or high_demand_until > now())) as high_demand,
+            high_demand_points,
+            high_demand_reason,
+            high_demand_until
      from items
      where coalesce(active, true) = true
        and deleted_at is null
@@ -51,6 +61,11 @@ function toCatalogItem(db: DbCatalogRow, side: "venda" | "compra" | "ambos", pri
     morador_purchase_price: prices.morador_purchase_price,
     min_sale_price: prices.min_sale_price,
     xp_points: db.xp_points ?? 0,
+    org_buy_enabled: db.org_buy_enabled ?? true,
+    high_demand: db.high_demand ?? false,
+    high_demand_points: db.high_demand_points ?? null,
+    high_demand_reason: db.high_demand_reason ?? null,
+    high_demand_until: db.high_demand_until ?? null,
     tier_price: prices.tier_price,
     tier_price_with_material: prices.tier_price_with_material,
     tier_price_without_material: prices.tier_price_without_material,
@@ -85,6 +100,7 @@ export const getBuyCatalog = createServerFn({ method: "GET" })
       .map((db) => {
         const side = (db.side ?? "compra") as "venda" | "compra" | "ambos";
         if (side !== "compra" && side !== "ambos") return null;
+        if (db.org_buy_enabled === false) return null;
         const prices = resolveItemPrices(db, null);
         return toCatalogItem(db, side, prices);
       })

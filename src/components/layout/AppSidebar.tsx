@@ -45,14 +45,14 @@ import ballasLogo from "@/assets/ballas-logo.png";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; need?: "inventory"; admin?: boolean };
+type NavItem = { to: string; label: string; icon: LucideIcon; need?: "inventory"; admin?: boolean; adminOnly?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
 const GROUPS: NavGroup[] = [
   { label: "Geral", items: [{ to: "/dashboard", label: "Início", icon: Home }, { to: "/membros", label: "Membros", icon: Users }, { to: "/tops", label: "Classificação", icon: Trophy }, { to: "/premios", label: "Prémios", icon: Sparkles }] },
   { label: "Operação", items: [{ to: "/encomendas", label: "Encomendas", icon: ShoppingBag }, { to: "/entregas", label: "Entregas", icon: PackageOpen }, { to: "/operacoes", label: "Saídas", icon: Crosshair }] },
   { label: "Inventário", items: [{ to: "/precario", label: "Preçário", icon: Tags }, { to: "/inventario", label: "Inventário", icon: Package, need: "inventory" }, { to: "/receitas", label: "Receitas", icon: Hammer }] },
-  { label: "Gestão", items: [{ to: "/admin/dashboard", label: "Painel", icon: Activity, admin: true }, { to: "/admin/itens", label: "Itens", icon: Package, admin: true }, { to: "/admin/dados", label: "Dados", icon: Database, admin: true }, { to: "/admin", label: "Definições", icon: Shield, admin: true }, { to: "/auditoria", label: "Auditoria", icon: ScrollText, admin: true }] },
+  { label: "Gestão", items: [{ to: "/admin/dashboard", label: "Painel", icon: Activity, admin: true }, { to: "/admin/itens", label: "Itens", icon: Package, admin: true }, { to: "/admin/dados", label: "Dados", icon: Database, admin: true }, { to: "/admin", label: "Definições", icon: Shield, admin: true, adminOnly: true }, { to: "/auditoria", label: "Auditoria", icon: ScrollText, admin: true }] },
 ];
 
 export function AppSidebar() {
@@ -82,6 +82,7 @@ export function AppSidebar() {
     ...group,
     items: group.items.filter((it) => {
       if (it.admin && !(me.data?.is_manager ?? false)) return false;
+      if (it.adminOnly && !(me.data?.is_admin || me.data?.is_superadmin)) return false;
       if (it.need === "inventory" && !canSeeInv) return false;
       return true;
     }),

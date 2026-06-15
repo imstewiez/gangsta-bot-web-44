@@ -22,6 +22,41 @@ type TargetMember = {
   role: string | null;
 };
 
+export type MemberAdminNote = {
+  id: number;
+  body: string;
+  created_at: string;
+  created_by_name: string | null;
+};
+
+export type MemberDisciplinaryRecord = {
+  id: number;
+  kind: "aviso" | "punicao";
+  title: string | null;
+  body: string;
+  points: number;
+  issued_at: string;
+  expires_at: string | null;
+  resolved_at: string | null;
+  created_by_name: string | null;
+};
+
+export type MemberAbsenceRecord = {
+  id: string;
+  starts_at: string;
+  ends_at: string | null;
+  reason: string | null;
+  ended_at: string | null;
+  created_by_name: string | null;
+};
+
+export type MemberAdminRecords = {
+  notes: MemberAdminNote[];
+  disciplinary: MemberDisciplinaryRecord[];
+  active_absence: MemberAbsenceRecord | null;
+  absences: MemberAbsenceRecord[];
+};
+
 const TIER_RANK: Record<string, number> = {
   young_blood: 1,
   o_gunao: 2,
@@ -255,6 +290,26 @@ function toNumber(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function isoOrNull(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) throw new Error("Data invalida");
+  return date.toISOString();
+}
+
+async function assertCanUseMemberAdminRecords(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  memberId: number,
+  action: string,
+) {
+  const me = await assertManager(supabase, userId);
+  const target = await getTargetMember(memberId);
+  if (!target) throw new Error("Membro nao encontrado ou ja inativo.");
+  assertCanManageTarget(me, target, action);
+  return { me, target };
+}
+
 // ---------- Stats override (all counters) ----------
 export const adminAdjustStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -373,6 +428,245 @@ export const adminAdjustStats = createServerFn({ method: "POST" })
         orders_delta: data.orders_delta,
         saidas_delta: data.saidas_delta,
       },
+    });
+    return { ok: true };
+  });
+
+export const listMemberAdminRecords = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { member_id: number }) => ({ member_id: z.number().int().positive().parse(d.member_id) }))
+  .handler(async ({ data, context }): Promise<MemberAdminRecords> => {
+    await assertCanUseMemberAdminRecords(context.supabase, context.userId, data.member_id, "ver dados internos de alguem");
+
+    const [notes, disciplinary, absences] = await Promise.all([
+      pgQuery<MemberAdminNote>(
+        `select n.id, n.body, n.created_at,
+                coalesce(actor.display_name, actor.nickname) as created_by_name
+           from member_notes n
+           left join members actor on actor.id = n.created_by_member_id
+          where n.member_id = $1
+            and n.deleted_at is null
+          order by n.created_at desc
+          limit 100`,
+        [data.member_id],
+      ),
+      pgQuery<MemberDisciplinaryRecord>(
+        `select d.id, d.kind, d.title, d.body, d.points,
+                d.issued_at, d.expires_at, d.resolved_at,
+                coalesce(actor.display_name, actor.nickname) as created_by_name
+           from member_disciplinary_records d
+           left join members actor on actor.id = d.created_by_member_id
+          where d.member_id = $1
+            and d.deleted_at is null
+          order by d.issued_at desc, d.created_at desc
+          limit 100`,
+        [data.member_id],
+      ),
+      pgQuery<MemberAbsenceRecord>(
+        `select a.id::text as id, a.starts_at, a.ends_at, a.reason, a.ended_at,
+                coalesce(actor.display_name, actor.nickname) as created_by_name
+           from member_absences a
+           left join members actor on actor.id = a.created_by_member_id
+          where a.member_id = $1
+          order by a.starts_at desc
+          limit 50`,
+        [data.member_id],
+      ),
+    ]);
+
+    return {
+      notes,
+      disciplinary,
+      active_absence: absences.find((absence) => absence.ended_at == null) ?? null,
+      absences,
+    };
+  });
+
+export const adminAddMemberNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({
+    member_id: z.number().int().positive(),
+    body: z.string().trim().min(1).max(2000),
+  }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { me, target } = await assertCanUseMemberAdminRecords(context.supabase, context.userId, data.member_id, "adicionar notas a alguem");
+    const row = await pgOne<{ id: number }>(
+      `insert into member_notes (member_id, body, created_by_user_id, created_by_member_id)
+       values ($1, $2, $3, $4)
+       returning id`,
+      [data.member_id, data.body, context.userId, me.id],
+    );
+    await logAdminAction(context.supabase, {
+      action: "member_note_added",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direcao",
+      targetType: "member",
+      targetId: data.member_id,
+      details: `Nota adicionada a ${target.display_name ?? "membro #" + data.member_id}`,
+      afterState: { note_id: row?.id },
+    });
+    return { id: row?.id ?? null };
+  });
+
+export const adminDeleteMemberNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ id: z.number().int().positive() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const note = await pgOne<{ member_id: number }>(
+      `select member_id from member_notes where id = $1 and deleted_at is null`,
+      [data.id],
+    );
+    if (!note) throw new Error("Nota nao encontrada.");
+    const { me } = await assertCanUseMemberAdminRecords(context.supabase, context.userId, note.member_id, "remover notas de alguem");
+    await pgQuery(`update member_notes set deleted_at = now(), deleted_by_user_id = $2 where id = $1`, [data.id, context.userId]);
+    await logAdminAction(context.supabase, {
+      action: "member_note_removed",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direcao",
+      targetType: "member",
+      targetId: note.member_id,
+      details: "Nota removida",
+      afterState: { note_id: data.id },
+    });
+    return { ok: true };
+  });
+
+export const adminAddDisciplinaryRecord = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({
+    member_id: z.number().int().positive(),
+    kind: z.enum(["aviso", "punicao"]),
+    title: z.string().trim().max(120).optional().nullable(),
+    body: z.string().trim().min(1).max(2000),
+    points: z.union([z.number().int(), z.string()]).optional().nullable(),
+    expires_at: z.string().optional().nullable(),
+  }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { me, target } = await assertCanUseMemberAdminRecords(context.supabase, context.userId, data.member_id, "adicionar avisos/punicoes a alguem");
+    const points = toNumber(data.points) ?? 0;
+    const row = await pgOne<{ id: number }>(
+      `insert into member_disciplinary_records
+         (member_id, kind, title, body, points, expires_at, created_by_user_id, created_by_member_id)
+       values ($1, $2, $3, $4, $5, $6::timestamptz, $7, $8)
+       returning id`,
+      [data.member_id, data.kind, data.title || null, data.body, Math.round(points), isoOrNull(data.expires_at), context.userId, me.id],
+    );
+    await logAdminAction(context.supabase, {
+      action: data.kind === "aviso" ? "member_warning_added" : "member_punishment_added",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direcao",
+      targetType: "member",
+      targetId: data.member_id,
+      details: `${data.kind === "aviso" ? "Aviso" : "Punicao"} adicionada a ${target.display_name ?? "membro #" + data.member_id}`,
+      afterState: { record_id: row?.id, points },
+    });
+    return { id: row?.id ?? null };
+  });
+
+export const adminDeleteDisciplinaryRecord = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ id: z.number().int().positive() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const record = await pgOne<{ member_id: number; kind: string }>(
+      `select member_id, kind from member_disciplinary_records where id = $1 and deleted_at is null`,
+      [data.id],
+    );
+    if (!record) throw new Error("Registo nao encontrado.");
+    const { me } = await assertCanUseMemberAdminRecords(context.supabase, context.userId, record.member_id, "remover avisos/punicoes de alguem");
+    await pgQuery(`update member_disciplinary_records set deleted_at = now(), deleted_by_user_id = $2 where id = $1`, [data.id, context.userId]);
+    await logAdminAction(context.supabase, {
+      action: record.kind === "aviso" ? "member_warning_removed" : "member_punishment_removed",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direcao",
+      targetType: "member",
+      targetId: record.member_id,
+      details: `${record.kind === "aviso" ? "Aviso" : "Punicao"} removida`,
+      afterState: { record_id: data.id },
+    });
+    return { ok: true };
+  });
+
+export const adminSetMemberAbsence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({
+    member_id: z.number().int().positive(),
+    reason: z.string().trim().max(500).optional().nullable(),
+    ends_at: z.string().optional().nullable(),
+  }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { me, target } = await assertCanUseMemberAdminRecords(context.supabase, context.userId, data.member_id, "marcar ausencia de alguem");
+    const endsAt = isoOrNull(data.ends_at);
+    await pgQuery(
+      `update member_absences
+          set ended_at = coalesce(ended_at, now()),
+              ended_by_user_id = $2,
+              updated_at = now()
+        where member_id = $1
+          and ended_at is null`,
+      [data.member_id, context.userId],
+    );
+    const row = await pgOne<{ id: string }>(
+      `insert into member_absences
+         (member_id, starts_at, ends_at, reason, created_by_user_id, created_by_member_id)
+       values ($1, now(), $2::timestamptz, $3, $4, $5)
+       returning id::text as id`,
+      [data.member_id, endsAt, data.reason || null, context.userId, me.id],
+    );
+    await pgQuery(
+      `update members
+          set status = 'ausente',
+              lifecycle_state = 'absent',
+              lifecycle_changed_at = now(),
+              lifecycle_changed_by = $2,
+              lifecycle_notes = $3,
+              updated_at = now()
+        where id = $1`,
+      [data.member_id, `web:${context.userId}`, data.reason || "Ausencia marcada pela direcao"],
+    );
+    await logAdminAction(context.supabase, {
+      action: "member_absence_started",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direcao",
+      targetType: "member",
+      targetId: data.member_id,
+      details: `${target.display_name ?? "Membro"} marcado como ausente${endsAt ? ` ate ${endsAt}` : ""}`,
+      afterState: { absence_id: row?.id, ends_at: endsAt, reason: data.reason || null },
+    });
+    return { id: row?.id ?? null };
+  });
+
+export const adminEndMemberAbsence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ member_id: z.number().int().positive() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { me, target } = await assertCanUseMemberAdminRecords(context.supabase, context.userId, data.member_id, "terminar ausencia de alguem");
+    await pgQuery(
+      `update member_absences
+          set ended_at = coalesce(ended_at, now()),
+              ended_by_user_id = $2,
+              updated_at = now()
+        where member_id = $1
+          and ended_at is null`,
+      [data.member_id, context.userId],
+    );
+    await pgQuery(
+      `update members
+          set status = 'ativo',
+              lifecycle_state = 'active',
+              lifecycle_changed_at = now(),
+              lifecycle_changed_by = $2,
+              lifecycle_notes = 'Ausencia terminada pela direcao',
+              updated_at = now()
+        where id = $1`,
+      [data.member_id, `web:${context.userId}`],
+    );
+    await logAdminAction(context.supabase, {
+      action: "member_absence_ended",
+      actorId: context.userId,
+      actorName: me.display_name ?? "Direcao",
+      targetType: "member",
+      targetId: data.member_id,
+      details: `${target.display_name ?? "Membro"} voltou a ativo`,
     });
     return { ok: true };
   });

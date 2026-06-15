@@ -44,6 +44,11 @@ type AdminDbItemRow = {
   min_sale_price: number | null;
   estimated_value: number | null;
   xp_points: number | null;
+  org_buy_enabled: boolean;
+  high_demand: boolean;
+  high_demand_points: number | null;
+  high_demand_reason: string | null;
+  high_demand_until: string | null;
   active: boolean;
   in_config: boolean;
   recipe_id: number | null;
@@ -60,6 +65,11 @@ type ItemPricingInput = {
   min_sale_price?: number | null;
   estimated_value?: number | null;
   xp_points?: number | null;
+  org_buy_enabled?: boolean | null;
+  high_demand?: boolean | null;
+  high_demand_points?: number | null;
+  high_demand_reason?: string | null;
+  high_demand_until?: string | null;
   active?: boolean | null;
 };
 
@@ -73,6 +83,11 @@ type NormalizedItemPricing = {
   min_sale_price: number | null;
   estimated_value: number | null;
   xp_points: number;
+  org_buy_enabled: boolean;
+  high_demand: boolean;
+  high_demand_points: number | null;
+  high_demand_reason: string | null;
+  high_demand_until: string | null;
   active: boolean;
 };
 
@@ -101,6 +116,18 @@ function cleanXp(value: unknown): number {
   if (!Number.isFinite(n) || n < 0) throw new Error("XP inválido");
   return Math.round(n);
 }
+function cleanNullableInt(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) throw new Error("Valor invalido");
+  return Math.round(n);
+}
+function cleanNullableIso(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) throw new Error("Data invalida");
+  return date.toISOString();
+}
 function moneyValue(value: number | null | undefined): number {
   return Number.isFinite(Number(value)) ? Number(value ?? 0) : 0;
 }
@@ -126,24 +153,55 @@ function normalizeItemPricing(input: ItemPricingInput, existing?: Partial<Normal
   const side = normalizeSide(input.side ?? existing?.side ?? "venda");
   const category = inferCategory(name, cleanText(input.category ?? existing?.category, "outros"));
   const subcategory = inferSubcategory(name, category, cleanNullableText(input.subcategory ?? existing?.subcategory));
-  let purchase_price = input.purchase_price !== undefined ? cleanMoney(input.purchase_price) : (existing?.purchase_price ?? null);
+  const purchase_price = input.purchase_price !== undefined ? cleanMoney(input.purchase_price) : (existing?.purchase_price ?? null);
   let morador_purchase_price = input.morador_purchase_price !== undefined ? cleanMoney(input.morador_purchase_price) : (existing?.morador_purchase_price ?? null);
   let min_sale_price = input.min_sale_price !== undefined ? cleanMoney(input.min_sale_price) : (existing?.min_sale_price ?? null);
   let estimated_value = input.estimated_value !== undefined ? cleanMoney(input.estimated_value) : (existing?.estimated_value ?? null);
   const xp_points = input.xp_points !== undefined ? cleanXp(input.xp_points) : (existing?.xp_points ?? 0);
+  const canBeBought = side === "compra" || side === "ambos";
+  const org_buy_enabled = canBeBought
+    ? (input.org_buy_enabled !== undefined && input.org_buy_enabled !== null ? Boolean(input.org_buy_enabled) : (existing?.org_buy_enabled ?? true))
+    : false;
+  const requestedHighDemand = input.high_demand !== undefined && input.high_demand !== null ? Boolean(input.high_demand) : (existing?.high_demand ?? false);
+  const high_demand = canBeBought && org_buy_enabled && requestedHighDemand;
+  const high_demand_points = high_demand
+    ? (input.high_demand_points !== undefined ? cleanNullableInt(input.high_demand_points) : (existing?.high_demand_points ?? null))
+    : null;
+  const high_demand_reason = high_demand
+    ? (input.high_demand_reason !== undefined ? cleanNullableText(input.high_demand_reason) : (existing?.high_demand_reason ?? null))
+    : null;
+  const high_demand_until = high_demand
+    ? (input.high_demand_until !== undefined ? cleanNullableIso(input.high_demand_until) : (existing?.high_demand_until ?? null))
+    : null;
   const active = input.active !== undefined && input.active !== null ? Boolean(input.active) : (existing?.active ?? true);
 
   if (side === "compra") { min_sale_price = null; estimated_value = null; }
   if (side === "venda") { morador_purchase_price = null; }
   if (active) {
-    if ((side === "compra" || side === "ambos") && moneyValue(purchase_price) <= 0 && moneyValue(morador_purchase_price) <= 0) {
+    if (canBeBought && org_buy_enabled && moneyValue(purchase_price) <= 0 && moneyValue(morador_purchase_price) <= 0) {
       throw new Error("Define pelo menos um preço de compra para este material.");
     }
     if ((side === "venda" || side === "ambos") && moneyValue(min_sale_price) <= 0 && moneyValue(purchase_price) <= 0) {
       throw new Error("Define preço com material ou preço sem material para este item.");
     }
   }
-  return { name, category, subcategory, side, purchase_price, morador_purchase_price, min_sale_price, estimated_value, xp_points, active };
+  return {
+    name,
+    category,
+    subcategory,
+    side,
+    purchase_price,
+    morador_purchase_price,
+    min_sale_price,
+    estimated_value,
+    xp_points,
+    org_buy_enabled,
+    high_demand,
+    high_demand_points,
+    high_demand_reason,
+    high_demand_until,
+    active,
+  };
 }
 async function assertManager(context: any) {
   const me = await resolveCurrentMember(context.supabase, context.userId);
@@ -199,7 +257,13 @@ export const listDbItemsAdmin = createServerFn({ method: "GET" })
     const rows = await pgQuery<any>(
       `select id, name, category, subcategory, side, purchase_price::float as purchase_price,
               morador_purchase_price::float as morador_purchase_price, min_sale_price::float as min_sale_price,
-              estimated_value::float as estimated_value, xp_points, coalesce(active, true) as active
+              estimated_value::float as estimated_value, xp_points,
+              coalesce(org_buy_enabled, true) as org_buy_enabled,
+              (coalesce(high_demand, false) and (high_demand_until is null or high_demand_until > now())) as high_demand,
+              high_demand_points,
+              high_demand_reason,
+              high_demand_until,
+              coalesce(active, true) as active
        from items where deleted_at is null order by coalesce(active, true) desc, category, name`,
     );
     const recipeRows = await pgQuery<{ recipe_id: number; item_id: number }>(`select id as recipe_id, item_id from craft_recipes`);
@@ -259,10 +323,10 @@ export const updateItemAdmin = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }): Promise<void> => {
     const me = await assertManager(context);
-    const existing = await pgOne<NormalizedItemPricing>(`select name, category, subcategory, side, purchase_price::float as purchase_price, morador_purchase_price::float as morador_purchase_price, min_sale_price::float as min_sale_price, estimated_value::float as estimated_value, xp_points, coalesce(active, true) as active from items where id = $1 and deleted_at is null`, [data.item_id]);
+    const existing = await pgOne<NormalizedItemPricing>(`select name, category, subcategory, side, purchase_price::float as purchase_price, morador_purchase_price::float as morador_purchase_price, min_sale_price::float as min_sale_price, estimated_value::float as estimated_value, xp_points, coalesce(org_buy_enabled, true) as org_buy_enabled, coalesce(high_demand, false) as high_demand, high_demand_points, high_demand_reason, high_demand_until, coalesce(active, true) as active from items where id = $1 and deleted_at is null`, [data.item_id]);
     if (!existing) throw new Error("Item não encontrado");
     const item = normalizeItemPricing(data, existing);
-    await pgQuery(`update items set name = $2, category = $3, subcategory = $4, side = $5, purchase_price = $6, morador_purchase_price = $7, min_sale_price = $8, estimated_value = $9, xp_points = $10, active = $11, updated_at = now() where id = $1 and deleted_at is null`, [data.item_id, item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points, item.active]);
+    await pgQuery(`update items set name = $2, category = $3, subcategory = $4, side = $5, purchase_price = $6, morador_purchase_price = $7, min_sale_price = $8, estimated_value = $9, xp_points = $10, active = $11, org_buy_enabled = $12, high_demand = $13, high_demand_points = $14, high_demand_reason = $15, high_demand_until = $16::timestamptz, high_demand_updated_at = now(), updated_at = now() where id = $1 and deleted_at is null`, [data.item_id, item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points, item.active, item.org_buy_enabled, item.high_demand, item.high_demand_points, item.high_demand_reason, item.high_demand_until]);
     await logAdminAction(context.supabase, { action: "item_updated", actorId: context.userId, actorName: me.display_name ?? "Direção", targetType: "item", targetId: data.item_id, details: `Item atualizado: ${item.name}`, afterState: item });
   });
 
@@ -278,11 +342,11 @@ export const createItemAdmin = createServerFn({ method: "POST" })
     const item = normalizeItemPricing(data, { active: true });
     const existing = await pgOne<{ id: number; active: boolean | null; deleted_at: string | null }>(`select id, active, deleted_at from items where lower(name) = lower($1) order by id desc limit 1`, [item.name]);
     if (existing?.deleted_at) {
-      await pgQuery(`update items set category = $2, subcategory = $3, side = $4, purchase_price = $5, morador_purchase_price = $6, min_sale_price = $7, estimated_value = $8, xp_points = $9, active = true, deleted_at = null, updated_at = now() where id = $1`, [existing.id, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points]);
+      await pgQuery(`update items set category = $2, subcategory = $3, side = $4, purchase_price = $5, morador_purchase_price = $6, min_sale_price = $7, estimated_value = $8, xp_points = $9, org_buy_enabled = $10, high_demand = $11, high_demand_points = $12, high_demand_reason = $13, high_demand_until = $14::timestamptz, high_demand_updated_at = now(), active = true, deleted_at = null, updated_at = now() where id = $1`, [existing.id, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points, item.org_buy_enabled, item.high_demand, item.high_demand_points, item.high_demand_reason, item.high_demand_until]);
       return { id: existing.id };
     }
     if (existing) throw new Error("Já existe um material com esse nome.");
-    const result = await pgOne<{ id: number }>(`insert into items (name, category, subcategory, side, purchase_price, morador_purchase_price, min_sale_price, estimated_value, xp_points, active) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true) returning id`, [item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points]);
+    const result = await pgOne<{ id: number }>(`insert into items (name, category, subcategory, side, purchase_price, morador_purchase_price, min_sale_price, estimated_value, xp_points, org_buy_enabled, high_demand, high_demand_points, high_demand_reason, high_demand_until, high_demand_updated_at, active) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::timestamptz,now(),true) returning id`, [item.name, item.category, item.subcategory, item.side, item.purchase_price, item.morador_purchase_price, item.min_sale_price, item.estimated_value, item.xp_points, item.org_buy_enabled, item.high_demand, item.high_demand_points, item.high_demand_reason, item.high_demand_until]);
     if (!result) throw new Error("Erro ao criar item");
     await logAdminAction(context.supabase, { action: "item_created", actorId: context.userId, actorName: me.display_name ?? "Direção", targetType: "item", targetId: result.id, details: `Material criado: ${item.name}`, afterState: item });
     return { id: result.id };
@@ -292,7 +356,7 @@ export const getMaterialItemsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertManager(context);
-    return pgQuery<{ id: number; name: string; category: string | null; purchase_price: number | null }>(`select id, name, category, purchase_price::float as purchase_price from items where coalesce(active, true)=true and deleted_at is null and coalesce(side,'compra') in ('compra','ambos') order by category, name`);
+    return pgQuery<{ id: number; name: string; category: string | null; purchase_price: number | null }>(`select id, name, category, purchase_price::float as purchase_price from items where coalesce(active, true)=true and deleted_at is null and coalesce(org_buy_enabled, true)=true and coalesce(side,'compra') in ('compra','ambos') order by category, name`);
   });
 
 export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
@@ -329,7 +393,7 @@ export const updateItemRecipeAdmin = createServerFn({ method: "POST" })
       }
     }
     if (aggregated.size > 0) {
-      const validRows = await pgQuery<{ id: number }>(`select id from items where id = any($1::int[]) and coalesce(active,true)=true and deleted_at is null and coalesce(side,'compra') in ('compra','ambos')`, [Array.from(aggregated.keys())]);
+      const validRows = await pgQuery<{ id: number }>(`select id from items where id = any($1::int[]) and coalesce(active,true)=true and deleted_at is null and coalesce(org_buy_enabled, true)=true and coalesce(side,'compra') in ('compra','ambos')`, [Array.from(aggregated.keys())]);
       const valid = new Set(validRows.map((r) => r.id));
       for (const id of aggregated.keys()) if (!valid.has(id)) throw new Error("A receita só pode usar materiais ativos de compra/ambos.");
     }

@@ -110,6 +110,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
      from items
      where coalesce(active, true) = true
        and deleted_at is null
+        and coalesce(org_buy_enabled, true) = true
        and (
          id = any($1::int[])
          or ${SQL_NORMALIZED_NAME} = any($2::text[])

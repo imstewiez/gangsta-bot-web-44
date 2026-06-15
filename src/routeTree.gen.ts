@@ -36,6 +36,7 @@ import { Route as AuthenticatedAdminReceitasRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminPrecosRouteImport } from './routes/_authenticated/admin.precos'
 import { Route as AuthenticatedAdminItensRouteImport } from './routes/_authenticated/admin.itens'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin.dashboard'
+import { Route as AuthenticatedAdminDadosRouteImport } from './routes/_authenticated/admin.dados'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -177,6 +178,11 @@ const AuthenticatedAdminDashboardRoute =
     path: '/dashboard',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminDadosRoute = AuthenticatedAdminDadosRouteImport.update({
+  id: '/dados',
+  path: '/dados',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/dados': typeof AuthenticatedAdminDadosRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/itens': typeof AuthenticatedAdminItensRoute
   '/admin/precos': typeof AuthenticatedAdminPrecosRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/receitas': typeof AuthenticatedReceitasRoute
   '/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/dados': typeof AuthenticatedAdminDadosRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/itens': typeof AuthenticatedAdminItensRoute
   '/admin/precos': typeof AuthenticatedAdminPrecosRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/_authenticated/receitas': typeof AuthenticatedReceitasRoute
   '/_authenticated/tops': typeof AuthenticatedTopsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/_authenticated/admin/dados': typeof AuthenticatedAdminDadosRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/itens': typeof AuthenticatedAdminItensRoute
   '/_authenticated/admin/precos': typeof AuthenticatedAdminPrecosRoute
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/tops'
     | '/auth/callback'
+    | '/admin/dados'
     | '/admin/dashboard'
     | '/admin/itens'
     | '/admin/precos'
@@ -306,6 +316,7 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/tops'
     | '/auth/callback'
+    | '/admin/dados'
     | '/admin/dashboard'
     | '/admin/itens'
     | '/admin/precos'
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/_authenticated/receitas'
     | '/_authenticated/tops'
     | '/auth/callback'
+    | '/_authenticated/admin/dados'
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/itens'
     | '/_authenticated/admin/precos'
@@ -544,10 +556,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/dados': {
+      id: '/_authenticated/admin/dados'
+      path: '/dados'
+      fullPath: '/admin/dados'
+      preLoaderRoute: typeof AuthenticatedAdminDadosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminDadosRoute: typeof AuthenticatedAdminDadosRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminItensRoute: typeof AuthenticatedAdminItensRoute
   AuthenticatedAdminPrecosRoute: typeof AuthenticatedAdminPrecosRoute
@@ -556,6 +576,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminDadosRoute: AuthenticatedAdminDadosRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminItensRoute: AuthenticatedAdminItensRoute,
   AuthenticatedAdminPrecosRoute: AuthenticatedAdminPrecosRoute,
