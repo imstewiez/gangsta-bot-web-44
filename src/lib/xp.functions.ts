@@ -75,7 +75,7 @@ export async function applyMemberTierFromXp(memberId: number): Promise<{ totalPo
     await pgQuery(
       `UPDATE members
        SET tier = $2,
-           role = CASE WHEN coalesce(role, '') IN ('', 'bairrista', $1) THEN 'bairrista' ELSE role END,
+           role = CASE WHEN coalesce(role, '') IN ('', 'bairrista', 'young_blood', 'o_gunao', 'gangster_fodido') THEN 'bairrista' ELSE role END,
            updated_at = now()
        WHERE id = $1`,
       [memberId, currentTier],
