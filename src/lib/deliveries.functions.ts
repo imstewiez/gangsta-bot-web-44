@@ -46,7 +46,7 @@ type DeliveryRow = {
 type RawDeliveryRow = Omit<DeliveryRow, "lines"> & { lines: unknown };
 
 const SQL_NORMALIZED_NAME = "translate(lower(name), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')";
-const RESPONSIBLE_TIERS = ["patrao_di_zona", "kingpin", "manda_chuva"];
+const RESPONSIBLE_TIERS = ["patrao_di_zona", "real_gangster", "og", "kingpin", "manda_chuva"];
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -76,7 +76,7 @@ async function assertResponsibleExists(memberId: number) {
        and tier = any($2::text[])`,
     [memberId, RESPONSIBLE_TIERS],
   );
-  if (!row) throw new Error("Responsável inválido. Só Patrão di Zona, Kingpin ou Manda-Chuva podem ser responsáveis.");
+  if (!row) throw new Error("Responsável inválido. Só Patrão di Zona, Real Gangster, OG, Kingpin ou Manda-Chuva podem ser responsáveis.");
 }
 
 async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "entrega" | "venda" = "entrega"): Promise<DeliveryLine[]> {
@@ -320,8 +320,6 @@ export const decideDelivery = createServerFn({ method: "POST" })
       [data.id],
     );
     if (!before) throw new Error("Pedido não encontrado");
-    if (!before.responsavel_member_id) throw new Error("Pedido sem responsável. Define um responsável antes de tratar.");
-    if (!me.is_superadmin && me.id !== before.responsavel_member_id) throw new Error("Sem permissão — só o responsável pode tratar este pedido");
     if (normalizeStatus(before.status) !== "pending") throw new Error("Já decidido");
 
     const tipo = before.tipo === "venda" ? "venda" : "entrega";
