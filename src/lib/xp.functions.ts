@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgOne, pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
+import { notifyBot } from "./discord.server";
 import { getPromotions, getTierOrder, getTierLabels } from "./config.loader";
 
 // XP vem exclusivamente da Gestão de Materiais: items.xp_points.
@@ -65,9 +66,32 @@ function resolveTierFromPoints(currentTier: string, totalPoints: number): string
   return tier;
 }
 
+async function queueDiscordSync(memberId: number, discordId: string, toTier: string) {
+  await pgQuery(
+    `INSERT INTO bot_outbox_events (event_type, entity_type, entity_id, discord_id, payload, status, attempts, created_at)
+     VALUES ('member.role_changed', 'member', $1, $2, $3::jsonb, 'pending', 0, now())`,
+    [String(memberId), discordId, JSON.stringify({ to_tier: toTier })],
+  ).catch(() => null);
+}
+
+async function syncDiscordTier(memberId: number, discordId: string | null, fromTier: string, toTier: string) {
+  if (!discordId) return;
+
+  const result = await notifyBot({
+    action: "promote",
+    discord_id: discordId,
+    from_tier: fromTier,
+    to_tier: toTier,
+  }).catch(() => ({ ok: false }));
+
+  if (!result.ok) {
+    await queueDiscordSync(memberId, discordId, toTier);
+  }
+}
+
 export async function applyMemberTierFromXp(memberId: number): Promise<{ totalPoints: number; previousTier: string; currentTier: string; promoted: boolean }> {
   const totalPoints = await calculateTotalPoints(memberId);
-  const member = await pgOne<{ tier: string | null }>("SELECT tier FROM members WHERE id = $1", [memberId]);
+  const member = await pgOne<{ tier: string | null; discord_id: string | null }>("SELECT tier, discord_id FROM members WHERE id = $1", [memberId]);
   const previousTier = member?.tier ?? "young_blood";
   const currentTier = resolveTierFromPoints(previousTier, totalPoints);
 
@@ -80,6 +104,7 @@ export async function applyMemberTierFromXp(memberId: number): Promise<{ totalPo
        WHERE id = $1`,
       [memberId, currentTier],
     );
+    await syncDiscordTier(memberId, member?.discord_id ?? null, previousTier, currentTier);
   }
 
   return { totalPoints, previousTier, currentTier, promoted: currentTier !== previousTier };
