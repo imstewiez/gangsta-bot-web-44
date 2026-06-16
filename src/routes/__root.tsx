@@ -18,6 +18,11 @@ import appCss from "../styles.css?url";
 import { MapPinOff, RotateCcw, Home } from "lucide-react";
 import { ERROR_PAGE } from "@/lib/messages";
 
+const SITE_URL = "https://ballasgang.eu";
+const SITE_TITLE = "Ballas Gang";
+const SITE_DESCRIPTION = "Painel interno da Ballas Gang para gestão operacional, membros, entregas, encomendas, inventário e direção.";
+const SITE_IMAGE = `${SITE_URL}/assets/ballas-logo-Dw-OuUpd.png`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -88,20 +93,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" },
-        { title: "Ballas Gang" },
-        {
-          name: "description",
-          content:
-            "Painel operacional da Ballas Gang — gestão interna, recursos e estrutura hierárquica.",
-        },
-        { property: "og:title", content: "Ballas Gang" },
-        { name: "twitter:title", content: "Ballas Gang" },
-        { property: "og:description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
-        { name: "twitter:description", content: "Plataforma de gestão da firma Ballas Gang — encomendas, armazém, classificações e direção." },
-        { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
-        { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63b21cd3-9da8-450a-9c1d-fd27accd9031/id-preview-9caf4930--19809dc3-8dcb-4892-b409-4a41be469381.lovable.app-1778616396528.png" },
-        { name: "twitter:card", content: "summary_large_image" },
+        { title: SITE_TITLE },
+        { name: "description", content: SITE_DESCRIPTION },
+        { property: "og:site_name", content: SITE_TITLE },
+        { property: "og:title", content: SITE_TITLE },
+        { property: "og:description", content: SITE_DESCRIPTION },
         { property: "og:type", content: "website" },
+        { property: "og:url", content: SITE_URL },
+        { property: "og:image", content: SITE_IMAGE },
+        { property: "og:image:secure_url", content: SITE_IMAGE },
+        { property: "og:image:alt", content: SITE_TITLE },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: SITE_TITLE },
+        { name: "twitter:description", content: SITE_DESCRIPTION },
+        { name: "twitter:image", content: SITE_IMAGE },
+        { name: "twitter:image:alt", content: SITE_TITLE },
       ],
       links: [
         { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
