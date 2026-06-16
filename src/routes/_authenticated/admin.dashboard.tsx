@@ -86,8 +86,9 @@ function AdminDashboardPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-display flex items-center gap-2 text-sm">
                   <ShoppingCart className="h-4 w-4 text-primary" />
-                  Ciclos
+                  Ciclos em gestão
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">Só encomendas ativas: pendentes, aprovadas, em tratamento ou prontas.</p>
               </CardHeader>
               <CardContent>
                 {cycles.isLoading && (
@@ -99,8 +100,8 @@ function AdminDashboardPage() {
                 {cycles.data && cycles.data.length === 0 && (
                   <div className="col-span-full py-6 text-center">
                     <ShoppingCart className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                    <p className="text-sm font-medium text-foreground">{EMPTY_STATE.orders.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{EMPTY_STATE.orders.description}</p>
+                    <p className="text-sm font-medium text-foreground">Sem encomendas ativas</p>
+                    <p className="mt-1 text-xs text-muted-foreground">As encomendas entregues ficam no arquivo da página Encomendas.</p>
                   </div>
                 )}
                 <div className="space-y-4">
@@ -114,9 +115,6 @@ function AdminDashboardPage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[10px]">
-                          <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-400">
-                            {cycle.fulfilled_count} entregues
-                          </span>
                           {cycle.active_count > 0 && (
                             <span className="rounded bg-blue-500/10 px-2 py-0.5 font-medium text-blue-400">
                               {cycle.active_count} em curso
