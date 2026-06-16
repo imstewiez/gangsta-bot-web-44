@@ -23,7 +23,7 @@ export type OrderCycle = {
   }[];
 };
 
-const ACTIVE_ORDER_STATUSES = ["approved", "in_progress", "ready"];
+const ACTIVE_ORDER_STATUSES = ["pending", "approved", "in_progress", "ready"];
 
 function orderVisibilitySql(me: { id: number; is_superadmin?: boolean | null }) {
   return me.is_superadmin ? { sql: "", params: [] as unknown[] } : { sql: " and o.responsavel_member_id = $1", params: [me.id] as unknown[] };
@@ -161,6 +161,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
     const isChefia = me?.tier === "kingpin" || me?.tier === "manda_chuva" || me?.is_superadmin || me?.role_label === "kingpin" || me?.role_label === "manda_chuva";
     if (!isChefia || !me) throw new Error("Acesso restrito. Apenas Kingpin e Manda-Chuva.");
     const visibility = orderVisibilitySql(me);
+    const statusParamIndex = visibility.params.length + 1;
 
     const cycles = await pgQuery<{
       cycle_start: string;
@@ -185,7 +186,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
           COALESCE(i.estimated_value, 0) as unit_cost
         FROM orders o
         JOIN items i ON i.id = o.item_id
-        WHERE o.status NOT IN ('cancelled', 'denied')
+        WHERE o.status = any($${statusParamIndex}::text[])
         ${visibility.sql}
       )
       SELECT
@@ -196,9 +197,9 @@ export const getOrderCycles = createServerFn({ method: "GET" })
         SUM(total_price)::float as total_revenue,
         SUM(quantity * unit_cost)::float as total_cost,
         SUM(total_price - quantity * unit_cost)::float as total_profit,
-        COUNT(DISTINCT order_key) FILTER (WHERE status = 'fulfilled')::int as fulfilled_count,
+        0::int as fulfilled_count,
         COUNT(DISTINCT order_key) FILTER (WHERE status = 'pending')::int as pending_count,
-        COUNT(DISTINCT order_key) FILTER (WHERE status = any($${visibility.params.length + 1}::text[]))::int as active_count
+        COUNT(DISTINCT order_key) FILTER (WHERE status in ('approved','in_progress','ready'))::int as active_count
       FROM cycle_orders
       GROUP BY cycle_start, cycle_end
       ORDER BY cycle_start DESC
@@ -216,11 +217,11 @@ export const getOrderCycles = createServerFn({ method: "GET" })
         SUM(${currentOrderValueSql("o", "i")} - o.quantity * COALESCE(i.estimated_value, 0))::float as profit
       FROM orders o
       JOIN items i ON i.id = o.item_id
-      WHERE o.status NOT IN ('cancelled', 'denied')
+      WHERE o.status = any($${statusParamIndex}::text[])
       ${visibility.sql}
       GROUP BY date_trunc('week', o.created_at)::date, i.name
       ORDER BY cycle_start DESC, profit DESC`,
-      visibility.params,
+      [...visibility.params, ACTIVE_ORDER_STATUSES],
     ).catch(() => []);
 
     return cycles.map((c) => ({
