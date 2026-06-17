@@ -163,6 +163,27 @@ export const getOrderCycles = createServerFn({ method: "GET" })
     const visibility = orderVisibilitySql(me);
     const statusParamIndex = visibility.params.length + 1;
 
+    const baseVisibleOrdersSql = `
+      select
+        o.id,
+        o.batch_id,
+        o.created_at,
+        date_trunc('week', o.created_at)::date as cycle_start,
+        (date_trunc('week', o.created_at)::date + interval '6 days')::date as cycle_end,
+        coalesce(o.batch_id, o.id::text) as order_key,
+        o.status,
+        o.quantity,
+        i.name as item_name,
+        ${currentOrderValueSql("o", "i")} as total_price,
+        coalesce(i.estimated_value, 0) as unit_cost
+      from orders o
+      join items i on i.id = o.item_id
+      where o.status = any($${statusParamIndex}::text[])
+      ${visibility.sql}
+      order by o.created_at desc
+      limit 200
+    `;
+
     const cycles = await pgQuery<{
       cycle_start: string;
       cycle_end: string;
@@ -175,52 +196,37 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       pending_count: number;
       active_count: number;
     }>(
-      `WITH cycle_orders AS (
-        SELECT
-          date_trunc('week', o.created_at)::date as cycle_start,
-          (date_trunc('week', o.created_at)::date + interval '6 days')::date as cycle_end,
-          coalesce(o.batch_id, o.id::text) as order_key,
-          o.status,
-          o.quantity,
-          ${currentOrderValueSql("o", "i")} as total_price,
-          COALESCE(i.estimated_value, 0) as unit_cost
-        FROM orders o
-        JOIN items i ON i.id = o.item_id
-        WHERE o.status = any($${statusParamIndex}::text[])
-        ${visibility.sql}
-      )
-      SELECT
-        cycle_start,
-        cycle_end,
-        COUNT(DISTINCT order_key)::int as total_orders,
-        SUM(quantity)::int as total_material,
-        SUM(total_price)::float as total_revenue,
-        SUM(quantity * unit_cost)::float as total_cost,
-        SUM(total_price - quantity * unit_cost)::float as total_profit,
-        0::int as fulfilled_count,
-        COUNT(DISTINCT order_key) FILTER (WHERE status = 'pending')::int as pending_count,
-        COUNT(DISTINCT order_key) FILTER (WHERE status in ('approved','in_progress','ready'))::int as active_count
-      FROM cycle_orders
-      GROUP BY cycle_start, cycle_end
-      ORDER BY cycle_start DESC
-      LIMIT 8`,
+      `with visible_orders as (${baseVisibleOrdersSql})
+       select
+         cycle_start,
+         cycle_end,
+         count(distinct order_key)::int as total_orders,
+         sum(quantity)::int as total_material,
+         sum(total_price)::float as total_revenue,
+         sum(quantity * unit_cost)::float as total_cost,
+         sum(total_price - quantity * unit_cost)::float as total_profit,
+         0::int as fulfilled_count,
+         count(distinct order_key) filter (where status = 'pending')::int as pending_count,
+         count(distinct order_key) filter (where status in ('approved','in_progress','ready'))::int as active_count
+       from visible_orders
+       group by cycle_start, cycle_end
+       order by cycle_start desc
+       limit 8`,
       [...visibility.params, ACTIVE_ORDER_STATUSES],
     ).catch(() => []);
 
     const items = await pgQuery<{ cycle_start: string; item_name: string; quantity: number; revenue: number; cost: number; profit: number }>(
-      `SELECT
-        date_trunc('week', o.created_at)::date as cycle_start,
-        i.name as item_name,
-        SUM(o.quantity)::int as quantity,
-        SUM(${currentOrderValueSql("o", "i")})::float as revenue,
-        SUM(o.quantity * COALESCE(i.estimated_value, 0))::float as cost,
-        SUM(${currentOrderValueSql("o", "i")} - o.quantity * COALESCE(i.estimated_value, 0))::float as profit
-      FROM orders o
-      JOIN items i ON i.id = o.item_id
-      WHERE o.status = any($${statusParamIndex}::text[])
-      ${visibility.sql}
-      GROUP BY date_trunc('week', o.created_at)::date, i.name
-      ORDER BY cycle_start DESC, profit DESC`,
+      `with visible_orders as (${baseVisibleOrdersSql})
+       select
+         cycle_start,
+         item_name,
+         sum(quantity)::int as quantity,
+         sum(total_price)::float as revenue,
+         sum(quantity * unit_cost)::float as cost,
+         sum(total_price - quantity * unit_cost)::float as profit
+       from visible_orders
+       group by cycle_start, item_name
+       order by cycle_start desc, profit desc`,
       [...visibility.params, ACTIVE_ORDER_STATUSES],
     ).catch(() => []);
 
