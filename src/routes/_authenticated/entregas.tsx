@@ -20,7 +20,7 @@ import { fmtDate, fmtNum, fmtPrice, fmtCategoryLabel } from "@/lib/domain";
 import { ARMORY_CAT_ORDER, ARMORY_CAT_CONFIG, filterItemForDisplay } from "@/lib/armory.catalog";
 import { toast } from "sonner";
 import { beautifyError, EMPTY_STATE, LOADING } from "@/lib/messages";
-import { Plus, Trash2, Check, X, PackageOpen, Package, Coins, Loader2 } from "lucide-react";
+import { Plus, Trash2, Check, X, PackageOpen, Package, Coins, Loader2, Zap } from "lucide-react";
 import { ItemIcon } from "@/components/domain/ItemIcon";
 import type { LucideIcon } from "lucide-react";
 import { FadeIn } from "@/components/layout/FadeIn";
@@ -35,6 +35,8 @@ export const Route = createFileRoute("/_authenticated/entregas")({
 type DeliveryTipo = "entrega" | "venda";
 type DeliveryLineInput = { item_id: string; qty: string };
 type DeliveryStatusFilter = "active" | "archived";
+
+const ZERO_POINT_CATEGORIES = new Set(["quimicos_droga", "dinheiro"]);
 
 function statusMeta(tipo: string, status: string): { label: string; color: string } {
   const isVenda = tipo === "venda";
@@ -52,6 +54,13 @@ const TIPO_META: Record<string, { label: string; Icon: LucideIcon; tone: string 
 function lineQty(line: DeliveryLineInput) {
   const qty = Number(line.qty);
   return Number.isFinite(qty) && qty > 0 ? qty : 0;
+}
+
+function itemDeliveryXp(item: CatalogItem | undefined | null) {
+  if (!item) return 0;
+  if (item.category && ZERO_POINT_CATEGORIES.has(item.category.toLowerCase())) return 0;
+  const xp = Number(item.xp_points ?? 0);
+  return Number.isFinite(xp) && xp > 0 ? xp : 0;
 }
 
 function Page() {
@@ -233,6 +242,10 @@ function NewDelivery() {
     const item = allItems.find((i) => String(i.id) === line.item_id);
     return acc + lineQty(line) * (item?.morador_purchase_price ?? item?.purchase_price ?? 0);
   }, 0);
+  const selectedXp = tipo === "entrega" ? validLines.reduce((acc, line) => {
+    const item = allItems.find((i) => String(i.id) === line.item_id);
+    return acc + lineQty(line) * itemDeliveryXp(item);
+  }, 0) : 0;
 
   const mutation = useMutation({
     mutationFn: () => createFn({ data: { lines: validLines.map((l) => ({ item_id: Number(l.item_id), qty: Number(l.qty) })), notes, tipo, responsavel_member_id: Number(responsavel) } }),
@@ -285,7 +298,11 @@ function NewDelivery() {
                   placeholder="Item"
                   searchPlaceholder="Pesquisar item..."
                   emptyText="Nenhum item encontrado"
-                  options={items.map((it) => ({ value: String(it.id), label: it.name, description: `${fmtCategoryLabel(it.category)} · ${fmtPrice(it.morador_purchase_price ?? it.purchase_price ?? 0)}` }))}
+                  options={items.map((it) => {
+                    const xp = itemDeliveryXp(it);
+                    const price = it.morador_purchase_price ?? it.purchase_price ?? 0;
+                    return { value: String(it.id), label: it.name, description: `${fmtCategoryLabel(it.category)} · ${fmtPrice(price)}${tipo === "entrega" && xp > 0 ? ` · +${fmtNum(xp)} XP/u` : ""}` };
+                  })}
                 />
                 <Input type="number" min={1} value={line.qty} onChange={(e) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, qty: e.target.value } : l)))} />
                 <Button variant="outline" size="icon" disabled={lines.length === 1} onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4" /></Button>
@@ -296,6 +313,7 @@ function NewDelivery() {
           <Textarea placeholder="Notas" value={notes} onChange={(e) => setNotes(e.target.value)} />
           <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
             <div className="flex justify-between"><span>Quantidade total</span><strong>{fmtNum(validLines.reduce((a, l) => a + lineQty(l), 0))}</strong></div>
+            {tipo === "entrega" && <div className="mt-1 flex justify-between"><span>XP após aprovação</span><strong className="inline-flex items-center gap-1 text-primary"><Zap className="h-3.5 w-3.5" />+{fmtNum(selectedXp)} XP</strong></div>}
             {tipo === "venda" && <div className="flex justify-between"><span>Valor estimado</span><strong>{fmtPrice(selectedValue)}</strong></div>}
           </div>
         </div>
