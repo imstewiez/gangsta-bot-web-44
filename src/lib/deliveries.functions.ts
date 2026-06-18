@@ -80,6 +80,22 @@ async function assertResponsibleExists(memberId: number) {
   if (!row) throw new Error("Responsável inválido. Só Patrão di Zona, Real Gangster, OG, Kingpin ou Manda-Chuva podem ser responsáveis.");
 }
 
+function normalizeRawDeliveryLines(lines: unknown, tipo: "entrega" | "venda" = "entrega"): DeliveryLine[] {
+  if (!Array.isArray(lines)) return [];
+  return lines
+    .filter((line): line is RawDeliveryLine => Boolean(line && typeof line === "object"))
+    .map((line) => {
+      const qty = asPositiveNumber(line.qty ?? line.quantity ?? line.amount) ?? 0;
+      const itemId = asPositiveNumber(line.item_id ?? line.itemId) ?? 0;
+      const itemName = String(line.item_name ?? line.itemName ?? (itemId ? `Item #${itemId}` : "Item inválido"));
+      const explicitUnit = asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.unit_price ?? line.effectivePrice ?? line.basePrice);
+      const lineValue = asOptionalNumber(line.lineValue);
+      const unit = tipo === "entrega" ? 0 : (explicitUnit ?? (lineValue != null && qty > 0 ? lineValue / qty : 0) ?? 0);
+      return { item_id: itemId, item_name: itemName, qty, unit_value: unit };
+    })
+    .filter((line) => line.qty > 0);
+}
+
 async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "entrega" | "venda" = "entrega"): Promise<DeliveryLine[]> {
   if (!Array.isArray(lines)) {
     if (strict) throw new Error("Linhas inválidas");
@@ -87,6 +103,13 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
   }
 
   const rawLines = lines.filter((l): l is RawDeliveryLine => Boolean(l && typeof l === "object"));
+
+  // Para listagens antigas/arquivadas, se a linha já vem enriquecida com nome/preço,
+  // evita queries extra à DB. Isto torna a página resistente depois de aprovar/arquivar.
+  if (!strict && rawLines.every((line) => (line.item_name || line.itemName) && asPositiveNumber(line.qty ?? line.quantity ?? line.amount))) {
+    return normalizeRawDeliveryLines(rawLines, tipo);
+  }
+
   const ids = new Set<number>();
   const names = new Set<string>();
 
@@ -131,12 +154,7 @@ async function normalizeDeliveryLines(lines: unknown, strict: boolean, tipo: "en
 
     if (!qty || !item || !allowed) {
       if (strict) throw new Error(`Linha inválida: ${JSON.stringify(line)}`);
-      normalized.push({
-        item_id: rawId ?? 0,
-        item_name: rawName ?? "Item inválido",
-        qty: qty ?? 0,
-        unit_value: tipo === "entrega" ? 0 : (asOptionalNumber(line.unit_value ?? line.unitValue ?? line.unitPrice ?? line.unit_price ?? line.effectivePrice ?? line.basePrice) ?? 0),
-      });
+      normalized.push(...normalizeRawDeliveryLines([line], tipo));
       continue;
     }
 
@@ -163,7 +181,12 @@ function deliveryTotals(lines: DeliveryLine[]) {
 
 async function hydrateDeliveryRow(row: RawDeliveryRow): Promise<DeliveryRow> {
   const tipo = row.tipo === "venda" ? "venda" : "entrega";
-  const lines = await normalizeDeliveryLines(row.lines, false, tipo);
+  let lines: DeliveryLine[];
+  try {
+    lines = await normalizeDeliveryLines(row.lines, false, tipo);
+  } catch (_) {
+    lines = normalizeRawDeliveryLines(row.lines, tipo);
+  }
   const totals = deliveryTotals(lines);
   return {
     ...row,
@@ -173,6 +196,11 @@ async function hydrateDeliveryRow(row: RawDeliveryRow): Promise<DeliveryRow> {
     total_qty: row.total_qty || totals.totalQty,
     total_value: tipo === "entrega" ? 0 : (row.total_value || totals.totalValue),
   };
+}
+
+async function hydrateDeliveryRows(rows: RawDeliveryRow[]) {
+  const hydrated = await Promise.all(rows.map((row) => hydrateDeliveryRow(row).catch(() => null)));
+  return hydrated.filter((row): row is DeliveryRow => Boolean(row));
 }
 
 export const listDeliveries = createServerFn({ method: "GET" })
@@ -230,8 +258,8 @@ export const listDeliveries = createServerFn({ method: "GET" })
          order by im.created_at desc
          limit 500`,
         params,
-      );
-      return Promise.all(movementRows.map((row) => hydrateDeliveryRow(row)));
+      ).catch(() => []);
+      return hydrateDeliveryRows(movementRows);
     }
 
     const params: unknown[] = [];
@@ -261,7 +289,7 @@ export const listDeliveries = createServerFn({ method: "GET" })
       params,
     ).catch(() => []);
 
-    return Promise.all(requestRows.map((row) => hydrateDeliveryRow(row)));
+    return hydrateDeliveryRows(requestRows);
   });
 
 export const createDelivery = createServerFn({ method: "POST" })
