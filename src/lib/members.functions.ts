@@ -39,13 +39,14 @@ type MemberStats = {
 
 type MemberDetail = {
   member: MemberRow | null;
-  contributions: { type: string; total: number }[];
+  contributions: { type: string; total: number; points: number }[];
   recentMovements: {
     id: number;
     type: string;
     item_id: number | null;
     item_name: string | null;
     qty: number;
+    points: number;
     created_at: string;
   }[];
   kills: number;
@@ -81,6 +82,16 @@ const ACTIVE_MEMBER_WHERE = `
   and coalesce(m.lifecycle_state::text, m.status, 'active') in ('active','ativo','promoted')
   and m.tier = any($1::text[])
 `;
+
+const XP_POINTS_SQL = `case
+  when lower(coalesce(i.category,'')) in ('quimicos_droga','dinheiro') then 0
+  else coalesce(i.xp_points, 0)
+end`;
+
+const DELIVERY_XP_SQL = `case
+  when im.movement_type in ('entrega_bairrista','entrega_oficial') and im.quantity > 0 then im.quantity * ${XP_POINTS_SQL}
+  else 0
+end`;
 
 const EMPTY_MEMBER_STATS: MemberStats = {
   kills: 0,
@@ -339,16 +350,25 @@ export const getMember = createServerFn({ method: "GET" })
       if (!member) return emptyMemberDetail();
 
       const [contrib, movs, stats] = await Promise.all([
-        pgQuery<{ type: string; total: string }>(
-          `select movement_type as type, sum(quantity)::text as total
-           from inventory_movements
-           where member_id = $1
-           group by movement_type
-           order by abs(sum(quantity)) desc`,
+        pgQuery<{ type: string; total: string; points: string }>(
+          `select im.movement_type as type,
+                  sum(im.quantity)::text as total,
+                  coalesce(sum(${DELIVERY_XP_SQL}), 0)::text as points
+           from inventory_movements im
+           left join items i on i.id = im.item_id
+           where im.member_id = $1
+           group by im.movement_type
+           order by abs(sum(im.quantity)) desc`,
           [data.id],
         ),
         pgQuery<MemberDetail["recentMovements"][number]>(
-          `select im.id, im.movement_type as type, im.item_id, i.name as item_name, im.quantity as qty, im.created_at
+          `select im.id,
+                  im.movement_type as type,
+                  im.item_id,
+                  i.name as item_name,
+                  im.quantity as qty,
+                  coalesce(${DELIVERY_XP_SQL}, 0)::float as points,
+                  im.created_at
            from inventory_movements im
            left join items i on i.id = im.item_id
            where im.member_id = $1
@@ -361,8 +381,8 @@ export const getMember = createServerFn({ method: "GET" })
 
       return {
         member,
-        contributions: contrib.map((r) => ({ type: r.type, total: Number(r.total) })),
-        recentMovements: movs,
+        contributions: contrib.map((r) => ({ type: r.type, total: Number(r.total), points: Number(r.points ?? 0) })),
+        recentMovements: movs.map((r) => ({ ...r, points: Number(r.points ?? 0) })),
         kills: stats.kills,
         deaths: stats.deaths,
         saidas: stats.saidas,
