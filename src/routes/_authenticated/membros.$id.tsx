@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { fmtNum, fmtDate, POSITION_LABELS, TIER_ORDER } from "@/lib/domain";
 import { MemberIdentity } from "@/components/domain/RoleBadge";
 import { MemberAdminPanel } from "@/components/domain/MemberAdminPanel";
@@ -108,14 +107,18 @@ function Page() {
 
       <Reveal direction="up" delay={150}>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Card><CardHeader><CardTitle>Contribuições</CardTitle></CardHeader><CardContent>{(data.contributions?.length ?? 0) === 0 ? <EmptyState icon={File} title={EMPTY_STATE.memberProfileRecords.title} description={EMPTY_STATE.memberProfileRecords.description} /> : <ul className="space-y-1.5">{data.contributions.map((c) => <li key={c.type} className="interactive-row flex justify-between border-b border-border/50 py-1.5 text-sm last:border-0"><MovementTypeBadge type={c.type} /><span className="font-mono">{fmtNum(c.total)}</span></li>)}</ul>}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Movimentos recentes</CardTitle></CardHeader><CardContent>{(data.recentMovements?.length ?? 0) === 0 ? <EmptyState icon={ArrowDownUp} title={EMPTY_STATE.memberProfileMovements.title} description={EMPTY_STATE.memberProfileMovements.description} /> : <ul className="space-y-1">{data.recentMovements.map((mv) => <li key={mv.id} className="interactive-row flex items-baseline gap-2 border-b border-border/50 py-1.5 text-xs last:border-0"><span className="text-muted-foreground">{fmtDate(mv.created_at).split(",")[0]}</span><MovementTypeBadge type={mv.type} /><span className="text-muted-foreground">{mv.item_name ?? "—"}</span><span className="ml-auto font-mono">{fmtNum(mv.qty)}</span></li>)}</ul>}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Contribuições</CardTitle></CardHeader><CardContent>{(data.contributions?.length ?? 0) === 0 ? <EmptyState icon={File} title={EMPTY_STATE.memberProfileRecords.title} description={EMPTY_STATE.memberProfileRecords.description} /> : <ul className="space-y-1.5">{data.contributions.map((c) => <li key={c.type} className="interactive-row flex justify-between border-b border-border/50 py-1.5 text-sm last:border-0"><MovementTypeBadge type={c.type} /><span className="font-mono">{fmtNum(c.total)}{c.points > 0 && <XpPill points={c.points} />}</span></li>)}</ul>}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Movimentos recentes</CardTitle></CardHeader><CardContent>{(data.recentMovements?.length ?? 0) === 0 ? <EmptyState icon={ArrowDownUp} title={EMPTY_STATE.memberProfileMovements.title} description={EMPTY_STATE.memberProfileMovements.description} /> : <ul className="space-y-1">{data.recentMovements.map((mv) => <li key={mv.id} className="interactive-row flex items-baseline gap-2 border-b border-border/50 py-1.5 text-xs last:border-0"><span className="text-muted-foreground">{fmtDate(mv.created_at).split(",")[0]}</span><MovementTypeBadge type={mv.type} /><span className="text-muted-foreground">{mv.item_name ?? "—"}</span><span className="ml-auto font-mono">{fmtNum(mv.qty)}{mv.points > 0 && <XpPill points={mv.points} />}</span></li>)}</ul>}</CardContent></Card>
         </div>
       </Reveal>
 
       {isChefia && <Reveal direction="up" delay={200}><div className="mt-6"><MemberAdminPanel member={{ id: m.id, display_name: m.display_name, nick: m.nick, tier: m.tier }} stats={{ kills: data.kills, deaths: data.deaths, saidas: data.saidas, deliveries: data.deliveries, vendas: data.vendas, orders: data.orders }} myTier={myTier} canManage={canManage} /></div></Reveal>}
     </>
   );
+}
+
+function XpPill({ points }: { points: number }) {
+  return <span className="ml-1 whitespace-nowrap text-[11px] font-semibold text-primary">(+{fmtNum(points)} XP)</span>;
 }
 
 function InfoCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
