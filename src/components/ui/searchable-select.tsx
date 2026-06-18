@@ -26,7 +26,7 @@ function GroupHeader({ label }: { label: string }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 rounded-sm border-l-2 px-2 py-1 mb-0.5",
+        "mb-0.5 flex items-center gap-1.5 rounded-sm border-l-2 px-2 py-1",
         cfg?.bg ?? "bg-muted/30",
         cfg?.border ? cfg.border.replace("border", "border-l") : "border-l-border",
         cfg?.headerColor ?? "text-muted-foreground",
@@ -43,13 +43,15 @@ function GroupHeader({ label }: { label: string }) {
 type Option = {
   value: string;
   label: string;
+  description?: string;
   group?: string;
   groupColor?: string;
 };
 
 type SearchableSelectProps = {
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
+  onValueChange?: (value: string) => void;
   options: Option[];
   placeholder?: string;
   searchPlaceholder?: string;
@@ -60,6 +62,7 @@ type SearchableSelectProps = {
 export function SearchableSelect({
   value,
   onChange,
+  onValueChange,
   options,
   placeholder = "Seleciona...",
   searchPlaceholder = "Procurar...",
@@ -69,8 +72,16 @@ export function SearchableSelect({
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const selected = options.find((o) => o.value === value);
+  const emitChange = React.useCallback(
+    (nextValue: string) => {
+      onValueChange?.(nextValue);
+      onChange?.(nextValue);
+      setOpen(false);
+      setSearch("");
+    },
+    [onChange, onValueChange],
+  );
 
-  // Group options
   const groups = React.useMemo(() => {
     const map = new Map<string, Option[]>();
     for (const opt of options) {
@@ -90,7 +101,8 @@ export function SearchableSelect({
         const filtered = groupOptions.filter(
           (opt) =>
             opt.label.toLowerCase().includes(query) ||
-            opt.value.toLowerCase().includes(query),
+            opt.value.toLowerCase().includes(query) ||
+            opt.description?.toLowerCase().includes(query),
         );
         return [groupName, filtered] as [string, Option[]];
       })
@@ -98,6 +110,30 @@ export function SearchableSelect({
   }, [groups, query]);
 
   const hasResults = filteredGroups.some(([, opts]) => opts.length > 0);
+
+  const renderOption = (opt: Option) => (
+    <button
+      key={opt.value}
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => emitChange(opt.value)}
+      className={cn(
+        "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+        value === opt.value && "bg-accent text-accent-foreground",
+      )}
+    >
+      <Check
+        className={cn(
+          "h-4 w-4 shrink-0",
+          value === opt.value ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{opt.label}</span>
+        {opt.description && <span className="block truncate text-[11px] text-muted-foreground">{opt.description}</span>}
+      </span>
+    </button>
+  );
 
   return (
     <Popover
@@ -109,6 +145,7 @@ export function SearchableSelect({
     >
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -117,17 +154,16 @@ export function SearchableSelect({
             className,
           )}
         >
-          {selected ? selected.label : placeholder}
+          <span className="min-w-0 truncate">{selected ? selected.label : placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-full p-0 max-h-[320px] overflow-y-auto"
+        className="z-[80] max-h-[320px] w-[var(--radix-popover-trigger-width)] overflow-y-auto p-0"
         align="start"
         onWheel={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
       >
-        {/* Search input */}
         <div className="flex items-center border-b px-3 py-2">
           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
           <input
@@ -148,7 +184,6 @@ export function SearchableSelect({
           />
         </div>
 
-        {/* Options list */}
         <div>
           {!hasResults ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
@@ -160,62 +195,10 @@ export function SearchableSelect({
                 groupName ? (
                   <div key={groupName} className="mb-1">
                     <GroupHeader label={groupName} />
-                    <div>
-                      {groupOptions.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => {
-                            onChange(opt.value);
-                            setOpen(false);
-                            setSearch("");
-                          }}
-                          className={cn(
-                            "relative flex w-full cursor-pointer gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                            value === opt.value && "bg-accent text-accent-foreground",
-                          )}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4 shrink-0",
-                              value === opt.value
-                                ? "opacity-100"
-                                : "opacity-0",
-                            )}
-                          />
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
+                    <div>{groupOptions.map(renderOption)}</div>
                   </div>
                 ) : (
-                  <div key="__ungrouped">
-                    {groupOptions.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          onChange(opt.value);
-                          setOpen(false);
-                          setSearch("");
-                        }}
-                        className={cn(
-                          "relative flex w-full cursor-pointer gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                          value === opt.value && "bg-accent text-accent-foreground",
-                        )}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4 shrink-0",
-                            value === opt.value
-                              ? "opacity-100"
-                              : "opacity-0",
-                          )}
-                        />
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
+                  <div key="__ungrouped">{groupOptions.map(renderOption)}</div>
                 ),
               )}
             </div>
