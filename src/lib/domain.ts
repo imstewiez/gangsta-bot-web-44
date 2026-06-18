@@ -4,6 +4,8 @@
 import { getTierOrder } from "./config.loader";
 
 export type Tier =
+  | "ballas"
+  | "bairrista"
   | "young_blood"
   | "o_gunao"
   | "gangster_fodido"
@@ -13,11 +15,12 @@ export type Tier =
   | "kingpin"
   | "manda_chuva";
 
-export type MemberRole = Tier | "bairrista";
+export type MemberRole = Tier;
 
 // Cargo/posição principal — deve bater com o que o Discord mostra à comunidade.
 // Usado em Cargo/Posição, perfil, hierarquia e badges coloridas.
 export const ROLE_LABELS: Record<string, string> = {
+  ballas: "Ballas",
   young_blood: "Young Blood",
   o_gunao: "O Gunão",
   gangster_fodido: "Gangster Fodido",
@@ -35,6 +38,7 @@ export const TIER_LABELS: Record<string, string> = ROLE_LABELS;
 
 // Tier/descrição — informação secundária, sem substituir o cargo.
 export const TIER_DESCRIPTION_LABELS: Record<string, string> = {
+  ballas: "Bairro",
   young_blood: "Entrada / Tier 1",
   o_gunao: "Progressão / Tier 2",
   gangster_fodido: "Progressão / Tier 3",
@@ -56,6 +60,7 @@ export const TIER_GRADIENT: Record<string, string> = {
   gangster_fodido: "linear-gradient(135deg, #22d3ee 0%, #0f766e 100%)",
   o_gunao: "linear-gradient(135deg, #34d399 0%, #166534 100%)",
   young_blood: "linear-gradient(135deg, #94a3b8 0%, #334155 100%)",
+  ballas: "linear-gradient(135deg, #a855f7 0%, #581c87 100%)",
   bairrista: "linear-gradient(135deg, #7c3aed 0%, #3b0764 100%)",
 };
 
@@ -68,6 +73,7 @@ export const TIER_ACCENT: Record<string, string> = {
   gangster_fodido: "#22d3ee",
   o_gunao: "#34d399",
   young_blood: "#94a3b8",
+  ballas: "#a855f7",
   bairrista: "#a855f7",
 };
 
@@ -119,7 +125,9 @@ export function tierColor(tier: string | null | undefined): string {
       return "bg-emerald-400/15 text-emerald-300 border-emerald-400/50";
     case "young_blood":
       return "bg-slate-400/15 text-slate-300 border-slate-400/50";
+    case "ballas":
     case "bairrista":
+      return "bg-purple-500/15 text-purple-300 border-purple-400/50";
     default:
       return "bg-muted text-muted-foreground border-border";
   }
@@ -158,19 +166,6 @@ export function fmtCategoryLabel(raw: string | null | undefined): string {
     drogas: "Substâncias",
     materiais_craft: "Material",
     coletes: "Colete",
-    lixo: "Sucata",
-    madeiras: "Madeira",
-    materias_primas: "Matéria-prima",
-    minerios: "Minério",
-    corpos: "Corpo",
-    prints: "Print",
-    entrega_bairrista: "Entrega",
-    venda_bairrista: "Venda",
   };
-  return map[raw] ?? raw;
-}
-
-/** Portuguese pluralization: returns singular if n === 1, plural otherwise. */
-export function pluralPT(n: number, singular: string, plural: string): string {
-  return `${n} ${n === 1 ? singular : plural}`;
+  return map[raw] ?? raw.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
