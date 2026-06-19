@@ -97,10 +97,18 @@ function daysSince(iso: string | null): number | null {
 function recencyPoints(days: number | null, max: number): number {
   if (days == null) return 0;
   if (days <= 1) return max;
-  if (days <= 3) return Math.round(max * 0.8);
-  if (days <= 7) return Math.round(max * 0.55);
-  if (days <= 14) return Math.round(max * 0.25);
+  if (days <= 3) return Math.round(max * 0.85);
+  if (days <= 7) return Math.round(max * 0.65);
+  if (days <= 14) return Math.round(max * 0.4);
+  if (days <= 30) return Math.round(max * 0.15);
   return 0;
+}
+
+function hasAnyActivity(row: RawActivityMember): boolean {
+  return Boolean(row.portal_created_at)
+    || num(row.order_count) > 0
+    || num(row.delivery_count) > 0
+    || num(row.discord_message_count_30d) > 0;
 }
 
 function buildScore(row: RawActivityMember): number {
@@ -116,59 +124,62 @@ function buildScore(row: RawActivityMember): number {
   const deliveries7 = num(row.delivery_count_7d);
   const orders7 = num(row.order_count_7d);
   const messages7 = num(row.discord_message_count_7d);
+  const messages30 = num(row.discord_message_count_30d);
   const discordActive7 = num(row.discord_active_days_7);
   const discordActive30 = num(row.discord_active_days_30);
 
-  let score = 0;
+  if (!hasAnyActivity(row)) return 0;
 
-  // Portal: uso real da webapp.
-  score += row.portal_created_at ? 7 : 0;
-  score += recencyPoints(portalDays, 6);
+  let score = 20; // base: existe algum sinal real, logo não é zero absoluto.
 
-  // Discord: contexto diário. Não substitui entregas, mas ausência pesa.
+  // Portal: contexto de uso da webapp. Não bloqueia nem destrói o score sozinho.
+  score += row.portal_created_at ? 10 : 0;
+  score += recencyPoints(portalDays, 7);
+
+  // Discord: sinal de presença, com peso moderado porque o tracking começou agora.
+  score += messages30 > 0 ? 8 : 0;
   score += messages7 > 0 ? 8 : 0;
-  score += Math.min(7, Math.floor(messages7 / 5));
-  score += Math.min(7, Math.round((discordActive7 / 7) * 7));
-  score += Math.min(5, Math.round((discordActive30 / 30) * 5));
-  score += recencyPoints(discordDays, 7);
+  score += Math.min(6, Math.floor(messages7 / 10));
+  score += Math.min(6, Math.round((discordActive7 / 7) * 6));
+  score += Math.min(4, Math.round((discordActive30 / 30) * 4));
+  score += recencyPoints(discordDays, 5);
 
-  // Encomendas: sinal de uso real da app.
-  score += orders > 0 ? 7 : 0;
-  score += recencyPoints(orderDays, 10);
-  score += Math.min(5, orders7 * 2);
+  // Encomendas: atividade económica/operacional.
+  score += orders > 0 ? 9 : 0;
+  score += orders7 > 0 ? 7 : 0;
+  score += recencyPoints(orderDays, 8);
 
-  // Entregas: contribuição direta para o bairro.
-  score += deliveries > 0 ? 10 : 0;
-  score += recencyPoints(deliveryDays, 14);
-  score += Math.min(9, deliveries7 * 3);
+  // Entregas: contribuição direta.
+  score += deliveries > 0 ? 12 : 0;
+  score += deliveries7 > 0 ? 10 : 0;
+  score += Math.min(8, deliveries7 * 2);
+  score += recencyPoints(deliveryDays, 10);
 
-  // Regularidade geral: dias diferentes com ações nos últimos 7/30 dias.
-  score += Math.min(12, Math.round((active7 / 7) * 12));
-  score += Math.min(8, Math.round((active30 / 30) * 8));
+  // Regularidade geral.
+  score += Math.min(8, Math.round((active7 / 7) * 8));
+  score += Math.min(7, Math.round((active30 / 30) * 7));
+  score += recencyPoints(activityDays, 6);
 
-  // Recência geral.
-  score += recencyPoints(activityDays, 8);
-
-  // Penalizações fortes para silêncio total/recente.
-  if (!row.last_discord_message_at) score -= 12;
-  else if (discordDays != null && discordDays > 7) score -= 8;
-  if (!row.portal_created_at) score -= 8;
-  if (orders === 0) score -= 6;
-  if (deliveries === 0) score -= 10;
+  // Penalização leve apenas quando existe abandono claro, não por dados novos ausentes.
+  if (activityDays != null && activityDays > 14) score -= 10;
+  if (activityDays != null && activityDays > 30) score -= 15;
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function classify(score: number, row: RawActivityMember): { key: ActivityStatusKey; label: string } {
-  const hasNothing = !row.portal_created_at && num(row.order_count) === 0 && num(row.delivery_count) === 0 && num(row.discord_message_count_30d) === 0;
   const activityDays = daysSince(row.last_activity_at);
-  const discordDays = daysSince(row.last_discord_message_at);
-  if (hasNothing || activityDays == null || activityDays >= 14) return { key: "critical", label: "Crítico" };
-  if ((discordDays == null || discordDays > 14) && score < 55) return { key: "critical", label: "Crítico" };
-  if (score >= 85) return { key: "extreme", label: "Extremamente ativo" };
-  if (score >= 65) return { key: "active", label: "Ativo" };
-  if (score >= 40) return { key: "irregular", label: "Irregular" };
-  return { key: "inactive", label: "Inativo" };
+  const anyRecent7 = num(row.discord_message_count_7d) > 0
+    || num(row.order_count_7d) > 0
+    || num(row.delivery_count_7d) > 0
+    || (activityDays != null && activityDays <= 7);
+
+  if (!hasAnyActivity(row)) return { key: "critical", label: "Sem atividade" };
+  if (activityDays != null && activityDays > 30) return { key: "inactive", label: "Parado" };
+  if (activityDays != null && activityDays > 14 && score < 55) return { key: "inactive", label: "Parado" };
+  if (score >= 80) return { key: "extreme", label: "Muito ativo" };
+  if (score >= 55 || anyRecent7) return { key: "active", label: "Ativo / OK" };
+  return { key: "irregular", label: "Alguma atividade" };
 }
 
 function buildFlags(row: RawActivityMember): { flags: string[]; risk_reasons: string[] } {
@@ -180,43 +191,26 @@ function buildFlags(row: RawActivityMember): { flags: string[]; risk_reasons: st
   const lastDelivery = daysSince(row.last_delivery_at);
   const lastPortal = daysSince(row.portal_last_seen_at);
 
-  if (!row.portal_created_at) {
-    flags.push("Nunca entrou no portal");
-    risk.push("sem acesso/uso do site");
-  } else if (lastPortal != null && lastPortal > 7) {
-    flags.push(`Portal parado há ${lastPortal} dias`);
+  if (!hasAnyActivity(row)) {
+    flags.push("Sem atividade de todo");
+    risk.push("sem portal, Discord, encomendas ou entregas registadas");
+    return { flags, risk_reasons: risk };
   }
 
-  if (!row.last_discord_message_at) {
-    flags.push("Nunca falou no Discord desde o tracking");
-    risk.push("sem mensagens Discord");
-  } else if (lastDiscord != null && lastDiscord > 7) {
-    flags.push(`Sem mensagens há ${lastDiscord} dias`);
-    risk.push("silêncio no Discord há mais de 7 dias");
-  }
+  if (!row.portal_created_at) flags.push("Nunca entrou no portal");
+  else if (lastPortal != null && lastPortal > 14) flags.push(`Portal parado há ${lastPortal} dias`);
 
-  if (num(row.order_count) === 0) {
-    flags.push("Nunca fez encomenda");
-    risk.push("sem encomendas");
-  } else if (lastOrder != null && lastOrder > 7) {
-    flags.push(`Sem encomendas há ${lastOrder} dias`);
-  }
+  if (!row.last_discord_message_at) flags.push("Sem mensagens registadas");
+  else if (lastDiscord != null && lastDiscord > 14) flags.push(`Sem mensagens há ${lastDiscord} dias`);
 
-  if (num(row.delivery_count) === 0) {
-    flags.push("Nunca fez entrega");
-    risk.push("sem entregas");
-  } else if (lastDelivery != null && lastDelivery > 7) {
-    flags.push(`Sem entregas há ${lastDelivery} dias`);
-  }
+  if (num(row.order_count) === 0) flags.push("Nunca fez encomenda");
+  else if (lastOrder != null && lastOrder > 14) flags.push(`Sem encomendas há ${lastOrder} dias`);
 
-  if (lastActivity == null) {
-    flags.push("Sem atividade registada");
-  } else if (lastActivity > 7) {
-    flags.push(`Nada registado há ${lastActivity} dias`);
-  }
+  if (num(row.delivery_count) === 0) flags.push("Nunca fez entrega");
+  else if (lastDelivery != null && lastDelivery > 14) flags.push(`Sem entregas há ${lastDelivery} dias`);
 
-  if (num(row.active_days_7) === 0) flags.push("0 dias ativos nos últimos 7 dias");
-  if (num(row.discord_active_days_7) === 0) flags.push("0 dias com mensagens nos últimos 7 dias");
+  if (lastActivity != null && lastActivity > 7) flags.push(`Última atividade há ${lastActivity} dias`);
+  if (num(row.active_days_7) === 0) flags.push("0 dias ativos em 7 dias");
 
   return { flags, risk_reasons: risk };
 }
