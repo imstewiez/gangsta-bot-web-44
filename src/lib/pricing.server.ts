@@ -41,6 +41,32 @@ function decorateMember(member: MemberRecord, viewAs?: { actual_member_id: numbe
   };
 }
 
+function explicitManagerMember(role: "superadmin" | "admin", displayName?: string | null): CurrentMember {
+  const tier = role === "superadmin" ? "manda_chuva" : "kingpin";
+  const member: MemberRecord = {
+    id: 0,
+    discord_id: null,
+    display_name: displayName ?? role,
+    tier,
+    role_label: tier,
+  };
+  return decorateMember(member);
+}
+
+async function getExplicitManagementRole(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<"superadmin" | "admin" | null> {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  const roles = new Set((data ?? []).map((r: { role: string }) => String(r.role ?? "").toLowerCase()));
+  if (roles.has("superadmin")) return "superadmin";
+  if (roles.has("admin")) return "admin";
+  return null;
+}
+
 async function getMemberByDiscord(discordId: string): Promise<MemberRecord | null> {
   return pgOne<MemberRecord>(
     `select id, discord_id, display_name, tier, coalesce(role,'bairrista') as role_label
@@ -72,9 +98,20 @@ export async function resolveActualMember(
     .select("discord_id, display_name")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!profile?.discord_id) return null;
-  const member = await getMemberByDiscord(profile.discord_id);
-  return member ? decorateMember(member) : null;
+
+  const explicitRole = await getExplicitManagementRole(supabase, userId);
+
+  if (profile?.discord_id) {
+    const member = await getMemberByDiscord(profile.discord_id);
+    if (member) {
+      const decorated = decorateMember(member);
+      if (explicitRole && !decorated.is_manager) return explicitManagerMember(explicitRole, profile.display_name ?? decorated.display_name);
+      return decorated;
+    }
+  }
+
+  if (explicitRole) return explicitManagerMember(explicitRole, profile?.display_name ?? null);
+  return null;
 }
 
 export async function resolveCurrentMember(
@@ -92,6 +129,5 @@ export async function resolveCurrentMember(
 
   const target = await getMemberById(viewAsId);
   if (!target) return actual;
-
   return decorateMember(target, { actual_member_id: actual.id, actual_display_name: actual.display_name });
 }
