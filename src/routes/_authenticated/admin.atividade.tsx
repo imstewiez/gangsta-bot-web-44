@@ -9,6 +9,7 @@ import {
   Ghost,
   Loader2,
   LogIn,
+  MessageSquare,
   PackageOpen,
   RotateCcw,
   Search,
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/admin/atividade")({
   component: ActivityPage,
 });
 
-type FilterKey = "all" | "critical" | "inactive" | "never_portal" | "never_order" | "never_delivery" | "no_activity_7d" | "extreme";
+type FilterKey = "all" | "critical" | "inactive" | "never_portal" | "never_order" | "never_delivery" | "no_discord_7d" | "no_activity_7d" | "extreme";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Todos" },
@@ -42,6 +43,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "never_portal", label: "Nunca portal" },
   { key: "never_order", label: "Nunca encomenda" },
   { key: "never_delivery", label: "Nunca entrega" },
+  { key: "no_discord_7d", label: "Sem Discord 7d" },
   { key: "no_activity_7d", label: "+7 dias parado" },
   { key: "extreme", label: "Extremos" },
 ];
@@ -92,9 +94,10 @@ function ActivityPage() {
 
       {report.data && (
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <MetricCard icon={UserX} label="Bairristas" value={report.data.summary.total_bairristas} sub="ativos na DB" />
             <MetricCard icon={Ghost} label="Críticos" value={report.data.summary.critical} tone="destructive" sub="sem histórico ou 14+ dias" />
+            <MetricCard icon={MessageSquare} label="Sem Discord" value={report.data.summary.no_discord_7d} tone="warning" sub="0 mensagens em 7 dias" />
             <MetricCard icon={LogIn} label="Nunca portal" value={report.data.summary.never_portal} tone="warning" sub="nunca entrou no site" />
             <MetricCard icon={ShoppingBag} label="Nunca encomenda" value={report.data.summary.never_order} tone="warning" sub="0 pedidos criados" />
             <MetricCard icon={PackageOpen} label="Nunca entrega" value={report.data.summary.never_delivery} tone="warning" sub="0 entregas aprovadas" />
@@ -109,7 +112,7 @@ function ActivityPage() {
                     Radar de inatividade
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Score 0-100 baseado em portal, encomendas, entregas, regularidade e última atividade. Só Bairristas: Young Blood, O Gunão e Gangster Fodido.
+                    Score 0-100 baseado em portal, mensagens Discord, encomendas, entregas, regularidade e última atividade. Só Bairristas: Young Blood, O Gunão e Gangster Fodido.
                   </p>
                 </div>
                 <div className="relative w-full lg:w-80">
@@ -154,6 +157,8 @@ function matchFilter(member: ActivityMember, filter: FilterKey) {
       return member.order_count === 0;
     case "never_delivery":
       return member.delivery_count === 0;
+    case "no_discord_7d":
+      return !member.last_discord_message_at || daysSince(member.last_discord_message_at) > 7;
     case "no_activity_7d":
       return member.days_since_activity == null || member.days_since_activity > 7;
     case "extreme":
@@ -177,8 +182,9 @@ function ActivityMemberCard({ member }: { member: ActivityMember }) {
             <Badge className={cn("text-[10px] uppercase tracking-wider", status.className)}>{status.label}</Badge>
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <div className="mt-3 grid gap-3 md:grid-cols-5">
             <MiniStat label="Última atividade" value={member.last_activity_at ? `${daysText(member.days_since_activity)} atrás` : "Nunca"} icon={Clock} />
+            <MiniStat label="Discord" value={`${fmtNum(member.discord_message_count_7d)} msgs 7d · ${fmtNum(member.discord_active_days_7)}/7 dias`} icon={MessageSquare} danger={!member.last_discord_message_at || daysSince(member.last_discord_message_at) > 7} />
             <MiniStat label="Portal" value={member.portal_created_at ? (member.portal_last_seen_at ? `${daysText(daysSince(member.portal_last_seen_at))} atrás` : "Entrou") : "Nunca entrou"} icon={LogIn} danger={!member.portal_created_at} />
             <MiniStat label="Encomendas" value={`${fmtNum(member.order_count)} total · ${fmtNum(member.order_count_7d)} em 7d`} icon={ShoppingBag} danger={member.order_count === 0} />
             <MiniStat label="Entregas" value={`${fmtNum(member.delivery_count)} total · ${fmtNum(member.delivery_count_7d)} em 7d`} icon={PackageOpen} danger={member.delivery_count === 0} />
@@ -188,7 +194,7 @@ function ActivityMemberCard({ member }: { member: ActivityMember }) {
             {member.flags.length === 0 ? (
               <span className="rounded-full border border-success/30 bg-success/10 px-2 py-1 text-xs text-success">Sem avisos</span>
             ) : (
-              member.flags.slice(0, 6).map((flag) => (
+              member.flags.slice(0, 7).map((flag) => (
                 <span key={flag} className="rounded-full border border-warning/30 bg-warning/10 px-2 py-1 text-xs text-warning">{flag}</span>
               ))
             )}
