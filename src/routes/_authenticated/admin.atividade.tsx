@@ -14,6 +14,7 @@ import {
   Search,
   ShoppingBag,
   UserX,
+  type LucideIcon,
 } from "lucide-react";
 
 import { useAuthedServerFn } from "@/lib/authed-server-fn";
@@ -24,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { fmtDate, fmtNum, TIER_LABELS } from "@/lib/domain";
+import { fmtNum, TIER_LABELS } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin/atividade")({
@@ -213,7 +214,7 @@ function ActivityMemberCard({ member }: { member: ActivityMember }) {
   );
 }
 
-function MetricCard({ icon: Icon, label, value, sub, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; sub: string; tone?: "warning" | "destructive" }) {
+function MetricCard({ icon: Icon, label, value, sub, tone }: { icon: LucideIcon; label: string; value: number; sub: string; tone?: "warning" | "destructive" }) {
   const toneClass = tone === "destructive" ? "text-destructive" : tone === "warning" ? "text-warning" : "text-foreground";
   return (
     <Card className="interactive-card">
@@ -229,7 +230,7 @@ function MetricCard({ icon: Icon, label, value, sub, tone }: { icon: React.Compo
   );
 }
 
-function MiniStat({ label, value, icon: Icon, danger }: { label: string; value: string; icon: React.ComponentType<{ className?: string }>; danger?: boolean }) {
+function MiniStat({ label, value, icon: Icon, danger }: { label: string; value: string; icon: LucideIcon; danger?: boolean }) {
   return (
     <div className={cn("rounded-xl border bg-muted/20 p-3", danger ? "border-warning/35" : "border-border/40")}>
       <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
