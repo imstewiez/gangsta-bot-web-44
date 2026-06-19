@@ -47,6 +47,7 @@ export const getAuthProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ profile: Profile | null; roles: string[] }> => {
     const uid = context.userId;
+    const now = new Date().toISOString();
     const [{ data: p }, { data: r }] = await Promise.all([
       context.supabase
         .from("profiles")
@@ -55,6 +56,16 @@ export const getAuthProfile = createServerFn({ method: "GET" })
         .maybeSingle(),
       context.supabase.from("user_roles").select("role").eq("user_id", uid),
     ]);
+
+    // updated_at passa a funcionar como "última vez visto no portal".
+    // Quem nunca entrou no portal continua sem linha em profiles.
+    if (p?.user_id) {
+      void context.supabase
+        .from("profiles")
+        .update({ updated_at: now })
+        .eq("user_id", uid);
+    }
+
     const roles = new Set((r ?? []).map((x: { role: string }) => x.role));
 
     // Include implicit roles from active member tier only.
