@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pgQuery } from "./pg.server";
 import { resolveCurrentMember } from "./pricing.server";
 
-export type ActivityStatusKey = "extreme" | "active" | "irregular" | "inactive" | "critical";
+export type ActivityStatusKey = "new" | "extreme" | "active" | "irregular" | "inactive" | "critical";
 
 export type ActivityMember = {
   id: number;
@@ -12,6 +12,8 @@ export type ActivityMember = {
   discord_id: string | null;
   tier: string | null;
   joined_at: string | null;
+  days_since_joined: number | null;
+  is_new_member: boolean;
   portal_created_at: string | null;
   portal_last_seen_at: string | null;
   discord_message_count_7d: number;
@@ -40,6 +42,7 @@ export type ActivityReport = {
   generated_at: string;
   summary: {
     total_bairristas: number;
+    new_members: number;
     extreme: number;
     active: number;
     irregular: number;
@@ -81,6 +84,7 @@ type RawActivityMember = {
 };
 
 const BAIRRISTA_TIERS = ["young_blood", "o_gunao", "gangster_fodido"];
+const NEW_MEMBER_GRACE_DAYS = 7;
 
 function num(value: unknown): number {
   const n = Number(value ?? 0);
@@ -92,6 +96,11 @@ function daysSince(iso: string | null): number | null {
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return null;
   return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
+
+function isNewMember(row: RawActivityMember): boolean {
+  const joinedDays = daysSince(row.joined_at);
+  return joinedDays != null && joinedDays < NEW_MEMBER_GRACE_DAYS;
 }
 
 function recencyPoints(days: number | null, max: number): number {
@@ -128,9 +137,9 @@ function buildScore(row: RawActivityMember): number {
   const discordActive7 = num(row.discord_active_days_7);
   const discordActive30 = num(row.discord_active_days_30);
 
-  if (!hasAnyActivity(row)) return 0;
+  if (!hasAnyActivity(row)) return isNewMember(row) ? 50 : 0;
 
-  let score = 20; // base: existe algum sinal real, logo não é zero absoluto.
+  let score = isNewMember(row) ? 55 : 20;
 
   // Portal: contexto de uso da webapp. Não bloqueia nem destrói o score sozinho.
   score += row.portal_created_at ? 10 : 0;
@@ -160,9 +169,11 @@ function buildScore(row: RawActivityMember): number {
   score += Math.min(7, Math.round((active30 / 30) * 7));
   score += recencyPoints(activityDays, 6);
 
-  // Penalização leve apenas quando existe abandono claro, não por dados novos ausentes.
-  if (activityDays != null && activityDays > 14) score -= 10;
-  if (activityDays != null && activityDays > 30) score -= 15;
+  // Penalização leve apenas quando existe abandono claro, e nunca em membros novos.
+  if (!isNewMember(row)) {
+    if (activityDays != null && activityDays > 14) score -= 10;
+    if (activityDays != null && activityDays > 30) score -= 15;
+  }
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -174,6 +185,7 @@ function classify(score: number, row: RawActivityMember): { key: ActivityStatusK
     || num(row.delivery_count_7d) > 0
     || (activityDays != null && activityDays <= 7);
 
+  if (isNewMember(row)) return { key: "new", label: "Novo" };
   if (!hasAnyActivity(row)) return { key: "critical", label: "Sem atividade" };
   if (activityDays != null && activityDays > 30) return { key: "inactive", label: "Parado" };
   if (activityDays != null && activityDays > 14 && score < 55) return { key: "inactive", label: "Parado" };
@@ -190,6 +202,13 @@ function buildFlags(row: RawActivityMember): { flags: string[]; risk_reasons: st
   const lastOrder = daysSince(row.last_order_at);
   const lastDelivery = daysSince(row.last_delivery_at);
   const lastPortal = daysSince(row.portal_last_seen_at);
+  const joinedDays = daysSince(row.joined_at);
+
+  if (isNewMember(row)) {
+    flags.push(`Novo — entrou há ${joinedDays ?? 0} dias`);
+    flags.push("Não conta para inatividade ainda");
+    return { flags, risk_reasons: risk };
+  }
 
   if (!hasAnyActivity(row)) {
     flags.push("Sem atividade de todo");
@@ -324,6 +343,7 @@ export const getActivityReport = createServerFn({ method: "GET" })
       const score = buildScore(row);
       const status = classify(score, row);
       const flags = buildFlags(row);
+      const joinedDays = daysSince(row.joined_at);
       return {
         id: row.id,
         display_name: row.display_name,
@@ -331,6 +351,8 @@ export const getActivityReport = createServerFn({ method: "GET" })
         discord_id: row.discord_id,
         tier: row.tier,
         joined_at: row.joined_at,
+        days_since_joined: joinedDays,
+        is_new_member: isNewMember(row),
         portal_created_at: row.portal_created_at,
         portal_last_seen_at: row.portal_last_seen_at,
         discord_message_count_7d: num(row.discord_message_count_7d),
@@ -356,21 +378,24 @@ export const getActivityReport = createServerFn({ method: "GET" })
       };
     });
 
+    const eligible = members.filter((m) => !m.is_new_member);
+
     return {
       generated_at: new Date().toISOString(),
       summary: {
         total_bairristas: members.length,
-        extreme: members.filter((m) => m.status_key === "extreme").length,
-        active: members.filter((m) => m.status_key === "active").length,
-        irregular: members.filter((m) => m.status_key === "irregular").length,
-        inactive: members.filter((m) => m.status_key === "inactive").length,
-        critical: members.filter((m) => m.status_key === "critical").length,
-        never_portal: members.filter((m) => !m.portal_created_at).length,
-        never_order: members.filter((m) => m.order_count === 0).length,
-        never_delivery: members.filter((m) => m.delivery_count === 0).length,
-        no_discord_7d: members.filter((m) => !m.last_discord_message_at || daysSince(m.last_discord_message_at) > 7).length,
-        no_activity_7d: members.filter((m) => m.days_since_activity == null || m.days_since_activity > 7).length,
-        no_activity_14d: members.filter((m) => m.days_since_activity == null || m.days_since_activity >= 14).length,
+        new_members: members.filter((m) => m.is_new_member).length,
+        extreme: eligible.filter((m) => m.status_key === "extreme").length,
+        active: eligible.filter((m) => m.status_key === "active").length,
+        irregular: eligible.filter((m) => m.status_key === "irregular").length,
+        inactive: eligible.filter((m) => m.status_key === "inactive").length,
+        critical: eligible.filter((m) => m.status_key === "critical").length,
+        never_portal: eligible.filter((m) => !m.portal_created_at).length,
+        never_order: eligible.filter((m) => m.order_count === 0).length,
+        never_delivery: eligible.filter((m) => m.delivery_count === 0).length,
+        no_discord_7d: eligible.filter((m) => !m.last_discord_message_at || daysSince(m.last_discord_message_at) > 7).length,
+        no_activity_7d: eligible.filter((m) => m.days_since_activity == null || m.days_since_activity > 7).length,
+        no_activity_14d: eligible.filter((m) => m.days_since_activity == null || m.days_since_activity >= 14).length,
       },
       members,
     };
