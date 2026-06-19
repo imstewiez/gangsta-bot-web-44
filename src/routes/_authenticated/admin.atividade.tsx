@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Search,
   ShoppingBag,
+  UserPlus,
   UserX,
   type LucideIcon,
 } from "lucide-react";
@@ -32,10 +33,11 @@ export const Route = createFileRoute("/_authenticated/admin/atividade")({
   component: ActivityPage,
 });
 
-type FilterKey = "all" | "critical" | "some" | "ok" | "never_portal" | "never_order" | "never_delivery" | "no_discord_7d" | "no_activity_7d";
+type FilterKey = "all" | "new" | "critical" | "some" | "ok" | "never_portal" | "never_order" | "never_delivery" | "no_discord_7d" | "no_activity_7d";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Todos" },
+  { key: "new", label: "Novos" },
   { key: "critical", label: "Sem atividade" },
   { key: "some", label: "Alguma atividade" },
   { key: "ok", label: "Ativos / OK" },
@@ -54,8 +56,9 @@ function ActivityPage() {
 
   const members = report.data?.members ?? [];
   const simple = useMemo(() => {
-    const ok = members.filter((m) => m.status_key === "active" || m.status_key === "extreme").length;
-    const some = members.filter((m) => m.status_key === "irregular" || m.status_key === "inactive").length;
+    const eligible = members.filter((m) => !m.is_new_member);
+    const ok = eligible.filter((m) => m.status_key === "active" || m.status_key === "extreme").length;
+    const some = eligible.filter((m) => m.status_key === "irregular" || m.status_key === "inactive").length;
     return { ok, some };
   }, [members]);
 
@@ -102,9 +105,10 @@ function ActivityPage() {
 
       {report.data && (
         <div className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
             <SummaryCard icon={UserX} label="Bairristas" value={report.data.summary.total_bairristas} sub="ativos na DB" />
-            <SummaryCard icon={Clock} label="Sem atividade" value={report.data.summary.critical} tone="destructive" sub="nada registado" />
+            <SummaryCard icon={UserPlus} label="Novos" value={report.data.summary.new_members} sub="menos de 7 dias" />
+            <SummaryCard icon={Clock} label="Sem atividade" value={report.data.summary.critical} tone="destructive" sub="exclui novos" />
             <SummaryCard icon={Activity} label="Alguma atividade" value={simple.some} tone="warning" sub="tem sinais, mas pouco" />
             <SummaryCard icon={CheckCircle2} label="Ativos / OK" value={simple.ok} tone="success" sub="presença clara" />
           </div>
@@ -118,7 +122,7 @@ function ActivityPage() {
                     Leitura simples
                   </CardTitle>
                   <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
-                    O objetivo é separar quem não faz nada, quem tem sinais de presença e quem está claramente ativo. Discord ajuda no contexto, mas não condena sozinho porque o tracking começou agora.
+                    Quem entrou há menos de 7 dias aparece como Novo e não conta para inatividade. Depois desse período, o sistema separa quem não faz nada, quem tem sinais de presença e quem está claramente ativo.
                   </p>
                 </div>
                 <div className="relative w-full lg:w-80">
@@ -159,22 +163,24 @@ function ActivityPage() {
 
 function matchFilter(member: ActivityMember, filter: FilterKey) {
   switch (filter) {
+    case "new":
+      return member.is_new_member;
     case "critical":
-      return member.status_key === "critical";
+      return !member.is_new_member && member.status_key === "critical";
     case "some":
-      return member.status_key === "irregular" || member.status_key === "inactive";
+      return !member.is_new_member && (member.status_key === "irregular" || member.status_key === "inactive");
     case "ok":
-      return member.status_key === "active" || member.status_key === "extreme";
+      return !member.is_new_member && (member.status_key === "active" || member.status_key === "extreme");
     case "never_portal":
-      return !member.portal_created_at;
+      return !member.is_new_member && !member.portal_created_at;
     case "never_order":
-      return member.order_count === 0;
+      return !member.is_new_member && member.order_count === 0;
     case "never_delivery":
-      return member.delivery_count === 0;
+      return !member.is_new_member && member.delivery_count === 0;
     case "no_discord_7d":
-      return !member.last_discord_message_at || daysSince(member.last_discord_message_at) > 7;
+      return !member.is_new_member && (!member.last_discord_message_at || daysSince(member.last_discord_message_at) > 7);
     case "no_activity_7d":
-      return member.days_since_activity == null || member.days_since_activity > 7;
+      return !member.is_new_member && (member.days_since_activity == null || member.days_since_activity > 7);
     default:
       return true;
   }
@@ -194,7 +200,11 @@ function ActivityRow({ member }: { member: ActivityMember }) {
           </Link>
           <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{TIER_LABELS[member.tier ?? ""] ?? member.tier ?? "—"}</Badge>
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">Última atividade: {member.last_activity_at ? `${daysText(member.days_since_activity)} atrás` : "nunca"}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {member.is_new_member
+            ? `Entrou há ${daysText(member.days_since_joined)}`
+            : `Última atividade: ${member.last_activity_at ? `${daysText(member.days_since_activity)} atrás` : "nunca"}`}
+        </div>
       </div>
 
       <div>
@@ -204,9 +214,9 @@ function ActivityRow({ member }: { member: ActivityMember }) {
       <div className="space-y-2">
         <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-4 xl:grid-cols-4">
           <Signal icon={MessageSquare} label="Discord" value={`${fmtNum(member.discord_message_count_7d)} msgs`} />
-          <Signal icon={LogIn} label="Portal" value={member.portal_created_at ? "entrou" : "nunca"} muted={!member.portal_created_at} />
-          <Signal icon={ShoppingBag} label="Encomendas" value={`${fmtNum(member.order_count)}`} muted={member.order_count === 0} />
-          <Signal icon={PackageOpen} label="Entregas" value={`${fmtNum(member.delivery_count)}`} muted={member.delivery_count === 0} />
+          <Signal icon={LogIn} label="Portal" value={member.portal_created_at ? "entrou" : "nunca"} muted={!member.portal_created_at && !member.is_new_member} />
+          <Signal icon={ShoppingBag} label="Encomendas" value={`${fmtNum(member.order_count)}`} muted={member.order_count === 0 && !member.is_new_member} />
+          <Signal icon={PackageOpen} label="Entregas" value={`${fmtNum(member.delivery_count)}`} muted={member.delivery_count === 0 && !member.is_new_member} />
         </div>
         <div className="text-xs text-muted-foreground">{mainSignals}</div>
         {flags.length > 0 && (
@@ -219,13 +229,14 @@ function ActivityRow({ member }: { member: ActivityMember }) {
       <div className="xl:text-right">
         <div className={cn("text-2xl font-black tabular-nums", status.textClass)}>{member.score}</div>
         <Progress value={member.score} className="mt-1 h-2 xl:ml-auto xl:w-28" />
-        <div className="mt-1 text-[11px] text-muted-foreground">{fmtNum(member.active_days_7)}/7 dias</div>
+        <div className="mt-1 text-[11px] text-muted-foreground">{member.is_new_member ? "período inicial" : `${fmtNum(member.active_days_7)}/7 dias`}</div>
       </div>
     </div>
   );
 }
 
 function buildSignalText(member: ActivityMember) {
+  if (member.is_new_member) return `Novo no bairro — só entra na avaliação de inatividade depois de 7 dias.`;
   if (member.status_key === "critical") return "Sem sinais reais: portal, Discord, encomendas e entregas a zero.";
   const bits: string[] = [];
   if (member.discord_message_count_7d > 0) bits.push(`${fmtNum(member.discord_message_count_7d)} mensagens em 7d`);
@@ -266,14 +277,17 @@ function statusRank(key: ActivityStatusKey) {
     case "critical": return 0;
     case "inactive": return 1;
     case "irregular": return 2;
-    case "active": return 3;
-    case "extreme": return 4;
-    default: return 5;
+    case "new": return 3;
+    case "active": return 4;
+    case "extreme": return 5;
+    default: return 6;
   }
 }
 
 function statusStyle(key: ActivityStatusKey) {
   switch (key) {
+    case "new":
+      return { label: "Novo", className: "border-primary/40 bg-primary/10 text-primary", textClass: "text-primary" };
     case "extreme":
       return { label: "Muito ativo", className: "border-success/40 bg-success/10 text-success", textClass: "text-success" };
     case "active":
