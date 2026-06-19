@@ -14,6 +14,11 @@ export type ActivityMember = {
   joined_at: string | null;
   portal_created_at: string | null;
   portal_last_seen_at: string | null;
+  discord_message_count_7d: number;
+  discord_message_count_30d: number;
+  discord_active_days_7: number;
+  discord_active_days_30: number;
+  last_discord_message_at: string | null;
   order_count: number;
   order_count_7d: number;
   last_order_at: string | null;
@@ -43,6 +48,7 @@ export type ActivityReport = {
     never_portal: number;
     never_order: number;
     never_delivery: number;
+    no_discord_7d: number;
     no_activity_7d: number;
     no_activity_14d: number;
   };
@@ -58,6 +64,11 @@ type RawActivityMember = {
   joined_at: string | null;
   portal_created_at: string | null;
   portal_last_seen_at: string | null;
+  discord_message_count_7d: number | string | null;
+  discord_message_count_30d: number | string | null;
+  discord_active_days_7: number | string | null;
+  discord_active_days_30: number | string | null;
+  last_discord_message_at: string | null;
   order_count: number | string | null;
   order_count_7d: number | string | null;
   last_order_at: string | null;
@@ -94,6 +105,7 @@ function recencyPoints(days: number | null, max: number): number {
 
 function buildScore(row: RawActivityMember): number {
   const portalDays = daysSince(row.portal_last_seen_at);
+  const discordDays = daysSince(row.last_discord_message_at);
   const orderDays = daysSince(row.last_order_at);
   const deliveryDays = daysSince(row.last_delivery_at);
   const activityDays = daysSince(row.last_activity_at);
@@ -103,37 +115,56 @@ function buildScore(row: RawActivityMember): number {
   const active30 = num(row.active_days_30);
   const deliveries7 = num(row.delivery_count_7d);
   const orders7 = num(row.order_count_7d);
+  const messages7 = num(row.discord_message_count_7d);
+  const discordActive7 = num(row.discord_active_days_7);
+  const discordActive30 = num(row.discord_active_days_30);
 
   let score = 0;
 
-  // Portal: importante, mas não suficiente.
-  score += row.portal_created_at ? 8 : 0;
-  score += recencyPoints(portalDays, 7);
+  // Portal: uso real da webapp.
+  score += row.portal_created_at ? 7 : 0;
+  score += recencyPoints(portalDays, 6);
+
+  // Discord: contexto diário. Não substitui entregas, mas ausência pesa.
+  score += messages7 > 0 ? 8 : 0;
+  score += Math.min(7, Math.floor(messages7 / 5));
+  score += Math.min(7, Math.round((discordActive7 / 7) * 7));
+  score += Math.min(5, Math.round((discordActive30 / 30) * 5));
+  score += recencyPoints(discordDays, 7);
 
   // Encomendas: sinal de uso real da app.
-  score += orders > 0 ? 8 : 0;
-  score += recencyPoints(orderDays, 12);
+  score += orders > 0 ? 7 : 0;
+  score += recencyPoints(orderDays, 10);
   score += Math.min(5, orders7 * 2);
 
   // Entregas: contribuição direta para o bairro.
   score += deliveries > 0 ? 10 : 0;
-  score += recencyPoints(deliveryDays, 15);
-  score += Math.min(10, deliveries7 * 3);
+  score += recencyPoints(deliveryDays, 14);
+  score += Math.min(9, deliveries7 * 3);
 
-  // Regularidade: dias diferentes com ações nos últimos 7/30 dias.
-  score += Math.min(15, Math.round((active7 / 7) * 15));
-  score += Math.min(10, Math.round((active30 / 30) * 10));
+  // Regularidade geral: dias diferentes com ações nos últimos 7/30 dias.
+  score += Math.min(12, Math.round((active7 / 7) * 12));
+  score += Math.min(8, Math.round((active30 / 30) * 8));
 
   // Recência geral.
-  score += recencyPoints(activityDays, 10);
+  score += recencyPoints(activityDays, 8);
+
+  // Penalizações fortes para silêncio total/recente.
+  if (!row.last_discord_message_at) score -= 12;
+  else if (discordDays != null && discordDays > 7) score -= 8;
+  if (!row.portal_created_at) score -= 8;
+  if (orders === 0) score -= 6;
+  if (deliveries === 0) score -= 10;
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function classify(score: number, row: RawActivityMember): { key: ActivityStatusKey; label: string } {
-  const hasNothing = !row.portal_created_at && num(row.order_count) === 0 && num(row.delivery_count) === 0;
+  const hasNothing = !row.portal_created_at && num(row.order_count) === 0 && num(row.delivery_count) === 0 && num(row.discord_message_count_30d) === 0;
   const activityDays = daysSince(row.last_activity_at);
+  const discordDays = daysSince(row.last_discord_message_at);
   if (hasNothing || activityDays == null || activityDays >= 14) return { key: "critical", label: "Crítico" };
+  if ((discordDays == null || discordDays > 14) && score < 55) return { key: "critical", label: "Crítico" };
   if (score >= 85) return { key: "extreme", label: "Extremamente ativo" };
   if (score >= 65) return { key: "active", label: "Ativo" };
   if (score >= 40) return { key: "irregular", label: "Irregular" };
@@ -144,6 +175,7 @@ function buildFlags(row: RawActivityMember): { flags: string[]; risk_reasons: st
   const flags: string[] = [];
   const risk: string[] = [];
   const lastActivity = daysSince(row.last_activity_at);
+  const lastDiscord = daysSince(row.last_discord_message_at);
   const lastOrder = daysSince(row.last_order_at);
   const lastDelivery = daysSince(row.last_delivery_at);
   const lastPortal = daysSince(row.portal_last_seen_at);
@@ -153,6 +185,14 @@ function buildFlags(row: RawActivityMember): { flags: string[]; risk_reasons: st
     risk.push("sem acesso/uso do site");
   } else if (lastPortal != null && lastPortal > 7) {
     flags.push(`Portal parado há ${lastPortal} dias`);
+  }
+
+  if (!row.last_discord_message_at) {
+    flags.push("Nunca falou no Discord desde o tracking");
+    risk.push("sem mensagens Discord");
+  } else if (lastDiscord != null && lastDiscord > 7) {
+    flags.push(`Sem mensagens há ${lastDiscord} dias`);
+    risk.push("silêncio no Discord há mais de 7 dias");
   }
 
   if (num(row.order_count) === 0) {
@@ -176,6 +216,7 @@ function buildFlags(row: RawActivityMember): { flags: string[]; risk_reasons: st
   }
 
   if (num(row.active_days_7) === 0) flags.push("0 dias ativos nos últimos 7 dias");
+  if (num(row.discord_active_days_7) === 0) flags.push("0 dias com mensagens nos últimos 7 dias");
 
   return { flags, risk_reasons: risk };
 }
@@ -201,6 +242,15 @@ export const getActivityReport = createServerFn({ method: "GET" })
          from profiles p
          where p.discord_id is not null
          group by p.discord_id
+       ), discord_agg as (
+         select d.discord_id,
+                coalesce(sum(d.message_count) filter (where d.activity_date >= current_date - 6), 0)::int as discord_message_count_7d,
+                coalesce(sum(d.message_count) filter (where d.activity_date >= current_date - 29), 0)::int as discord_message_count_30d,
+                count(distinct d.activity_date) filter (where d.activity_date >= current_date - 6)::int as discord_active_days_7,
+                count(distinct d.activity_date) filter (where d.activity_date >= current_date - 29)::int as discord_active_days_30,
+                max(d.last_message_at) as last_discord_message_at
+         from discord_member_daily_activity d
+         group by d.discord_id
        ), orders_agg as (
          select o.member_id,
                 count(distinct coalesce(nullif(o.batch_id, ''), o.id::text))::int as order_count,
@@ -233,6 +283,11 @@ export const getActivityReport = createServerFn({ method: "GET" })
          join portal p on p.discord_id = b.discord_id
          where p.portal_last_seen_at is not null
          union all
+         select b.id as member_id, da.last_discord_message_at as at
+         from bairristas b
+         join discord_agg da on da.discord_id = b.discord_id
+         where da.last_discord_message_at is not null
+         union all
          select member_id, created_at as at from orders where member_id is not null
          union all
          select member_id, created_at as at from delivery_movements
@@ -247,6 +302,11 @@ export const getActivityReport = createServerFn({ method: "GET" })
        select b.id, b.display_name, b.nickname, b.discord_id, b.tier, b.joined_at,
               p.portal_created_at,
               p.portal_last_seen_at,
+              coalesce(da.discord_message_count_7d, 0)::int as discord_message_count_7d,
+              coalesce(da.discord_message_count_30d, 0)::int as discord_message_count_30d,
+              coalesce(da.discord_active_days_7, 0)::int as discord_active_days_7,
+              coalesce(da.discord_active_days_30, 0)::int as discord_active_days_30,
+              da.last_discord_message_at,
               coalesce(o.order_count, 0)::int as order_count,
               coalesce(o.order_count_7d, 0)::int as order_count_7d,
               o.last_order_at,
@@ -258,6 +318,7 @@ export const getActivityReport = createServerFn({ method: "GET" })
               a.last_activity_at
        from bairristas b
        left join portal p on p.discord_id = b.discord_id
+       left join discord_agg da on da.discord_id = b.discord_id
        left join orders_agg o on o.member_id = b.id
        left join deliveries_agg d on d.member_id = b.id
        left join activity_agg a on a.member_id = b.id
@@ -278,6 +339,11 @@ export const getActivityReport = createServerFn({ method: "GET" })
         joined_at: row.joined_at,
         portal_created_at: row.portal_created_at,
         portal_last_seen_at: row.portal_last_seen_at,
+        discord_message_count_7d: num(row.discord_message_count_7d),
+        discord_message_count_30d: num(row.discord_message_count_30d),
+        discord_active_days_7: num(row.discord_active_days_7),
+        discord_active_days_30: num(row.discord_active_days_30),
+        last_discord_message_at: row.last_discord_message_at,
         order_count: num(row.order_count),
         order_count_7d: num(row.order_count_7d),
         last_order_at: row.last_order_at,
@@ -308,6 +374,7 @@ export const getActivityReport = createServerFn({ method: "GET" })
         never_portal: members.filter((m) => !m.portal_created_at).length,
         never_order: members.filter((m) => m.order_count === 0).length,
         never_delivery: members.filter((m) => m.delivery_count === 0).length,
+        no_discord_7d: members.filter((m) => !m.last_discord_message_at || daysSince(m.last_discord_message_at) > 7).length,
         no_activity_7d: members.filter((m) => m.days_since_activity == null || m.days_since_activity > 7).length,
         no_activity_14d: members.filter((m) => m.days_since_activity == null || m.days_since_activity >= 14).length,
       },
