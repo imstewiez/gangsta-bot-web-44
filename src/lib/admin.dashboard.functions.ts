@@ -25,8 +25,10 @@ export type OrderCycle = {
 
 const ACTIVE_ORDER_STATUSES = ["pending", "approved", "in_progress", "ready"];
 
-function orderVisibilitySql(me: { id: number; is_superadmin?: boolean | null }) {
-  return me.is_superadmin ? { sql: "", params: [] as unknown[] } : { sql: " and o.responsavel_member_id = $1", params: [me.id] as unknown[] };
+function orderVisibilitySql() {
+  // Incidente: nunca esconder encomendas da chefia no painel.
+  // A página de gestão deve mostrar o estado real global, não apenas encomendas atribuídas ao utilizador atual.
+  return { sql: "", params: [] as unknown[] };
 }
 
 function currentOrderValueSql(alias = "o", itemAlias = "i") {
@@ -49,7 +51,7 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const me = await resolveCurrentMember(context.supabase, context.userId);
     if (!me?.is_manager) throw new Error("Acesso restrito à direção.");
-    const visibility = orderVisibilitySql(me);
+    const visibility = orderVisibilitySql();
 
     const [totalMembers, activeMembers, pendingOrders, pendingDeliveries, lowStock, totalInventoryValue, weeklyRevenue, inactiveMembers] = await Promise.all([
       pgOne<{ count: number }>(`select count(*)::int as count from members where deleted_at is null`).catch(() => ({ count: 0 })),
@@ -64,9 +66,7 @@ export const getChefiaKpis = createServerFn({ method: "GET" })
       pgOne<{ count: number }>(
         `select count(*)::int as count
          from inventory_delivery_requests r
-         where r.status = 'pending'
-         ${me.is_superadmin ? "" : "and r.responsavel_member_id = $1"}`,
-        me.is_superadmin ? [] : [me.id],
+         where r.status = 'pending'`,
       ).catch(() => ({ count: 0 })),
       pgQuery<{ name: string; balance: number }>(
         `with visible_items as (
@@ -160,7 +160,7 @@ export const getOrderCycles = createServerFn({ method: "GET" })
     const me = await resolveCurrentMember(context.supabase, context.userId);
     const isChefia = me?.tier === "kingpin" || me?.tier === "manda_chuva" || me?.is_superadmin || me?.role_label === "kingpin" || me?.role_label === "manda_chuva";
     if (!isChefia || !me) throw new Error("Acesso restrito. Apenas Kingpin e Manda-Chuva.");
-    const visibility = orderVisibilitySql(me);
+    const visibility = orderVisibilitySql();
     const statusParamIndex = visibility.params.length + 1;
 
     const baseVisibleOrdersSql = `
@@ -230,14 +230,14 @@ export const getOrderCycles = createServerFn({ method: "GET" })
       [...visibility.params, ACTIVE_ORDER_STATUSES],
     ).catch(() => []);
 
-    return cycles.map((c) => ({
-      ...c,
-      items: items.filter((i) => i.cycle_start === c.cycle_start).map((i) => ({
-        item_name: i.item_name,
-        quantity: i.quantity,
-        revenue: i.revenue,
-        cost: i.cost,
-        profit: i.profit,
+    return cycles.map((cycle) => ({
+      ...cycle,
+      items: items.filter((item) => item.cycle_start === cycle.cycle_start).map((item) => ({
+        item_name: item.item_name,
+        quantity: item.quantity,
+        revenue: item.revenue,
+        cost: item.cost,
+        profit: item.profit,
       })),
     }));
   });
