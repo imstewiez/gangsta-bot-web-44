@@ -268,10 +268,7 @@ export const listOrders = createServerFn({ method: "GET" })
       conds.push(`o.member_id = $${params.length}`);
     } else {
       if (!me?.is_manager) return [];
-      if (!me.is_superadmin) {
-        params.push(me.id);
-        conds.push(`o.responsavel_member_id = $${params.length}`);
-      }
+      // Gestão/chefia deve ver todas as encomendas, não apenas as atribuídas ao utilizador atual.
     }
 
     if (data.statuses) {
@@ -318,7 +315,7 @@ export const listOrders = createServerFn({ method: "GET" })
          left join items i on i.id = o.item_id
         ${where}
         order by o.created_at desc
-        limit 200`,
+        limit 300`,
       params,
     );
 
@@ -460,9 +457,6 @@ export const transitionOrder = createServerFn({ method: "POST" })
     }>(`select status, member_id, item_id, quantity, batch_id, responsavel_member_id from orders where id=$1`, [data.id]);
     if (!order) throw new Error("Encomenda não encontrada");
     if (!order.responsavel_member_id) throw new Error("Encomenda sem responsável. Define um responsável antes de tratar.");
-    if (!me.is_superadmin && order.responsavel_member_id !== me.id) {
-      throw new Error("Sem permissão — só o responsável pode tratar esta encomenda");
-    }
     if (TERMINAL_STATUSES.has(order.status as OrderStatus)) throw new Error("Encomenda já fechada");
     if (!ALLOWED_TRANSITIONS[order.status]?.includes(data.to)) throw new Error("Transição inválida");
 
@@ -555,7 +549,7 @@ export const addOrderComment = createServerFn({ method: "POST" })
     await pgQuery(
       `insert into order_comments (order_id, author_id, author_name, content, created_at)
        values ($1,$2,$3,$4,now())`,
-      [data.order_id, me.id, me.display_name ?? me.nickname ?? null, data.content],
+      [data.order_id, me.id, me.display_name ?? null, data.content],
     );
 
     return { ok: true };
