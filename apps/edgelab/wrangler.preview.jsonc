@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "edgelab-preview",
+  "compatibility_date": "2026-05-12",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/server.ts",
+  "assets": {
+    "directory": "dist/client"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "APP_NAME": "EdgeLab",
+    "SUPABASE_URL": "REPLACE_WITH_EDGELAB_SUPABASE_URL",
+    "SUPABASE_PUBLISHABLE_KEY": "REPLACE_WITH_EDGELAB_SUPABASE_PUBLISHABLE_KEY"
+  },
+  "workers_dev": true
+}
